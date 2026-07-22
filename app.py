@@ -49,6 +49,7 @@ run = st.button(
 )
 
 if run:
+    st.write("Button clicked!")
 
     if type == "fixed":
         df = pd.read_excel(file_path, sheet_name="Area & Efficiency", header=[1])
