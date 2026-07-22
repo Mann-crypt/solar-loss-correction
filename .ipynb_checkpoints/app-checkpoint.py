@@ -20,8 +20,20 @@ if uploaded_file is None:
 
 file_path = uploaded_file
 
-#Variables
-type = "fixed"
+plant_type = st.radio(
+    "Plant Type",
+    ["Fixed", "Tracking"],
+    horizontal=True
+)
+
+type = plant_type.lower()
+
+run = st.button(
+    "🚀 Run Optimization",
+    use_container_width=True
+)
+
+if run:
 
 if type == "fixed":
     df = pd.read_excel(file_path, sheet_name="Area & Efficiency", header=[1])
@@ -126,7 +138,10 @@ if type == "fixed":
     ) / 1_000_000
 
     print(f"Best Efficiency Loss = {best_loss:.2f}%")
-
+    st.metric(
+        "Efficiency Loss",
+        f"{best_loss:.2f}%"
+    )
     p = np.arange(0, 96)
     plt.figure(figsize=(14,6))
     plt.plot(p, df_fix["Fixed Power=I*Ƞ*A"], color='green', label = "Forecast", linewidth=2)
@@ -380,6 +395,23 @@ elif type == "tracking":
     print("Tracking East Limit:", Tracking_angle_lim_E)
     print("Tracking West Limit:", Tracking_angle_lim_W)
     print("Efficiency Loss:", best_loss)
+
+    st.metric(
+        "Efficiency Loss",
+        f"{best_loss:.2f}%"
+    )
+    col1,col2,col3 = st.columns(3)
+
+    col1.metric("DHI", DHI)
+    col2.metric("Start Block", GHI_Starting_Block)
+    col3.metric("Max Block", GHI_Max_Block)
+
+    col1,col2,col3 = st.columns(3)
+
+    col1.metric("End Block", GHI_Ending_Block)
+    col2.metric("East Limit", Tracking_angle_lim_E)
+    col3.metric("West Limit", Tracking_angle_lim_W)
+    
 
     # ------------------ Final Calculation Using Best Parameters ------------------
 
