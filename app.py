@@ -5,13 +5,20 @@ from scipy.optimize import differential_evolution
 from sklearn.metrics import mean_absolute_percentage_error
 import streamlit as st
 
+st.set_page_config(page_title="Solar Loss Correction", layout="wide")
+
+st.title("Solar Loss Correction")
+
 uploaded_file = st.file_uploader(
     "Upload Excel File",
     type=["xlsx"]
 )
 
-if uploaded_file is not None:
-    file_path = uploaded_file
+if uploaded_file is None:
+    st.info("Please upload an Excel (.xlsx) file to continue.")
+    st.stop()
+
+file_path = uploaded_file
 
 #Variables
 type = "fixed"
