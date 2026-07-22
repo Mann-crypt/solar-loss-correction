@@ -32,6 +32,9 @@ edited_df = st.data_editor(
     use_container_width=True,
     num_rows="fixed"
 )
+if st.button("Load Values"):
+    df_fix["GHI_Forecast"] = edited_df["GHI_Forecast"].values
+    df_fix["Actual"] = edited_df["Actual"].values
 
 plant_type = st.radio(
     "Plant Type",
