@@ -20,12 +20,6 @@ if uploaded_file is None:
 
 file_path = uploaded_file
 
-plant_type = st.radio(
-    "Plant Type",
-    ["Fixed", "Tracking"],
-    horizontal=True
-)
-
 st.subheader("Input Data")
 
 input_df = pd.DataFrame({
@@ -37,6 +31,12 @@ edited_df = st.data_editor(
     input_df,
     use_container_width=True,
     num_rows="fixed"
+)
+
+plant_type = st.radio(
+    "Plant Type",
+    ["Fixed", "Tracking"],
+    horizontal=True
 )
 
 run = st.button(
