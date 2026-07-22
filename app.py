@@ -59,7 +59,7 @@ run = st.button(
 if run:
     st.write("Button clicked!")
 
-    if type == "Fixed":
+    if plant_type == "Fixed":
         df = pd.read_excel(file_path, sheet_name="Area & Efficiency", header=[1])
         df.columns = df.columns.str.strip()
         null_indices = df[df['Module Type'].isna()].index
@@ -176,7 +176,7 @@ if run:
         plt.legend()
         plt.grid(True)
         st.pyplot(plt.gcf())
-    elif type == "Tracking":
+    elif plant_type == "Tracking":
         df = pd.read_excel(file_path, sheet_name="Area & Efficiency", header=[1])
         df.columns = df.columns.str.strip()
         null_indices = df[df['Module Type'].isna()].index
