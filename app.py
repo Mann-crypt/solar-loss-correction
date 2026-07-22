@@ -33,6 +33,20 @@ run = st.button(
     use_container_width=True
 )
 
+st.subheader("Input Data")
+
+input_df = pd.DataFrame({
+    "Block": np.arange(1, 97),
+    "GHI_Forecast": np.zeros(96),
+    "Actual": np.zeros(96)
+})
+
+edited_df = st.data_editor(
+    input_df,
+    use_container_width=True,
+    num_rows="fixed"
+)
+
 if run:
 
     if type == "fixed":
@@ -58,6 +72,8 @@ if run:
         month_lookup = df_tilt.set_index('Month')['Fixed'].to_dict()
 
         df_fix = pd.read_excel(file_path, sheet_name="Fixed", header=[1])
+        df_fix["GHI_Forecast"] = edited_df["GHI_Forecast"]
+        df_fix["Actual"] = edited_df["Actual"]
         df_fix.columns = df_fix.columns.str.strip()
         null_indices = df_fix[df_fix['Date'].isna()].index
         first_null_pos = df_fix.index.get_loc(null_indices[0])
@@ -84,7 +100,7 @@ if run:
         df_fix["POA fixed"] = df_fix["GHI*sin(a+b)"] / df_fix["Sin(a)"]
 
         # Maximum possible loss
-        max_loss = df["Standard PV Efficiency (%)"].min() 
+        max_loss = df["Standard PV Efficiency (%)"].min()
 
         #peak_error = abs(actual_peak - predicted_peak) / actual_peak * 100
 
