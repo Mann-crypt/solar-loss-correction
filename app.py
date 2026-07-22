@@ -20,24 +20,30 @@ if uploaded_file is None:
 
 file_path = uploaded_file
 
+# Read Fixed sheet first
+df_fix = pd.read_excel(file_path, sheet_name="Fixed", header=[1])
+df_fix.columns = df_fix.columns.str.strip()
+
+# Remove empty rows
+null_indices = df_fix[df_fix["Date"].isna()].index
+if len(null_indices) > 0:
+    first_null = df_fix.index.get_loc(null_indices[0])
+    df_fix = df_fix.iloc[:first_null]
+
 st.subheader("Input Data")
 
-input_df = pd.DataFrame({
-    "GHI_Forecast": np.zeros(96),
-    "Actual": np.zeros(96)
-})
+# Create editable table using the existing Excel data
+input_df = df_fix[["GHI_Forecast", "Actual"]].copy()
 
 edited_df = st.data_editor(
     input_df,
     use_container_width=True,
-    num_rows="fixed"
+    hide_index=True
 )
-if st.button("Load Values"):
-    df_fix = pd.read_excel(file_path, sheet_name="Fixed", header=[1])
-    df_fix["GHI_Forecast"] = edited_df["GHI_Forecast"].values
-    df_fix["Actual"] = edited_df["Actual"].values
-    st.write(len(df_fix))
-    st.write(len(edited_df))
+
+# Update df_fix directly
+df_fix["GHI_Forecast"] = edited_df["GHI_Forecast"]
+df_fix["Actual"] = edited_df["Actual"]
 
 plant_type = st.radio(
     "Plant Type",
@@ -53,7 +59,7 @@ run = st.button(
 if run:
     st.write("Button clicked!")
 
-    if type == "fixed":
+    if type == "Fixed":
         df = pd.read_excel(file_path, sheet_name="Area & Efficiency", header=[1])
         df.columns = df.columns.str.strip()
         null_indices = df[df['Module Type'].isna()].index
@@ -170,7 +176,7 @@ if run:
         plt.legend()
         plt.grid(True)
         st.pyplot(plt.gcf())
-    elif type == "tracking":
+    elif type == "Tracking":
         df = pd.read_excel(file_path, sheet_name="Area & Efficiency", header=[1])
         df.columns = df.columns.str.strip()
         null_indices = df[df['Module Type'].isna()].index
