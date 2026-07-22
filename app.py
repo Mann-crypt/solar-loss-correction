@@ -200,7 +200,7 @@ if run:
         df_fix["POA fixed"] = df_fix["GHI*sin(a+b)"] / df_fix["Sin(a)"]
 
         # Maximum possible loss
-        max_loss = df["Standard PV Efficiency (%)"].min()
+        max_loss = 10.99
 
         #peak_error = abs(actual_peak - predicted_peak) / actual_peak * 100
 
