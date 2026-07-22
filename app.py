@@ -53,12 +53,12 @@ plant_type = st.radio(
 )
 
 run = st.button(
-    "🚀 Press it Hard",
+    "🚀 Dabao Magar Pyaar Se!!",
     use_container_width=True
 )
 
 if run:
-    st.write("Ho Raha Hai!! Sabar Karo")
+    st.write("Ghurrna Band Karo Noor!!")
 
     if plant_type == "Fixed":
         df = pd.read_excel(file_path, sheet_name="Area & Efficiency", header=[1])
