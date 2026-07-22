@@ -22,6 +22,7 @@ file_path = uploaded_file
 
 # Read Fixed sheet first
 df_fix = pd.read_excel(file_path, sheet_name="Fixed", header=[1])
+df_fix["Actual"] = df_fix["Actual"].fillna(0)
 df_fix.columns = df_fix.columns.str.strip()
 
 # Remove empty rows
