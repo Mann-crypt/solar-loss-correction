@@ -170,7 +170,7 @@ if run:
             'Unnamed: 2': 'Month_Num',
             'Unnamed: 3': 'Month',
         })
-        #month_lookup = df_tilt.set_index('Month')['Fixed'].to_dict()
+        month_lookup = df_tilt.set_index('Month')['Fixed'].to_dict()
 
         df_fix = pd.read_excel(file_path, sheet_name="Fixed", header=[1])
         df_fix.columns = df_fix.columns.str.strip()
