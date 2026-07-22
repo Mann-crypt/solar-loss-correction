@@ -33,6 +33,7 @@ edited_df = st.data_editor(
     num_rows="fixed"
 )
 if st.button("Load Values"):
+    df_fix = pd.read_excel(file_path, sheet_name="Fixed", header=[1])
     df_fix["GHI_Forecast"] = edited_df["GHI_Forecast"].values
     df_fix["Actual"] = edited_df["Actual"].values
 
