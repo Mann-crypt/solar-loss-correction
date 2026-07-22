@@ -10,12 +10,12 @@ st.set_page_config(page_title="Solar Loss Correction", layout="wide")
 st.title("Solar Loss Correction")
 
 uploaded_file = st.file_uploader(
-    "Upload Excel File",
+    "Yaha Feko",
     type=["xlsx"]
 )
 
 if uploaded_file is None:
-    st.info("Please upload an Excel (.xlsx) file to continue.")
+    st.info("Pehle File toh upload krr!!!")
     st.stop()
 
 file_path = uploaded_file
