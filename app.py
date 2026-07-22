@@ -220,7 +220,7 @@ if run:
         )
 
         df_fix["Elevation angle a"] = (90 - lat + df_fix["Declination Angle ∆"])
-        df_fix["Tilt Angle b"] = df_fix["Date"].dt.strftime('%B').map(month_lookup)
+        df_fix["Tilt Angle b"] = 0
         df_fix["a+b"] = df_fix["Elevation angle a"] + df_fix["Tilt Angle b"]
         df_fix["SIN(a+b)"] = np.sin(np.radians(df_fix["a+b"]))
         df_fix["Sin(a)"] = np.sin(np.radians(df_fix["Elevation angle a"]))
