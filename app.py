@@ -26,25 +26,21 @@ plant_type = st.radio(
     horizontal=True
 )
 
+ghi = st.text_area("Paste 96 GHI values (comma separated)")
+actual = st.text_area("Paste 96 Actual values")
+
+if st.button("Load"):
+
+    ghi = np.array([float(x) for x in ghi.split(",")])
+    actual = np.array([float(x) for x in actual.split(",")])
+
+    df_fix["GHI_Forecast"] = ghi
+    df_fix["Actual"] = actual
 type = plant_type.lower()
 
 run = st.button(
     "🚀 Run Optimization",
     use_container_width=True
-)
-
-st.subheader("Input Data")
-
-input_df = pd.DataFrame({
-    "Block": np.arange(1, 97),
-    "GHI_Forecast": np.zeros(96),
-    "Actual": np.zeros(96)
-})
-
-edited_df = st.data_editor(
-    input_df,
-    use_container_width=True,
-    num_rows="fixed"
 )
 
 if run:
