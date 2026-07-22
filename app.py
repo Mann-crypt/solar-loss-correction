@@ -26,15 +26,18 @@ plant_type = st.radio(
     horizontal=True
 )
 
-ghi = st.text_area("Paste 96 GHI values (comma separated)")
-actual = st.text_area("Paste 96 Actual values")
+st.subheader("Input Data")
 
-if st.button("Load"):
+input_df = pd.DataFrame({
+    "GHI_Forecast": np.zeros(96),
+    "Actual": np.zeros(96)
+})
 
-    ghi = np.array([float(x) for x in ghi.split(",")])
-    actual = np.array([float(x) for x in actual.split(",")])
-
-type = plant_type.lower()
+edited_df = st.data_editor(
+    input_df,
+    use_container_width=True,
+    num_rows="fixed"
+)
 
 run = st.button(
     "🚀 Run Optimization",
@@ -66,8 +69,8 @@ if run:
         month_lookup = df_tilt.set_index('Month')['Fixed'].to_dict()
 
         df_fix = pd.read_excel(file_path, sheet_name="Fixed", header=[1])
-        df_fix["GHI_Forecast"] = ghi
-        df_fix["Actual"] = actual
+        df_fix["GHI_Forecast"] = edited_df["GHI_Forecast"]
+        df_fix["Actual"] = edited_df["Actual"]
         df_fix.columns = df_fix.columns.str.strip()
         null_indices = df_fix[df_fix['Date'].isna()].index
         first_null_pos = df_fix.index.get_loc(null_indices[0])
@@ -184,8 +187,8 @@ if run:
 
         df_fix = pd.read_excel(file_path, sheet_name="Fixed", header=[1])
         df_fix.columns = df_fix.columns.str.strip()
-        df_fix["GHI_Forecast"] = ghi
-        df_fix["Actual"] = actual
+        df_fix["GHI_Forecast"] = edited_df["GHI_Forecast"]
+        df_fix["Actual"] = edited_df["Actual"]
         df_fix["Actual"] = df_fix["Actual"].fillna(0)
         null_indices = df_fix[df_fix['Date'].isna()].index
         first_null_pos = df_fix.index.get_loc(null_indices[0])
