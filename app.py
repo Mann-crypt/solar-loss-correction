@@ -36,6 +36,8 @@ if st.button("Load Values"):
     df_fix = pd.read_excel(file_path, sheet_name="Fixed", header=[1])
     df_fix["GHI_Forecast"] = edited_df["GHI_Forecast"].values
     df_fix["Actual"] = edited_df["Actual"].values
+    st.write(len(df_fix))
+    st.write(len(edited_df))
 
 plant_type = st.radio(
     "Plant Type",
