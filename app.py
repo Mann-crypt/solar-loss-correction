@@ -18,6 +18,15 @@ if uploaded_file is None:
     st.info("Pehle File toh upload krr!!!")
     st.stop()
 
+if "last_file" not in st.session_state:
+    st.session_state.last_file = None
+
+if uploaded_file is not None:
+    if st.session_state.last_file != uploaded_file.name:
+        st.session_state.last_file = uploaded_file.name
+        st.session_state.pop("params", None)
+        st.session_state.run_model = False
+        
 file_path = uploaded_file
 
 # Read Fixed sheet first
