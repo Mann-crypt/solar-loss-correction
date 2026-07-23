@@ -447,19 +447,22 @@ if run:
         best_loss = col1.number_input(
             "Efficiency Loss (%)",
             value=float(best_loss),
-            step=0.1
+            step=0.1,
+            key="loss"
         )
 
         DHI = col2.number_input(
             "DHI (%)",
             value=int(DHI),
-            step=1
+            step=1,
+            key="dhi"
         )
 
         GHI_Starting_Block = col3.number_input(
             "Starting Block",
             value=int(GHI_Starting_Block),
-            step=1
+            step=1,
+            key="start"
         )
 
         col1, col2, col3 = st.columns(3)
@@ -467,26 +470,32 @@ if run:
         GHI_Max_Block = col1.number_input(
             "Max Block",
             value=int(GHI_Max_Block),
-            step=1
+            step=1,
+            key="max"
         )
 
         GHI_Ending_Block = col2.number_input(
             "Ending Block",
             value=int(GHI_Ending_Block),
-            step=1
+            step=1,
+            key="end"
         )
 
         Tracking_angle_lim_E = col3.number_input(
             "East Limit",
             value=int(Tracking_angle_lim_E),
-            step=1
+            step=1,
+            key="east"
         )
 
         Tracking_angle_lim_W = st.number_input(
             "West Limit",
             value=int(Tracking_angle_lim_W),
-            step=1
+            step=1,
+            key="west"
         )
+
+        update = st.button("🔄 Update Graph")
     
 
         # ------------------ Final Calculation Using Best Parameters ------------------
