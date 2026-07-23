@@ -256,12 +256,13 @@ if st.session_state.run_model:
         null_indices = df_tilt[df_tilt['Fixed'].isna()].index
         first_null_pos = df_tilt.index.get_loc(null_indices[0])
         df_tilt = df_tilt.iloc[:first_null_pos]
-        df_tilt = df_tilt.dropna(how='all', axis=1)
         df_tilt = df_tilt.rename(columns={
             'Unnamed: 2': 'Month_Num',
             'Unnamed: 3': 'Month',
         })
-        df_tilt = df_tilt.fillna(0)
+        df_tilt['Month_Num'] = df_tilt['Month_Num'].fillna(0)
+        df_tilt['Month'] = df_tilt['Month'].fillna(0)
+        df_tilt = df_tilt.dropna(how='all', axis=1)
         month_lookup = df_tilt.set_index('Month')['Fixed'].to_dict()
 
         df_fix = pd.read_excel(file_path, sheet_name="Fixed", header=[1])
