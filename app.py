@@ -425,12 +425,15 @@ if st.session_state.run_model:
 
         best = np.round(result.x).astype(int)
 
-        DHI = best[0]
-        GHI_Starting_Block = best[1]
-        GHI_Ending_Block = best[2]
-        GHI_Max_Block = best[3]
-        Tracking_angle_lim_E = best[4]
-        Tracking_angle_lim_W = best[5]
+        st.session_state.params = {
+            "loss": float(best_loss),
+            "DHI": int(best[0]),
+            "start": int(best[1]),
+            "end": int(best[2]),
+            "max": int(best[3]),
+            "east": int(best[4]),
+            "west": int(best[5]),
+        }
 
         print("Error Score:", result.fun)
         print("DHI:", DHI)
@@ -441,106 +444,116 @@ if st.session_state.run_model:
         print("Tracking West Limit:", Tracking_angle_lim_W)
         print("Efficiency Loss:", best_loss)
 
-        st.subheader("Optimized Parameters")
+        if "params" in st.session_state:
+            
+            st.subheader("Optimized Parameters")
 
-        col1, col2, col3 = st.columns(3)
+            col1, col2, col3 = st.columns(3)
 
-        best_loss = col1.number_input(
-            "Efficiency Loss (%)",
-            value=float(best_loss),
-            step=0.1,
-            key="loss"
-        )
-
-        DHI = col2.number_input(
-            "DHI (%)",
-            value=int(DHI),
-            step=1,
-            key="dhi"
-        )
-
-        GHI_Starting_Block = col3.number_input(
-            "Starting Block",
-            value=int(GHI_Starting_Block),
-            step=1,
-            key="start"
-        )
-
-        col1, col2, col3 = st.columns(3)
-
-        GHI_Max_Block = col1.number_input(
-            "Max Block",
-            value=int(GHI_Max_Block),
-            step=1,
-            key="max"
-        )
-
-        GHI_Ending_Block = col2.number_input(
-            "Ending Block",
-            value=int(GHI_Ending_Block),
-            step=1,
-            key="end"
-        )
-
-        Tracking_angle_lim_E = col3.number_input(
-            "East Limit",
-            value=int(Tracking_angle_lim_E),
-            step=1,
-            key="east"
-        )
-
-        Tracking_angle_lim_W = st.number_input(
-            "West Limit",
-            value=int(Tracking_angle_lim_W),
-            step=1,
-            key="west"
-        )
-
-        # ------------------ Final Calculation Using Best Parameters ------------------
-
-        m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
-        m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
-
-        df_bcal["DHI"] = df_fix["GHI_Forecast"] * DHI / 100
-        df_bcal["GHI - DHI"] = df_fix["GHI_Forecast"] - df_bcal["DHI"]
-
-        df_bcal["Zenith angle ( θ )"] = np.where(
-             df_bcal["Block No."] <= GHI_Max_Block,
-             np.minimum(89, m1 * (df_bcal["Block No."] - GHI_Max_Block)),
-             np.minimum(89, m2 * (df_bcal["Block No."] - GHI_Max_Block))
-          )
-
-        df_bcal["Panel Angle (α)"] = np.where(
-            df_bcal["Block No."] < GHI_Max_Block,
-            np.where(
-                df_bcal["Zenith angle ( θ )"] < abs(Tracking_angle_lim_E),
-                df_bcal["Zenith angle ( θ )"],
-                abs(Tracking_angle_lim_E)
-            ),
-            np.where(
-                (df_bcal["Block No."] > GHI_Max_Block) &
-                (df_bcal["Zenith angle ( θ )"] > Tracking_angle_lim_W),
-                Tracking_angle_lim_W,
-                df_bcal["Zenith angle ( θ )"]
+            best_loss = col1.number_input(
+                "Efficiency Loss (%)",
+                value=st.session_state.params["loss"],
+                step=0.1,
+                key="loss"
             )
-        )
 
-        df_bcal["θ - α"] = df_bcal["Zenith angle ( θ )"] - df_bcal["Panel Angle (α)"]
-        df_bcal["Cos(θ)"] = np.cos(np.radians(df_bcal["Zenith angle ( θ )"]))
-        df_bcal["Cos(α)"] = np.cos(np.radians(df_bcal["Panel Angle (α)"]))
-        df_bcal["Cos(θ - α)"] = np.cos(np.radians(df_bcal["θ - α"]))
-        df_bcal["DNI"] = df_bcal["GHI - DHI"] / df_bcal["Cos(α)"]
+            DHI = col2.number_input(
+                "DHI (%)",
+                value=st.session_state.params["DHI"],
+                step=1,
+                key="dhi"
+            )
 
-        df_trac["Fixed Power=I*Ƞ*A"] = (
-            df_bcal["DNI"] * df["Eff Area"].sum()
-        ) / 1000000
+            GHI_Starting_Block = col3.number_input(
+                "Starting Block",
+                value=st.session_state.params["start"],
+                step=1,
+                key="start"
+            )
 
-        p = np.arange(0, 96)
-        plt.figure(figsize=(14,6))
-        #plt.plot(p, df_bcal["Panel Angle (α)"], color='green', linewidth=2)
-        plt.plot(p, df_trac["Fixed Power=I*Ƞ*A"], label="Forecast", color='Blue', linewidth=2)
-        plt.plot(p, df_fix["Actual"], label="Actual", color='Red', linewidth=2)
-        plt.xlim(0, 96)
-        plt.legend()
-        plt.grid(True)
-        st.pyplot(plt.gcf())
+            col1, col2, col3 = st.columns(3)
+
+            GHI_Max_Block = col1.number_input(
+                "Max Block",
+                value=st.session_state.params["max"],
+                step=1,
+                key="max"
+            )
+
+            GHI_Ending_Block = col2.number_input(
+                "Ending Block",
+                value=st.session_state.params["end"],
+                step=1,
+                key="end"
+            )
+
+            Tracking_angle_lim_E = col3.number_input(
+                "East Limit",
+                value=st.session_state.params["east"],
+                step=1,
+                key="east"
+            )
+
+            Tracking_angle_lim_W = st.number_input(
+                "West Limit",
+                value=st.session_state.params["west"],
+                step=1,
+                key="west"
+            )
+
+            best_loss = st.session_state.loss
+            DHI = st.session_state.dhi
+            GHI_Starting_Block = st.session_state.start
+            GHI_Ending_Block = st.session_state.end
+            GHI_Max_Block = st.session_state.max
+            Tracking_angle_lim_E = st.session_state.east
+            Tracking_angle_lim_W = st.session_state.west
+        
+            # ------------------ Final Calculation Using Best Parameters ------------------
+
+            m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
+            m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
+
+            df_bcal["DHI"] = df_fix["GHI_Forecast"] * DHI / 100
+            df_bcal["GHI - DHI"] = df_fix["GHI_Forecast"] - df_bcal["DHI"]
+
+            df_bcal["Zenith angle ( θ )"] = np.where(
+                df_bcal["Block No."] <= GHI_Max_Block,
+                np.minimum(89, m1 * (df_bcal["Block No."] - GHI_Max_Block)),
+                np.minimum(89, m2 * (df_bcal["Block No."] - GHI_Max_Block))
+            )
+
+            df_bcal["Panel Angle (α)"] = np.where(
+                df_bcal["Block No."] < GHI_Max_Block,
+                np.where(
+                    df_bcal["Zenith angle ( θ )"] < abs(Tracking_angle_lim_E),
+                    df_bcal["Zenith angle ( θ )"],
+                    abs(Tracking_angle_lim_E)
+                ),
+                np.where(
+                    (df_bcal["Block No."] > GHI_Max_Block) &
+                    (df_bcal["Zenith angle ( θ )"] > Tracking_angle_lim_W),
+                    Tracking_angle_lim_W,
+                    df_bcal["Zenith angle ( θ )"]
+                )
+            )
+
+            df_bcal["θ - α"] = df_bcal["Zenith angle ( θ )"] - df_bcal["Panel Angle (α)"]
+            df_bcal["Cos(θ)"] = np.cos(np.radians(df_bcal["Zenith angle ( θ )"]))
+            df_bcal["Cos(α)"] = np.cos(np.radians(df_bcal["Panel Angle (α)"]))
+            df_bcal["Cos(θ - α)"] = np.cos(np.radians(df_bcal["θ - α"]))
+            df_bcal["DNI"] = df_bcal["GHI - DHI"] / df_bcal["Cos(α)"]
+
+            df_trac["Fixed Power=I*Ƞ*A"] = (
+                df_bcal["DNI"] * df["Eff Area"].sum()
+            ) / 1000000
+
+            p = np.arange(0, 96)
+            plt.figure(figsize=(14,6))
+            #plt.plot(p, df_bcal["Panel Angle (α)"], color='green', linewidth=2)
+            plt.plot(p, df_trac["Fixed Power=I*Ƞ*A"], label="Forecast", color='Blue', linewidth=2)
+            plt.plot(p, df_fix["Actual"], label="Actual", color='Red', linewidth=2)
+            plt.xlim(0, 96)
+            plt.legend()
+            plt.grid(True)
+            st.pyplot(plt.gcf())
