@@ -86,7 +86,6 @@ if st.button("🚀 Dabao Magar Pyaar Se!!", use_container_width=True, type="prim
     st.session_state.run_model = True
 
 if st.session_state.run_model:
-    st.write("Ghurrna Band Karo Noor!!")
 
     if plant_type == "Fixed":
         df = pd.read_excel(file_path, sheet_name="Area & Efficiency", header=[1])
