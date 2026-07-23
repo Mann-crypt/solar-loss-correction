@@ -407,24 +407,24 @@ if st.session_state.run_model:
 
         # ------------------ Optimization ------------------
 
-        result = differential_evolution(
-            objective,
-            bounds=bounds,
-            strategy="best1bin",
-            maxiter=40,
-            popsize=15,
-            tol=0.001,
-            mutation=(0.5, 1),
-            recombination=0.7,
-            seed=42,
-            polish=True,
-            workers=1        # Use -1 on Linux/macOS if multiprocessing works
-        )
-
-        # ------------------ Best Parameters ------------------
-
-        best = np.round(result.x).astype(int)
         if "params" not in st.session_state:
+
+            result = differential_evolution(
+                objective,
+                bounds=bounds,
+                strategy="best1bin",
+                maxiter=40,
+                popsize=15,
+                tol=0.001,
+                mutation=(0.5,1),
+                recombination=0.7,
+                seed=42,
+                polish=True,
+                workers=1
+            )
+
+            best = np.round(result.x).astype(int)
+
             st.session_state.params = {
                 "loss": float(best_loss),
                 "DHI": int(best[0]),
