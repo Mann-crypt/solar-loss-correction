@@ -478,6 +478,7 @@ if st.session_state.run_model:
             ]
 
             generation = {"count": 0}
+            MAX_ITER = 40
 
             def callback(xk, convergence):
                 generation["count"] += 1
@@ -501,11 +502,11 @@ if st.session_state.run_model:
                     objective,
                     bounds=bounds,
                     strategy="best1bin",
-                    maxiter=40,
+                    MAX_ITER=40,
                     popsize=15,
                     tol=0.001,
                     mutation=(0.5,1),
-                    recombination=1.7,
+                    recombination=0.7,
                     seed=42,
                     polish=True,
                     workers=1,
