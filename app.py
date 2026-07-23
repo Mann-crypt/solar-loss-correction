@@ -424,17 +424,17 @@ if st.session_state.run_model:
         # ------------------ Best Parameters ------------------
 
         best = np.round(result.x).astype(int)
-
-        st.session_state.params = {
-            "loss": float(best_loss),
-            "DHI": int(best[0]),
-            "start": int(best[1]),
-            "end": int(best[2]),
-            "max": int(best[3]),
-            "east": int(best[4]),
-            "west": int(best[5]),
-        }
-
+        if "params" not in st.session_state:
+            st.session_state.params = {
+                "loss": float(best_loss),
+                "DHI": int(best[0]),
+                "start": int(best[1]),
+                "end": int(best[2]),
+                "max": int(best[3]),
+                "east": int(best[4]),
+                "west": int(best[5]),
+            }
+        
         #print("Error Score:", result.fun)
         #print("DHI:", dhi)
         #print("GHI Starting Block:", GHI_Starting_Block)
