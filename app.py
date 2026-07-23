@@ -78,8 +78,9 @@ plant_type = st.radio(
 
 if "run_model" not in st.session_state:
     st.session_state.run_model = False
-    
+
 if st.button("🚀 Dabao Magar Pyaar Se!!"):
+    st.session_state.pop("params", None)   # Delete old optimized values
     st.session_state.run_model = True
 
 if st.session_state.run_model:
