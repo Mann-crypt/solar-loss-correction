@@ -609,12 +609,48 @@ if st.session_state.run_model:
                 df_bcal["DNI"] * df["Eff Area"].sum()
             ) / 1000000
 
-            p = np.arange(0, 96)
-            plt.figure(figsize=(14,6))
-            #plt.plot(p, df_bcal["Panel Angle (α)"], color='green', linewidth=2)
-            plt.plot(p, df_trac["Fixed Power=I*Ƞ*A"], label="Forecast", color='Blue', linewidth=2)
-            plt.plot(p, df_fix["Actual"], label="Actual", color='Red', linewidth=2)
-            plt.xlim(0, 96)
-            plt.legend()
-            plt.grid(True)
-            st.pyplot(plt.gcf())
+            x = np.arange(1, 97)
+
+            fig = go.Figure()
+
+            fig.add_trace(
+                go.Scatter(
+                    x=x,
+                    y=df_trac["Fixed Power=I*Ƞ*A"],
+                    mode="lines",
+                    name="Forecast",
+                    line=dict(color="#2563EB", width=3),
+                )
+            )
+
+            fig.add_trace(
+                go.Scatter(
+                    x=x,
+                    y=df_fix["Actual"],
+                    mode="lines",
+                    name="Actual",
+                    line=dict(color="#DC2626", width=3),
+                )
+            )
+
+            fig.update_layout(
+                title="Forecast vs Actual Power",
+                template="plotly_white",
+                height=500,
+                hovermode="x unified",
+                xaxis=dict(
+                    title="15 Minute Block",
+                    dtick=4
+                ),
+                yaxis=dict(
+                    title="Power (MW)"
+                ),
+                legend=dict(
+                    orientation="h",
+                    y=1.08,
+                    x=0
+                ),
+                margin=dict(l=20, r=20, t=60, b=20)
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
