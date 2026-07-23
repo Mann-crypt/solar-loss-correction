@@ -444,6 +444,13 @@ if st.session_state.run_model:
                 "east": int(best[4]),
                 "west": int(best[5]),
             }
+            st.session_state.loss = st.session_state.params["loss"]
+            st.session_state.dhi = st.session_state.params["DHI"]
+            st.session_state.start = st.session_state.params["start"]
+            st.session_state.end = st.session_state.params["end"]
+            st.session_state.max = st.session_state.params["max"]
+            st.session_state.east = st.session_state.params["east"]
+            st.session_state.west = st.session_state.params["west"]
         
         #print("Error Score:", result.fun)
         #print("DHI:", dhi)
@@ -455,6 +462,19 @@ if st.session_state.run_model:
         #print("Efficiency Loss:", best_loss)
 
         if "params" in st.session_state:
+            defaults = {
+                "loss": st.session_state.params["loss"],
+                "dhi": st.session_state.params["DHI"],
+                "start": st.session_state.params["start"],
+                "end": st.session_state.params["end"],
+                "max": st.session_state.params["max"],
+                "east": st.session_state.params["east"],
+                "west": st.session_state.params["west"],
+            }
+
+            for k, v in defaults.items():
+                if k not in st.session_state:
+                    st.session_state[k] = v
             
             st.subheader("Optimized Parameters")
 
@@ -462,21 +482,18 @@ if st.session_state.run_model:
 
             best_loss = col1.number_input(
                 "Efficiency Loss (%)",
-                value=st.session_state.params["loss"],
                 step=0.1,
                 key="loss"
             )
 
             DHI = col2.number_input(
                 "DHI (%)",
-                value=st.session_state.params["DHI"],
                 step=1,
                 key="dhi"
             )
 
             GHI_Starting_Block = col3.number_input(
                 "Starting Block",
-                value=st.session_state.params["start"],
                 step=1,
                 key="start"
             )
@@ -485,39 +502,35 @@ if st.session_state.run_model:
 
             GHI_Max_Block = col1.number_input(
                 "Max Block",
-                value=st.session_state.params["max"],
                 step=1,
                 key="max"
             )
 
             GHI_Ending_Block = col2.number_input(
                 "Ending Block",
-                value=st.session_state.params["end"],
                 step=1,
                 key="end"
             )
 
             Tracking_angle_lim_E = col3.number_input(
                 "East Limit",
-                value=st.session_state.params["east"],
                 step=1,
                 key="east"
             )
 
             Tracking_angle_lim_W = st.number_input(
                 "West Limit",
-                value=st.session_state.params["west"],
                 step=1,
                 key="west"
             )
 
-            best_loss = st.session_state.loss
-            DHI = st.session_state.dhi
-            GHI_Starting_Block = st.session_state.start
-            GHI_Ending_Block = st.session_state.end
-            GHI_Max_Block = st.session_state.max
-            Tracking_angle_lim_E = st.session_state.east
-            Tracking_angle_lim_W = st.session_state.west
+            #best_loss = st.session_state.loss
+            #DHI = st.session_state.dhi
+            #GHI_Starting_Block = st.session_state.start
+            #GHI_Ending_Block = st.session_state.end
+            #GHI_Max_Block = st.session_state.max
+            #Tracking_angle_lim_E = st.session_state.east
+            #Tracking_angle_lim_W = st.session_state.west
         
             # ------------------ Final Calculation Using Best Parameters ------------------
 
