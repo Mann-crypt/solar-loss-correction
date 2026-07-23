@@ -440,21 +440,53 @@ if run:
         print("Tracking West Limit:", Tracking_angle_lim_W)
         print("Efficiency Loss:", best_loss)
 
-        st.metric(
-            "Efficiency Loss",
-            f"{best_loss:.2f}%"
+        st.subheader("Optimized Parameters")
+
+        col1, col2, col3 = st.columns(3)
+
+        best_loss = col1.number_input(
+            "Efficiency Loss (%)",
+            value=float(best_loss),
+            step=0.1
         )
-        col1,col2,col3 = st.columns(3)
 
-        col1.metric("DHI", DHI)
-        col2.metric("Start Block", GHI_Starting_Block)
-        col3.metric("Max Block", GHI_Max_Block)
+        DHI = col2.number_input(
+            "DHI (%)",
+            value=int(DHI),
+            step=1
+        )
 
-        col1,col2,col3 = st.columns(3)
+        GHI_Starting_Block = col3.number_input(
+            "Starting Block",
+            value=int(GHI_Starting_Block),
+            step=1
+        )
 
-        col1.metric("End Block", GHI_Ending_Block)
-        col2.metric("East Limit", Tracking_angle_lim_E)
-        col3.metric("West Limit", Tracking_angle_lim_W)
+        col1, col2, col3 = st.columns(3)
+
+        GHI_Max_Block = col1.number_input(
+            "Max Block",
+            value=int(GHI_Max_Block),
+            step=1
+        )
+
+        GHI_Ending_Block = col2.number_input(
+            "Ending Block",
+            value=int(GHI_Ending_Block),
+            step=1
+        )
+
+        Tracking_angle_lim_E = col3.number_input(
+            "East Limit",
+            value=int(Tracking_angle_lim_E),
+            step=1
+        )
+
+        Tracking_angle_lim_W = st.number_input(
+            "West Limit",
+            value=int(Tracking_angle_lim_W),
+            step=1
+        )
     
 
         # ------------------ Final Calculation Using Best Parameters ------------------
