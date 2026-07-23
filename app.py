@@ -477,6 +477,9 @@ if st.session_state.run_model:
                 "😎 6:30 hote hi Billu MAL se faraar..."
             ]
 
+            quote_index = {"i": 0}      # <-- ADD THIS
+            iteration = {"i": 0}
+
             generation = {"count": 0}
             MAX_ITER = 40
 
