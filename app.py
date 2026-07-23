@@ -261,6 +261,7 @@ if st.session_state.run_model:
             'Unnamed: 2': 'Month_Num',
             'Unnamed: 3': 'Month',
         })
+        df_tilt = df_tilt.fillna(0)
         month_lookup = df_tilt.set_index('Month')['Fixed'].to_dict()
 
         df_fix = pd.read_excel(file_path, sheet_name="Fixed", header=[1])
