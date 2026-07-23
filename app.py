@@ -501,7 +501,7 @@ if st.session_state.run_model:
                     popsize=15,
                     tol=0.001,
                     mutation=(0.5,1),
-                    recombination=1,
+                    recombination=1.7,
                     seed=42,
                     polish=True,
                     workers=1,
