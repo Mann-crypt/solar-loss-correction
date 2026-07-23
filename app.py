@@ -573,6 +573,19 @@ if st.session_state.run_model:
             #Tracking_angle_lim_W = st.session_state.west
         
             # ------------------ Final Calculation Using Best Parameters ------------------
+            # User edited efficiency loss
+            df["Efficiency Losses(%)"] = best_loss
+
+            # Recalculate
+            df["Net Efficiency (%)"] = (
+                df["Standard PV Efficiency (%)"]
+                - df["Efficiency Losses(%)"]
+            )
+
+            df["Eff Area"] = (
+                df["Total area(m2)"]
+                * df["Net Efficiency (%)"]
+            ) / 100
 
             m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
             m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
