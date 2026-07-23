@@ -67,12 +67,13 @@ plant_type = st.radio(
     horizontal=True
 )
 
-run = st.button(
-    "🚀 Dabao Magar Pyaar Se!!",
-    use_container_width=True
-)
+if "run_model" not in st.session_state:
+    st.session_state.run_model = False
+    
+if st.button("🚀 Dabao Magar Pyaar Se!!"):
+    st.session_state.run_model = True
 
-if run:
+if st.session_state.run_model:
     st.write("Ghurrna Band Karo Noor!!")
 
     if plant_type == "Fixed":
