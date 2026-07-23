@@ -502,7 +502,7 @@ if st.session_state.run_model:
                     objective,
                     bounds=bounds,
                     strategy="best1bin",
-                    MAX_ITER=40,
+                    maxiter=MAX_ITER,
                     popsize=15,
                     tol=0.001,
                     mutation=(0.5,1),
