@@ -204,7 +204,6 @@ if st.session_state.run_model:
             go.Scatter(
                 x=x,
                 y=df_fix["Fixed Power=I*Ƞ*A"],
-                fill="tozeroy",
                 mode="lines",
                 name="Forecast",
                 line=dict(color="#3B82F6", width=3),
