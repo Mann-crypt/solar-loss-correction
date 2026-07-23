@@ -466,16 +466,16 @@ if st.session_state.run_model:
             status = st.empty()
 
             quotes = [
-                "🌞 Reading plant configuration...",
-                "📐 Calculating solar geometry...",
-                "⚡ Estimating panel efficiency...",
-                "🔍 Finding optimal efficiency loss...",
-                "🧠 Searching best tracking parameters...",
-                "📊 Comparing forecast with actual...",
-                "🚀 Running Differential Evolution...",
-                "🌤️ Asking the Sun for cooperation...",
-                "🎯 Reducing prediction error...",
-                "☕ Optimizer is working hard..."
+                "☕ Vo kehte the kya ho tum, aaj hum kehte hai tum kya ho be?",
+                "🌦 Mausam Loss Correction waala hai hi nhi..",
+                "😊 Jinke ghar sheeshe ke bane hote hai vo basement mai kapde change krte h...",
+                "😋 Thana Thaliya?",
+                "😅 Ghurrna Band Karo Noor...",
+                "🛣  Iss Weekend free ho?..",
+                "😁 Horaha bass Thoda or rukjao mere liye...",
+                "😗 Muskuraiye aap MAL mai hai...",
+                "🥱 Hum na hote toh Operations ka kya hota?..",
+                "😎 6:30 hote hi Billu MAL se faraar..."
             ]
 
             generation = {"count": 0}
