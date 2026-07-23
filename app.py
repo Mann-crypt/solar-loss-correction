@@ -8,7 +8,7 @@ import streamlit as st
 
 st.set_page_config(page_title="Solar Loss Correction", layout="wide")
 
-st.title("Kuchu Puchu - Aao Tumhari Loss Corr Kardu!!")
+st.title("Kuchu Puchu🥰 - Aao Tumhari Loss Corr Kardu!!")
 
 uploaded_file = st.file_uploader(
     "Yaha Feko",
