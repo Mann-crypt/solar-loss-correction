@@ -471,7 +471,7 @@ if st.session_state.run_model:
                 "😋 Thana Thaliya?",
                 "😅 Ghurrna Band Karo Noor...",
                 "🛣  Iss Weekend free ho?..",
-                "😁 Horaha bass Thoda or rukjao mere liye...",
+                "😁 Horaha hai bass Thoda or rukjao mere liye...",
                 "😗 Muskuraiye aap MAL mai hai...",
                 "🥱 Hum na hote toh Operations ka kya hota?..",
                 "😎 6:30 hote hi Billu MAL se faraar..."
@@ -482,11 +482,15 @@ if st.session_state.run_model:
             def callback(xk, convergence):
                 generation["count"] += 1
 
-                progress.progress(generation["count"] / 40)
+                progress.progress(generation["count"] / MAX_ITER)
+
+                # Change quote every 5 generations
+                if generation["count"] % 5 == 1:
+                    quote_index["i"] = (quote_index["i"] + 1) % len(quotes)
 
                 status.info(
-                    f"{random.choice(quotes)}\n\n"
-                    f"Generation {generation['count']} / 40"
+                    f"{quotes[quote_index['i']]}\n\n"
+                    f"Generation {generation['count']} / {MAX_ITER}"
                 )
 
                 return False
