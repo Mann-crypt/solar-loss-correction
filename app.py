@@ -516,7 +516,7 @@ if st.session_state.run_model:
             
             st.subheader("Optimized Parameters")
 
-            best_loss = col1.number_input(
+            best_loss = st.number_input(
                 "Efficiency Loss (%)",
                 step=0.1,
                 key="loss"
@@ -524,19 +524,19 @@ if st.session_state.run_model:
 
             col1, col2, col3 = st.columns(3)
 
-            DHI = col2.number_input(
+            DHI = col1.number_input(
                 "DHI (%)",
                 step=1,
                 key="dhi"
             )
 
-            GHI_Starting_Block = col3.number_input(
+            GHI_Starting_Block = col2.number_input(
                 "Starting Block",
                 step=1,
                 key="start"
             )
 
-            GHI_Ending_Block = col2.number_input(
+            GHI_Ending_Block = col3.number_input(
                 "Ending Block",
                 step=1,
                 key="end"
@@ -550,13 +550,13 @@ if st.session_state.run_model:
                 key="max"
             )
 
-            Tracking_angle_lim_E = col3.number_input(
+            Tracking_angle_lim_E = col2.number_input(
                 "East Limit",
                 step=1,
                 key="east"
             )
 
-            Tracking_angle_lim_W = st.number_input(
+            Tracking_angle_lim_W = col3.number_input(
                 "West Limit",
                 step=1,
                 key="west"
