@@ -458,21 +458,59 @@ if st.session_state.run_model:
 
         # ------------------ Optimization ------------------
 
+        import random
+
         if "params" not in st.session_state:
 
-            result = differential_evolution(
-                objective,
-                bounds=bounds,
-                strategy="best1bin",
-                maxiter=40,
-                popsize=15,
-                tol=0.001,
-                mutation=(0.5,1),
-                recombination=0.7,
-                seed=42,
-                polish=True,
-                workers=1
-            )
+            progress = st.progress(0)
+            status = st.empty()
+
+            quotes = [
+                "🌞 Reading plant configuration...",
+                "📐 Calculating solar geometry...",
+                "⚡ Estimating panel efficiency...",
+                "🔍 Finding optimal efficiency loss...",
+                "🧠 Searching best tracking parameters...",
+                "📊 Comparing forecast with actual...",
+                "🚀 Running Differential Evolution...",
+                "🌤️ Asking the Sun for cooperation...",
+                "🎯 Reducing prediction error...",
+                "☕ Optimizer is working hard..."
+            ]
+
+            generation = {"count": 0}
+
+            def callback(xk, convergence):
+                generation["count"] += 1
+
+                progress.progress(generation["count"] / 40)
+
+                status.info(
+                    f"{random.choice(quotes)}\n\n"
+                    f"Generation {generation['count']} / 40"
+                )
+
+                return False
+
+            with st.spinner("Optimizing... Please wait"):
+
+                result = differential_evolution(
+                    objective,
+                    bounds=bounds,
+                    strategy="best1bin",
+                    maxiter=40,
+                    popsize=15,
+                    tol=0.001,
+                    mutation=(0.5,1),
+                    recombination=0.7,
+                    seed=42,
+                    polish=True,
+                    workers=1,
+                    callback=callback
+                )
+
+            progress.empty()
+            status.success("✅ Optimization Complete!")
 
             best = np.round(result.x).astype(int)
 
