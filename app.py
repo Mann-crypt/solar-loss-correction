@@ -495,54 +495,51 @@ if run:
             key="west"
         )
 
-        update = st.button("🔄 Update Graph")
-    
-        if update:
-            # ------------------ Final Calculation Using Best Parameters ------------------
+        # ------------------ Final Calculation Using Best Parameters ------------------
 
-            m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
-            m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
+        m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
+        m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
 
-            df_bcal["DHI"] = df_fix["GHI_Forecast"] * DHI / 100
-            df_bcal["GHI - DHI"] = df_fix["GHI_Forecast"] - df_bcal["DHI"]
+        df_bcal["DHI"] = df_fix["GHI_Forecast"] * DHI / 100
+        df_bcal["GHI - DHI"] = df_fix["GHI_Forecast"] - df_bcal["DHI"]
 
-            df_bcal["Zenith angle ( θ )"] = np.where(
-                df_bcal["Block No."] <= GHI_Max_Block,
-                np.minimum(89, m1 * (df_bcal["Block No."] - GHI_Max_Block)),
-                np.minimum(89, m2 * (df_bcal["Block No."] - GHI_Max_Block))
+        df_bcal["Zenith angle ( θ )"] = np.where(
+             df_bcal["Block No."] <= GHI_Max_Block,
+             np.minimum(89, m1 * (df_bcal["Block No."] - GHI_Max_Block)),
+             np.minimum(89, m2 * (df_bcal["Block No."] - GHI_Max_Block))
+          )
+
+        df_bcal["Panel Angle (α)"] = np.where(
+            df_bcal["Block No."] < GHI_Max_Block,
+            np.where(
+                df_bcal["Zenith angle ( θ )"] < abs(Tracking_angle_lim_E),
+                df_bcal["Zenith angle ( θ )"],
+                abs(Tracking_angle_lim_E)
+            ),
+            np.where(
+                (df_bcal["Block No."] > GHI_Max_Block) &
+                (df_bcal["Zenith angle ( θ )"] > Tracking_angle_lim_W),
+                Tracking_angle_lim_W,
+                df_bcal["Zenith angle ( θ )"]
             )
+        )
 
-            df_bcal["Panel Angle (α)"] = np.where(
-                df_bcal["Block No."] < GHI_Max_Block,
-                np.where(
-                    df_bcal["Zenith angle ( θ )"] < abs(Tracking_angle_lim_E),
-                    df_bcal["Zenith angle ( θ )"],
-                    abs(Tracking_angle_lim_E)
-                ),
-                np.where(
-                    (df_bcal["Block No."] > GHI_Max_Block) &
-                    (df_bcal["Zenith angle ( θ )"] > Tracking_angle_lim_W),
-                    Tracking_angle_lim_W,
-                    df_bcal["Zenith angle ( θ )"]
-                )
-            )
+        df_bcal["θ - α"] = df_bcal["Zenith angle ( θ )"] - df_bcal["Panel Angle (α)"]
+        df_bcal["Cos(θ)"] = np.cos(np.radians(df_bcal["Zenith angle ( θ )"]))
+        df_bcal["Cos(α)"] = np.cos(np.radians(df_bcal["Panel Angle (α)"]))
+        df_bcal["Cos(θ - α)"] = np.cos(np.radians(df_bcal["θ - α"]))
+        df_bcal["DNI"] = df_bcal["GHI - DHI"] / df_bcal["Cos(α)"]
 
-            df_bcal["θ - α"] = df_bcal["Zenith angle ( θ )"] - df_bcal["Panel Angle (α)"]
-            df_bcal["Cos(θ)"] = np.cos(np.radians(df_bcal["Zenith angle ( θ )"]))
-            df_bcal["Cos(α)"] = np.cos(np.radians(df_bcal["Panel Angle (α)"]))
-            df_bcal["Cos(θ - α)"] = np.cos(np.radians(df_bcal["θ - α"]))
-            df_bcal["DNI"] = df_bcal["GHI - DHI"] / df_bcal["Cos(α)"]
+        df_trac["Fixed Power=I*Ƞ*A"] = (
+            df_bcal["DNI"] * df["Eff Area"].sum()
+        ) / 1000000
 
-            df_trac["Fixed Power=I*Ƞ*A"] = (
-                df_bcal["DNI"] * df["Eff Area"].sum()
-            ) / 1000000
-
-            p = np.arange(0, 96)
-            plt.figure(figsize=(14,6))
-            #plt.plot(p, df_bcal["Panel Angle (α)"], color='green', linewidth=2)
-            plt.plot(p, df_trac["Fixed Power=I*Ƞ*A"], label="Forecast", color='Blue', linewidth=2)
-            plt.plot(p, df_fix["Actual"], label="Actual", color='Red', linewidth=2)
-            plt.xlim(0, 96)
-            plt.legend()
-            plt.grid(True)
-            st.pyplot(plt.gcf())
+        p = np.arange(0, 96)
+        plt.figure(figsize=(14,6))
+        #plt.plot(p, df_bcal["Panel Angle (α)"], color='green', linewidth=2)
+        plt.plot(p, df_trac["Fixed Power=I*Ƞ*A"], label="Forecast", color='Blue', linewidth=2)
+        plt.plot(p, df_fix["Actual"], label="Actual", color='Red', linewidth=2)
+        plt.xlim(0, 96)
+        plt.legend()
+        plt.grid(True)
+        st.pyplot(plt.gcf())
