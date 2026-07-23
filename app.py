@@ -12,7 +12,8 @@ st.title("Kuchu Puchu🥰 - Aao Tumhari Loss Correction Kardu!!")
 
 uploaded_file = st.file_uploader(
     "Yaha Feko",
-    type=["xlsx"]
+    type=["xlsx"],
+    key="excel_uploader"
 )
 
 if uploaded_file is None:
