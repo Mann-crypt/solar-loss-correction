@@ -435,14 +435,14 @@ if st.session_state.run_model:
             "west": int(best[5]),
         }
 
-        print("Error Score:", result.fun)
-        print("DHI:", dhi)
-        print("GHI Starting Block:", GHI_Starting_Block)
-        print("GHI Ending Block:", GHI_Ending_Block)
-        print("GHI Max Block:", GHI_Max_Block)
-        print("Tracking East Limit:", Tracking_angle_lim_E)
-        print("Tracking West Limit:", Tracking_angle_lim_W)
-        print("Efficiency Loss:", best_loss)
+        #print("Error Score:", result.fun)
+        #print("DHI:", dhi)
+        #print("GHI Starting Block:", GHI_Starting_Block)
+        #print("GHI Ending Block:", GHI_Ending_Block)
+        #print("GHI Max Block:", GHI_Max_Block)
+        #print("Tracking East Limit:", Tracking_angle_lim_E)
+        #print("Tracking West Limit:", Tracking_angle_lim_W)
+        #print("Efficiency Loss:", best_loss)
 
         if "params" in st.session_state:
             
