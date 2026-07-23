@@ -436,7 +436,7 @@ if st.session_state.run_model:
         }
 
         print("Error Score:", result.fun)
-        print("DHI:", DHI)
+        print("DHI:", dhi)
         print("GHI Starting Block:", GHI_Starting_Block)
         print("GHI Ending Block:", GHI_Ending_Block)
         print("GHI Max Block:", GHI_Max_Block)
