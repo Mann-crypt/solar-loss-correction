@@ -476,6 +476,16 @@ if st.session_state.run_model:
                 "🥱 Hum na hote toh Operations ka kya hota?..",
                 "😎 6:30 hote hi Billu MAL se faraar..."
             ]
+            last_quote = {"text": None}
+
+            def random_quote():
+                available = [q for q in quotes if q != last_quote["text"]]
+                q = random.choice(available)
+                last_quote["text"] = q
+                return q
+
+            status = st.empty()
+            status.info(random_quote())
 
             quote_index = {"i": 0}      # <-- ADD THIS
             iteration = {"i": 0}
@@ -484,6 +494,7 @@ if st.session_state.run_model:
             MAX_ITER = 40
 
             def callback(xk, convergence):
+                status.info(random.choice(quotes))
                 generation["count"] += 1
 
                 progress.progress(generation["count"] / MAX_ITER)
