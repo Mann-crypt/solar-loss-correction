@@ -546,19 +546,6 @@ if st.session_state.run_model:
             st.session_state.max = st.session_state.params["max"]
             st.session_state.east = st.session_state.params["east"]
             st.session_state.west = st.session_state.params["west"]
-
-            copy_text = "\t".join([
-                #str(st.session_state.loss),
-                str(st.session_state.dhi),
-                str(st.session_state.start),
-                str(st.session_state.max),
-                str(st.session_state.end),
-                str(st.session_state.east),
-                str(st.session_state.west),
-            ])
-
-            st.subheader("Copy Parameters")
-            st.code(copy_text, language=None)
         
         #print("Error Score:", result.fun)
         #print("DHI:", dhi)
@@ -599,18 +586,21 @@ if st.session_state.run_model:
                 step=1,
                 key="dhi"
             )
+            col1.code(str(int(DHI)), language=None)
 
             GHI_Starting_Block = col2.number_input(
                 "Starting Block",
                 step=1,
                 key="start"
             )
+            col2.code(str(int(GHI_Starting_Block)), language=None)
 
             GHI_Ending_Block = col3.number_input(
                 "Ending Block",
                 step=1,
                 key="end"
             )
+            col3.code(str(int(GHI_Ending_Block)), language=None)
 
             col1, col2, col3 = st.columns(3)
 
@@ -619,18 +609,21 @@ if st.session_state.run_model:
                 step=1,
                 key="max"
             )
+            col1.code(str(int(GHI_Max_Block)), language=None)
 
             Tracking_angle_lim_E = col2.number_input(
                 "East Limit",
                 step=1,
                 key="east"
             )
+            col2.code(str(int(Tracking_angle_lim_E)), language=None)
 
             Tracking_angle_lim_W = col3.number_input(
                 "West Limit",
                 step=1,
                 key="west"
             )
+            col3.code(str(int(Tracking_angle_lim_W)), language=None)
 
             #best_loss = st.session_state.loss
             #DHI = st.session_state.dhi
