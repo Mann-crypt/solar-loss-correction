@@ -706,7 +706,7 @@ if st.session_state.run_model:
                 title="Forecast vs Actual Power",
                 template="plotly_white",
                 height=500,
-                #hovermode="x unified",
+                hovermode="x unified",
                 #xaxis=dict(
                     #title="15 Minute Block",
                     #dtick=4
