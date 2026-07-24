@@ -191,6 +191,21 @@ if st.session_state.run_model:
             df_fix["POA fixed"] * df["Eff Area"].sum()
         ) / 1_000_000
 
+        with st.expander("🔍 View Efficiency Calculations"):
+                st.dataframe(
+                    df[
+                        [
+                            "Module Type",
+                            "Standard PV Efficiency (%)",
+                            "Efficiency Losses(%)",
+                            "Net Efficiency (%)",
+                            "Eff Area"
+                        ]
+                    ],
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
         print(f"Best Efficiency Loss = {best_loss:.2f}%")
         st.metric(
             "Efficiency Loss",
