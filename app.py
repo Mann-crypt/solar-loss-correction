@@ -484,27 +484,21 @@ if st.session_state.run_model:
                 last_quote["text"] = q
                 return q
 
-            status = st.empty()
-            status.info(random_quote())
+            current_quote = {"text": random_quote()}
 
-            quote_index = {"i": 0}      # <-- ADD THIS
-            iteration = {"i": 0}
-
-            generation = {"count": 0}
-            MAX_ITER = 40
+            status.info(current_quote["text"])
 
             def callback(xk, convergence):
-                status.info(random.choice(quotes))
-                generation["count"] += 1
 
+                generation["count"] += 1
                 progress.progress(generation["count"] / MAX_ITER)
 
-                # Change quote every 5 generations
+                # Change quote every 7 generations
                 if generation["count"] % 7 == 1:
-                    quote_index["i"] = (quote_index["i"] + 1) % len(quotes)
+                    current_quote["text"] = random_quote()
 
                 status.info(
-                    f"{quotes[quote_index['i']]}\n\n"
+                    f"{current_quote['text']}\n\n"
                     f"Generation {generation['count']} / {MAX_ITER}"
                 )
 
