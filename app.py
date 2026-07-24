@@ -191,6 +191,12 @@ if st.session_state.run_model:
             df_fix["POA fixed"] * df["Eff Area"].sum()
         ) / 1_000_000
 
+        print(f"Best Efficiency Loss = {best_loss:.2f}%")
+        st.metric(
+            "Efficiency Loss",
+            f"{best_loss:.2f}%"
+        )
+        
         with st.expander("🔍 View Efficiency Calculations"):
                 st.dataframe(
                     df[
@@ -205,12 +211,7 @@ if st.session_state.run_model:
                     use_container_width=True,
                     hide_index=True,
                 )
-
-        print(f"Best Efficiency Loss = {best_loss:.2f}%")
-        st.metric(
-            "Efficiency Loss",
-            f"{best_loss:.2f}%"
-        )
+            
         x = np.arange(1, 97)
 
         fig = go.Figure()
