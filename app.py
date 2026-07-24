@@ -11,13 +11,13 @@ st.set_page_config(page_title="Solar Loss Correction", layout="wide")
 st.title("Kuchu Puchu🥰 - Aao Tumhari Loss Correction Kardu!!")
 
 uploaded_file = st.file_uploader(
-    "Yaha Feko",
+    "Yaha Feko!!",
     type=["xlsx"],
     key="excel_uploader"
 )
 
 if uploaded_file is None:
-    st.info("Pehle File toh upload krr!!!")
+    st.info("Pehle File toh upload karo!!!")
     st.stop()
 
 if "last_file" not in st.session_state:
@@ -508,7 +508,7 @@ if st.session_state.run_model:
 
                 return False
 
-            with st.spinner("Ho raha hai aap tb tk saath waale se baat karlo...🗣"):
+            with st.spinner("Ho raha hai aap tab tak saath waale se baat karlo...🗣"):
 
                 result = differential_evolution(
                     objective,
