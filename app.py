@@ -99,10 +99,10 @@ if st.session_state.run_model:
 
         df_tilt = pd.read_excel(file_path, sheet_name="Config Tilt Angle", header=[7])
         df_tilt.columns = df_tilt.columns.str.strip()
+        df_tilt["Fixed"] = df_tilt["Fixed"].fillna(0)
         null_indices = df_tilt[df_tilt['Fixed'].isna()].index
         first_null_pos = df_tilt.index.get_loc(null_indices[0])
         df_tilt = df_tilt.iloc[:first_null_pos]
-        df_tilt["Fixed"] = df_tilt["Fixed"].fillna(0)
         df_tilt = df_tilt.dropna(how='all', axis=1)
         df_tilt = df_tilt.rename(columns={
             'Unnamed: 2': 'Month_Num',
