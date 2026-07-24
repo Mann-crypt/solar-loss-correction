@@ -468,10 +468,10 @@ if st.session_state.run_model:
                 "☕ Vo kehte the kya ho tum, aaj hum kehte hai tum kya ho be?",
                 "🌦 Mausam Loss Correction waala hai hi nhi..",
                 "😊 Jinke ghar sheeshe ke bane hote hai vo basement mai kapde change krte h...",
-                "😋 Thana Thaliya?",
+                "😋 Aromatic Rose Latte with Frothy Milk pine ka mann hor hai na...",
                 "🥛 Garmi mai daalo dudh mai Ice🧊 Dudh bangya Very Nice...",
-                "🛣  Iss Weekend free ho?..",
-                "😁 Horaha hai bass Thoda or rukjao mere liye...",
+                "🛣  Aap protest pr nahi gaye?..",
+                "😁 Horaha hai benstokes Kaan mai ghusjao insaan ke...",
                 "😗 Muskuraiye aap MAL mai hai...",
                 "🥱 Hum na hote toh Operations ka kya hota?..",
                 "😎 6:30 hote hi Billu MAL se faraar..."
@@ -497,7 +497,7 @@ if st.session_state.run_model:
                 progress.progress(generation["count"] / MAX_ITER)
 
                 # Change quote every 7 generations
-                if generation["count"] % 6 == 1:
+                if generation["count"] % 7 == 1:
                     current_quote["text"] = random_quote()
 
                 status.info(
