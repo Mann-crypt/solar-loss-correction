@@ -642,6 +642,21 @@ if st.session_state.run_model:
                 * df["Net Efficiency (%)"]
             ) / 100
             with st.expander("🔍 View Efficiency Calculations"):
+                with col1:
+                    st.download_button(
+                        "📋 Copy Efficiency Losses",
+                        data="\n".join(df["Efficiency Losses(%)"].astype(str)),
+                        file_name="Efficiency_Losses.txt",
+                        mime="text/plain"
+                    )
+
+                with col2:
+                    st.download_button(
+                        "📋 Copy Net Efficiency",
+                        data="\n".join(df["Net Efficiency (%)"].astype(str)),
+                        file_name="Net_Efficiency.txt",
+                        mime="text/plain"
+                    )
                 st.dataframe(
                     df[
                         [
