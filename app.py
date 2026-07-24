@@ -489,7 +489,7 @@ if st.session_state.run_model:
                 progress.progress(generation["count"] / MAX_ITER)
 
                 # Change quote every 5 generations
-                if generation["count"] % 5 == 1:
+                if generation["count"] % 8 == 1:
                     quote_index["i"] = (quote_index["i"] + 1) % len(quotes)
 
                 status.info(
