@@ -485,7 +485,8 @@ if st.session_state.run_model:
                 q = random.choice(available)
                 last_quote["text"] = q
                 return q
-
+                
+            generation = {"count": 0}
             current_quote = {"text": random_quote()}
 
             status.info(current_quote["text"])
@@ -496,7 +497,7 @@ if st.session_state.run_model:
                 progress.progress(generation["count"] / MAX_ITER)
 
                 # Change quote every 7 generations
-                if generation["count"] % 7 == 1:
+                if generation["count"] % 6 == 1:
                     current_quote["text"] = random_quote()
 
                 status.info(
