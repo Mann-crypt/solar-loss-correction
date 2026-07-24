@@ -641,6 +641,21 @@ if st.session_state.run_model:
                 df["Total area(m2)"]
                 * df["Net Efficiency (%)"]
             ) / 100
+            with st.expander("🔍 View Efficiency Calculations"):
+                st.dataframe(
+                    df[
+                        [
+                            "Module Type",
+                            "Standard PV Efficiency (%)",
+                            "Efficiency Losses(%)",
+                            "Net Efficiency (%)",
+                            "Eff Area"
+                        ]
+                    ],
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
 
             m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
             m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
