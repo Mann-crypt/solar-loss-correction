@@ -584,7 +584,6 @@ if st.session_state.run_model:
             DHI = col1.number_input(
                 "DHI (%)",
                 step=1,
-                value=str(st.session_state.dhi),
                 key="dhi"
             )
 
