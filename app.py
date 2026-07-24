@@ -469,7 +469,7 @@ if st.session_state.run_model:
                 "🌦 Mausam Loss Correction waala hai hi nhi..",
                 "😊 Jinke ghar sheeshe ke bane hote hai vo basement mai kapde change krte h...",
                 "😋 Thana Thaliya?",
-                "😅 Ghurrna Band Karo Noor...",
+                "🥛 Garmi mai daalo dudh mai Ice🧊 Dudh bangya Very Nice...",
                 "🛣  Iss Weekend free ho?..",
                 "😁 Horaha hai bass Thoda or rukjao mere liye...",
                 "😗 Muskuraiye aap MAL mai hai...",
