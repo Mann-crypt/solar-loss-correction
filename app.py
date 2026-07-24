@@ -476,6 +476,8 @@ if st.session_state.run_model:
                 "🥱 Hum na hote toh Operations ka kya hota?..",
                 "😎 6:30 hote hi Billu MAL se faraar..."
             ]
+
+            MAX_ITER = 40
             last_quote = {"text": None}
 
             def random_quote():
