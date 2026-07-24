@@ -474,7 +474,8 @@ if st.session_state.run_model:
                 "😁 Horaha hai benstokes Kaan mai ghusjao insaan ke...",
                 "😗 Muskuraiye aap MAL mai hai...",
                 "🥱 Hum na hote toh Operations ka kya hota?..",
-                "😎 6:30 hote hi Billu MAL se faraar..."
+                "😎 6:30 hote hi Billu MAL se faraar...",
+                "😇 Guruji ne ek baat kahi thi...."
             ]
 
             MAX_ITER = 40
@@ -507,7 +508,7 @@ if st.session_state.run_model:
 
                 return False
 
-            with st.spinner("Optimizing... Please wait"):
+            with st.spinner("Ho raha hai aap tb tk saath waale se baat karlo...😁"):
 
                 result = differential_evolution(
                     objective,
@@ -525,7 +526,7 @@ if st.session_state.run_model:
                 )
 
             progress.empty()
-            status.success("✅ Optimization Complete!")
+            status.success("✅ Dekha Kitni Jaldi Hogaya!")
 
             best = np.round(result.x).astype(int)
 
