@@ -548,7 +548,7 @@ if st.session_state.run_model:
             st.session_state.west = st.session_state.params["west"]
 
             copy_text = "\t".join([
-                str(dhi),
+                str(DHI),
                 str(GHI_Starting_Block),
                 str(GHI_Ending_Block),
                 str(GHI_Max_Block),
