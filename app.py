@@ -482,16 +482,19 @@ if st.session_state.run_model:
 
             quotes = [
                 "☕ Vo kehte the kya ho tum, aaj hum kehte hai tum kya ho be?",
-                "🌦 Mausam Loss Correction waala hai hi nhi..",
+                "🌦 Aapka mann nahi kar raha bahar jaane ka?..",
                 "😊 Jinke ghar sheeshe ke bane hote hai vo basement mai kapde change krte h...",
                 "😋 Aromatic Rose Latte with Frothy Milk pine ka mann hor hai na...",
                 "🥛 Garmi mai daalo dudh mai Ice🧊 Dudh bangya Very Nice - Dudh Dudh Dudh Dudh...",
-                "🛣  Aap protest par nahi gaye?..",
+                "🌟 Aapke face pr toh Modiji se bhi jyda glow hai..",
                 "😁 Horaha hai benstokes Kaan mai ghusjao insaan ke...",
                 "😗 Muskuraiye aap MAL mai hai...",
                 "🥱 Hum na hote toh Operations ka kya hota?..",
                 "😎 6:30 hote hi Billu MAL se faraar...",
-                "😇 Guruji ne ek baat kahi thi...."
+                "😇 Guruji ne ek baat kahi thi....",
+                "🎼 Karna hai kuchh kaam M se gaao...",
+                "😠 Nahi karni Loss Correction, Now what to do?...",
+                "💸 Iss Job ko chhod or chhod kar ameer ho.."
             ]
 
             MAX_ITER = 40
