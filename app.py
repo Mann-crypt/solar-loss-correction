@@ -508,7 +508,7 @@ if st.session_state.run_model:
 
                 return False
 
-            with st.spinner("Ho raha hai aap tb tk saath waale se baat karlo...😁"):
+            with st.spinner("Ho raha hai aap tb tk saath waale se baat karlo...🗣"):
 
                 result = differential_evolution(
                     objective,
