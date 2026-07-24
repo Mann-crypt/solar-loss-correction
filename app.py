@@ -548,13 +548,13 @@ if st.session_state.run_model:
             st.session_state.west = st.session_state.params["west"]
 
             copy_text = "\t".join([
-                str(DHI),
-                str(GHI_Starting_Block),
-                str(GHI_Ending_Block),
-                str(GHI_Max_Block),
-                str(Tracking_angle_lim_E),
-                str(Tracking_angle_lim_W),
-                #f"{best_loss:.1f}"
+                #str(st.session_state.loss),
+                str(st.session_state.dhi),
+                str(st.session_state.start),
+                str(st.session_state.max),
+                str(st.session_state.end),
+                str(st.session_state.east),
+                str(st.session_state.west),
             ])
 
             st.subheader("Copy Parameters")
