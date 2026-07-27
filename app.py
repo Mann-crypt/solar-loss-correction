@@ -1332,13 +1332,19 @@ if st.session_state.run_model:
                         workers=1,
                         callback=callback
                     )
-
-                st.write(result.fun)
     
                 progress.empty()
                 status.success("✅ Dekha Kitni Jaldi Hogaya!")
-    
+                st.write("Optimizer score:", result.fun)
+
                 best = np.round(result.x).astype(int)
+                
+                st.write("Optimizer parameters:", best.tolist())
+                
+                st.write(
+                    "Rounded score:",
+                    objective(best)
+                )
     
                 st.session_state.params = {
                     "loss": float(best_loss),
