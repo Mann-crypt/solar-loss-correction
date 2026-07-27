@@ -421,6 +421,39 @@ if st.session_state.run_model:
             
             # Assign best efficiency loss
             df["Efficiency Losses(%)"] = best_loss
+            # Recalculate dependent columns
+            df["Net Efficiency (%)"] = df["Standard PV Efficiency (%)"] - df["Efficiency Losses(%)"]
+            df_weight["CL-1"] = ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-1"].values[0:1]
+            df_weight["CL-2"] = ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-2"].values[0:1]
+            df_weight["CL-3"] = ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-3"].values[0:1]
+            df_weight["CL-4"] = ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-4"].values[0:1]
+            df_weight["CL-5"] = ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-5"].values[0:1]
+                
+            df_fix["CL1_Fixed Power=I*Ƞ*A"] = (
+                df_fix["POA fixed"] * np.sum(df_weight["CL-1"])
+            ) / 1000000
+            
+            df_fix["CL2_Fixed Power=I*Ƞ*A"] = (
+                df_fix["POA fixed-CL2"] * np.sum(df_weight["CL-2"])
+            ) / 1000000
+            
+            df_fix["CL3_Fixed Power=I*Ƞ*A"] = (
+                df_fix["POA fixed-CL3"] * np.sum(df_weight["CL-3"])
+            ) / 1000000
+            
+            df_fix["CL4_Fixed Power=I*Ƞ*A"] = (
+                df_fix["POA fixed-CL4"] * np.sum(df_weight["CL-4"])
+            ) / 1000000
+            
+            df_fix["CL5_Fixed Power=I*Ƞ*A"] = (
+                df_fix["POA fixed-CL5"] * np.sum(df_weight["CL-5"])
+            ) / 1000000
+            
+            df_fix["Total Power (CL1+CL2+…)"] = df_fix["CL1_Fixed Power=I*Ƞ*A"] + df_fix["CL2_Fixed Power=I*Ƞ*A"] + df_fix["CL3_Fixed Power=I*Ƞ*A"] + df_fix["CL4_Fixed Power=I*Ƞ*A"] + df_fix["CL5_Fixed Power=I*Ƞ*A"]
+            st.metric(
+                "Efficiency Loss",
+                f"{best_loss:.2f}%"
+            )
             # ------------------ Read Data ------------------
 
             df_bcal1 = pd.read_excel(uploaded_file, sheet_name="Backend Cal CL1")
@@ -820,6 +853,20 @@ if st.session_state.run_model:
                     ) / 1_000_000
                 
                 df_trac["Fixed Power=I*Ƞ*A"] = forecast
+                with st.expander("🔍 View Efficiency Calculations"):
+                    st.dataframe(
+                        df[
+                            [
+                                "Module Type",
+                                "Standard PV Efficiency (%)",
+                                "Efficiency Losses(%)",
+                                "Net Efficiency (%)",
+                                "Total area(m2)"
+                            ]
+                        ],
+                        use_container_width=True,
+                        hide_index=True,
+                    )
                 x = np.arange(1, 97)
         
                 fig = go.Figure()
