@@ -763,6 +763,28 @@ if st.session_state.run_model:
     
             
                 # ------------------ Final Calculation Using Best Parameters ------------------
+                df["Efficiency Losses(%)"] = best_loss
+
+                # Recalculate
+                df["Net Efficiency (%)"] = (
+                    df["Standard PV Efficiency (%)"]
+                    - df["Efficiency Losses(%)"]
+                )
+                
+                with st.expander("🔍 View Efficiency Calculations"):
+                    st.dataframe(
+                        df[
+                            [
+                                "Module Type",
+                                "Standard PV Efficiency (%)",
+                                "Efficiency Losses(%)",
+                                "Net Efficiency (%)",
+                                "Total area(m2)"
+                            ]
+                        ],
+                        use_container_width=True,
+                        hide_index=True,
+                    )
                 
                 m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
                 m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
