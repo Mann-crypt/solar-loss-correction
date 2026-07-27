@@ -457,96 +457,108 @@ if st.session_state.run_model:
             # ------------------ Objective Function ------------------
             
             def objective(x):
-            
-                DHI = int(round(x[0]))
-                GHI_Starting_Block = int(round(x[1]))
-                GHI_Ending_Block = int(round(x[2]))
-                GHI_Max_Block = int(round(x[3]))
-                Tracking_angle_lim_E = int(round(x[4]))
-                Tracking_angle_lim_W = int(round(x[5]))
-            
-                # Invalid combinations
-                if (
-                    GHI_Starting_Block >= GHI_Max_Block
-                    or GHI_Max_Block >= GHI_Ending_Block
-                ):
-                    return 1e9
-            
-                m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
-                m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
-            
-                predictions = []
-
-                blocks = backend_list[0]["Block No."]
+                try:
+                    DHI = int(round(x[0]))
+                    GHI_Starting_Block = int(round(x[1]))
+                    GHI_Ending_Block = int(round(x[2]))
+                    GHI_Max_Block = int(round(x[3]))
+                    Tracking_angle_lim_E = int(round(x[4]))
+                    Tracking_angle_lim_W = int(round(x[5]))
                 
-                zenith = np.where(
-                    blocks <= GHI_Max_Block,
-                    np.minimum(89, m1 * (blocks - GHI_Max_Block)),
-                    np.minimum(89, m2 * (blocks - GHI_Max_Block))
-                )
+                    # Invalid combinations
+                    if (
+                        GHI_Starting_Block >= GHI_Max_Block
+                        or GHI_Max_Block >= GHI_Ending_Block
+                    ):
+                        return 1e9
                 
-                panel = np.where(
-                    blocks < GHI_Max_Block,
-                    np.minimum(zenith, abs(Tracking_angle_lim_E)),
-                    np.minimum(zenith, Tracking_angle_lim_W)
-                )
+                    m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
+                    m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
                 
-                cos_alpha = np.cos(np.radians(panel))
+                    predictions = []
+    
+                    blocks = backend_list[0]["Block No."]
+                    
+                    zenith = np.where(
+                        blocks <= GHI_Max_Block,
+                        np.minimum(89, m1 * (blocks - GHI_Max_Block)),
+                        np.minimum(89, m2 * (blocks - GHI_Max_Block))
+                    )
+                    
+                    panel = np.where(
+                        blocks < GHI_Max_Block,
+                        np.minimum(zenith, abs(Tracking_angle_lim_E)),
+                        np.minimum(zenith, Tracking_angle_lim_W)
+                    )
+                    
+                    cos_alpha = np.cos(np.radians(panel))
+                    
+                    weights = df_weight.sum()
+                    
+                    for backend, ghi_col, weight_col in zip(
+                            backend_list,
+                            ghi_cols,
+                            weight_cols):
+                    
+                        ghi = df_fix[ghi_col].to_numpy()
+                    
+                        dhi = ghi * DHI / 100
+                        cos_alpha = np.clip(cos_alpha, 1e-6, None)
+                        dni = (ghi - dhi) / cos_alpha
+                    
+                        pred = (
+                            dni * weights[weight_col]
+                        ) / 1_000_000
+                    
+                        predictions.append(pred)
+                    
+                    prediction = np.sum(predictions, axis=0)
                 
-                weights = df_weight.sum()
+                    # Comparision
                 
-                for backend, ghi_col, weight_col in zip(
-                        backend_list,
-                        ghi_cols,
-                        weight_cols):
+                    mask = df_fix["Actual"] != 0
                 
-                    ghi = df_fix[ghi_col].to_numpy()
+                    from sklearn.metrics import mean_squared_error
                 
-                    dhi = ghi * DHI / 100
+                    actual = df_fix["Actual"].values
                 
-                    dni = (ghi - dhi) / cos_alpha
+                    # Consider only daylight blocks
+                    #mask = ghi_cols > 50
                 
-                    pred = (
-                        dni * weights[weight_col]
-                    ) / 1_000_000
+                    actual = actual[mask]
+                    prediction = prediction[mask]
                 
-                    predictions.append(pred)
+                    # Higher weights near peak generation
+                    weights = actual / actual.max()
                 
-                prediction = np.sum(predictions, axis=0)
-            
-                # Comparision
-            
-                mask = df_fix["Actual"] != 0
-            
-                from sklearn.metrics import mean_squared_error
-            
-                actual = df_fix["Actual"].values
-            
-                # Consider only daylight blocks
-                mask = ghi_cols > 50
-            
-                actual = actual[mask]
-                prediction = prediction[mask]
-            
-                # Higher weights near peak generation
-                weights = actual / actual.max()
-            
-                # Weighted RMSE
-                block_error = np.mean(np.abs(actual - prediction)) / actual.max()
-            
-                # Peak error
-                peak_error = abs(actual.max() - prediction.max()) / actual.max()
-            
-                # Daily energy error
-                energy_error = abs(actual.sum() - prediction.sum()) / actual.sum()
-            
-                score = (
-                    0.80 * block_error +
-                    0.10 * peak_error +
-                    0.10 * energy_error
-                )
-            
-                return score
+                    # Weighted RMSE
+                    block_error = np.mean(np.abs(actual - prediction)) / actual.max()
+                
+                    # Peak error
+                    peak_error = abs(actual.max() - prediction.max()) / actual.max()
+                
+                    # Daily energy error
+                    energy_error = abs(actual.sum() - prediction.sum()) / actual.sum()
+                
+                    score = (
+                        0.80 * block_error +
+                        0.10 * peak_error +
+                        0.10 * energy_error
+                    )
+                    if (
+                        np.isnan(prediction).any()
+                        or np.isinf(prediction).any()
+                    ):
+                        return 1e9
+                    if actual.max() == 0:
+                        return 1e9
+                
+                    return score
+                except Exception as e:
+                    print(e)
+                    import traceback
+                    traceback.print_exc()
+                    raise
             
             
             # ------------------ Parameter Bounds ------------------
@@ -1203,10 +1215,13 @@ if st.session_state.run_model:
                 from sklearn.metrics import mean_squared_error
     
                 actual = df_fix["Actual"].values
-                prediction = prediction.values
     
                 # Consider only daylight blocks
-                mask = df_fix["GHI_Forecast"].values > 50
+                mask = (
+                    df_fix[["CL1-GHI","CL2-GHI","CL3-GHI","CL4-GHI","CL5-GHI"]]
+                    .mean(axis=1)
+                    .to_numpy() > 50
+                )
     
                 actual = actual[mask]
                 prediction = prediction[mask]
