@@ -828,20 +828,6 @@ if st.session_state.run_model:
                     ) / 1_000_000
                 
                 df_trac["Fixed Power=I*Ƞ*A"] = forecast
-                with st.expander("🔍 View Efficiency Calculations"):
-                    st.dataframe(
-                        df[
-                            [
-                                "Module Type",
-                                "Standard PV Efficiency (%)",
-                                "Efficiency Losses(%)",
-                                "Net Efficiency (%)",
-                                "Total area(m2)"
-                            ]
-                        ],
-                        use_container_width=True,
-                        hide_index=True,
-                    )
                 x = np.arange(1, 97)
         
                 fig = go.Figure()
