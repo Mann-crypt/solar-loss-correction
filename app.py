@@ -304,7 +304,831 @@ if st.session_state.run_model:
             )
     
             st.plotly_chart(fig, use_container_width=True)
+        elif plant_type == "Tracking":
+            df = pd.read_excel(uploaded_file, sheet_name="Area & Efficiency", header=[1], usecols=range(8))
+            null_indices = df[df['Module Type'].isna()].index
+            first_null_pos = df.index.get_loc(null_indices[0])
+            df = df.iloc[:first_null_pos]
+            df.columns = df.columns.str.strip()
+            df_w = pd.read_excel(uploaded_file, sheet_name="Area & Efficiency", header=2, usecols=[12, 13, 14, 15, 16])
+            df_st = pd.read_excel(uploaded_file, sheet_name="Forecast Config", header=[8])
+            lat = float(df_st.loc[0, "Lat"])
+            df_tilt = pd.read_excel(uploaded_file, sheet_name="Config Tilt Angle", header=[7])
+            df_tilt.columns = df_tilt.columns.str.strip()
+            null_indices = df_tilt[df_tilt['Fixed'].isna()].index
+            first_null_pos = df_tilt.index.get_loc(null_indices[0])
+            df_tilt = df_tilt.iloc[:first_null_pos]
+            df_tilt = df_tilt.dropna(how='all', axis=1)
+            df_tilt = df_tilt.rename(columns={
+                'Unnamed: 2': 'Month_Num',
+                'Unnamed: 3': 'Month',
+            })
+            month_lookup = df_tilt.set_index('Month')['Fixed'].to_dict()
+            df_ghi = pd.read_excel(uploaded_file, sheet_name="Result", usecols=[0, 1, 2, 3, 4, 5])
+            df_ghi = df_ghi.fillna(0)
+            df_fix = pd.read_excel(uploaded_file, sheet_name="Fixed-CL1", header=[1])
+            df_fix.columns = df_fix.columns.str.strip()
+            null_indices = df_fix[df_fix['Date'].isna()].index
+            first_null_pos = df_fix.index.get_loc(null_indices[0])
+            df_fix = df_fix.iloc[:first_null_pos]
             
+            df_fix["Date"] = pd.Timestamp.today()
+            first_date = pd.Timestamp.today().replace(month=1, day=1).normalize()
+            
+            df_fix["Declination Angle ∆"] = 23.45 * (
+                np.sin(
+                    np.radians(
+                        360 * (284 + (df_fix["Date"] - first_date).dt.days + 1) / 365
+                    )
+                )
+            )
+            df_fix["Elevation angle a"] = (90 - lat + df_fix["Declination Angle ∆"])
+            df_fix["Tilt Angle b"] = df_fix["Date"].dt.strftime('%B').map(month_lookup)
+            df_fix["a+b"] = df_fix["Elevation angle a"] + df_fix["Tilt Angle b"]
+            df_fix["SIN(a+b)"] = np.sin(np.radians(df_fix["a+b"]))
+            df_fix["Sin(a)"] = np.sin(np.radians(df_fix["Elevation angle a"]))
+            df_fix["GHI*sin(a)"] = df_fix["CL1-GHI"] * df_fix["Sin(a)"]
+            df_fix["GHI*sin(a+b)"] = df_fix["CL1-GHI"] * df_fix["SIN(a+b)"]
+            df_fix["POA fixed"] = df_fix["GHI*sin(a)"] / df_fix["Sin(a)"]
+            df_fix["GHI*sin(a)-CL2"] = df_fix["CL2-GHI"] * df_fix["Sin(a)"]
+            df_fix["GHI*sin(a+b)-CL2"] = df_fix["CL2-GHI"] * df_fix["SIN(a+b)"]
+            df_fix["POA fixed-CL2"] = df_fix["GHI*sin(a)-CL2"] / df_fix["Sin(a)"]
+            df_fix["GHI*sin(a)-CL3"] = df_fix["CL3-GHI"] * df_fix["Sin(a)"]
+            df_fix["GHI*sin(a+b)-CL3"] = df_fix["CL3-GHI"] * df_fix["SIN(a+b)"]
+            df_fix["POA fixed-CL3"] = df_fix["GHI*sin(a)-CL3"] / df_fix["Sin(a)"]
+            df_fix["GHI*sin(a)-CL4"] = df_fix["CL4-GHI"] * df_fix["Sin(a)"]
+            df_fix["GHI*sin(a+b)-CL4"] = df_fix["CL4-GHI"] * df_fix["SIN(a+b)"]
+            df_fix["POA fixed-CL4"] = df_fix["GHI*sin(a)-CL4"] / df_fix["Sin(a)"]
+            df_fix["GHI*sin(a)-CL5"] = df_fix["CL5-GHI"] * df_fix["Sin(a)"]
+            df_fix["GHI*sin(a+b)-CL5"] = df_fix["CL5-GHI"] * df_fix["SIN(a+b)"]
+            df_fix["POA fixed-CL5"] = df_fix["GHI*sin(a)-CL5"] / df_fix["Sin(a)"]
+            
+            
+            # Maximum possible loss
+            max_loss = df["Standard PV Efficiency (%)"].min()
+            
+            #peak_error = abs(actual_peak - predicted_peak) / actual_peak * 100
+            
+            results = []
+            
+            for loss in np.arange(0, max_loss + 0.01, 0.1):
+            
+                df["Efficiency Losses(%)"] = loss
+                df["Net Efficiency (%)"] = df["Standard PV Efficiency (%)"] - df["Efficiency Losses(%)"]
+                df_weight = pd.DataFrame({
+                    "CL-1" : ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-1"].values[0:1],
+                    "CL-2" : ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-2"].values[0:1],
+                    "CL-3" : ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-3"].values[0:1],
+                    "CL-4" : ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-4"].values[0:1],
+                    "CL-5" : ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-5"].values[0:1],
+                })
+            
+                df_fix["CL1_Fixed Power=I*Ƞ*A"] = (
+                    df_fix["POA fixed"] * np.sum(df_weight["CL-1"])
+                ) / 1000000
+            
+                df_fix["CL2_Fixed Power=I*Ƞ*A"] = (
+                    df_fix["POA fixed-CL2"] * np.sum(df_weight["CL-2"])
+                ) / 1000000
+            
+                df_fix["CL3_Fixed Power=I*Ƞ*A"] = (
+                    df_fix["POA fixed-CL3"] * np.sum(df_weight["CL-3"])
+                ) / 1000000
+            
+                df_fix["CL4_Fixed Power=I*Ƞ*A"] = (
+                    df_fix["POA fixed-CL4"] * np.sum(df_weight["CL-4"])
+                ) / 1000000
+            
+                df_fix["CL5_Fixed Power=I*Ƞ*A"] = (
+                    df_fix["POA fixed-CL5"] * np.sum(df_weight["CL-5"])
+                ) / 1000000
+            
+                df_fix["Total Power (CL1+CL2+…)"] = df_fix["CL1_Fixed Power=I*Ƞ*A"] + df_fix["CL2_Fixed Power=I*Ƞ*A"] + df_fix["CL3_Fixed Power=I*Ƞ*A"] + df_fix["CL4_Fixed Power=I*Ƞ*A"] + df_fix["CL5_Fixed Power=I*Ƞ*A"]
+                
+            
+                # Peak power comparison
+                actual_peak = df_fix["Actual"].max()
+                predicted_peak = df_fix["Total Power (CL1+CL2+…)"].max()
+            
+                peak_error = abs(actual_peak - predicted_peak)
+            
+                results.append({
+                    "Efficiency Loss (%)": loss,
+                    "Actual Peak": actual_peak,
+                    "Predicted Peak": predicted_peak,
+                    "Peak Error": peak_error
+                })
+            
+            results_df = pd.DataFrame(results)
+            
+            # Get efficiency loss with least Peak Error
+            best_loss = results_df.loc[
+                results_df["Peak Error"].idxmin(),
+                "Efficiency Loss (%)"
+            ]
+            
+            # Assign best efficiency loss
+            df["Efficiency Losses(%)"] = best_loss
+            # ------------------ Read Data ------------------
+
+            df_bcal1 = pd.read_excel(file_path, sheet_name="Backend Cal CL1")
+            df_bcal2 = pd.read_excel(file_path, sheet_name="Backend Cal CL2")
+            df_bcal3 = pd.read_excel(file_path, sheet_name="Backend Cal CL3")
+            df_bcal4 = pd.read_excel(file_path, sheet_name="Backend Cal CL4")
+            df_bcal5 = pd.read_excel(file_path, sheet_name="Backend Cal CL5")
+            df_trac = pd.read_excel(file_path, sheet_name="Tracking", header=[1])
+            
+            # ------------------ Objective Function ------------------
+            
+            def objective(x):
+            
+                DHI = int(round(x[0]))
+                GHI_Starting_Block = int(round(x[1]))
+                GHI_Ending_Block = int(round(x[2]))
+                GHI_Max_Block = int(round(x[3]))
+                Tracking_angle_lim_E = int(round(x[4]))
+                Tracking_angle_lim_W = int(round(x[5]))
+            
+                # Invalid combinations
+                if (
+                    GHI_Starting_Block >= GHI_Max_Block
+                    or GHI_Max_Block >= GHI_Ending_Block
+                ):
+                    return 1e9
+            
+                m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
+                m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
+            
+                temp1 = df_bcal1.copy()
+            
+                temp1["DHI"] = df_fix["CL1-GHI"] * DHI / 100
+                temp1["GHI - DHI"] = df_fix["CL1-GHI"] - temp1["DHI"]
+            
+                temp1["Zenith angle ( θ )"] = np.where(
+                    temp1["Block No."] <= GHI_Max_Block,
+                    np.minimum(89, m1 * (temp1["Block No."] - GHI_Max_Block)),
+                    np.minimum(89, m2 * (temp1["Block No."] - GHI_Max_Block))
+                )
+            
+                temp1["Panel Angle (α)"] = np.where(
+                    temp1["Block No."] < GHI_Max_Block,
+                    np.where(
+                        temp1["Zenith angle ( θ )"] < abs(Tracking_angle_lim_E),
+                        temp1["Zenith angle ( θ )"],
+                        abs(Tracking_angle_lim_E)
+                    ),
+                    np.where(
+                        (temp1["Block No."] > GHI_Max_Block) &
+                        (temp1["Zenith angle ( θ )"] > Tracking_angle_lim_W),
+                        Tracking_angle_lim_W,
+                        temp1["Zenith angle ( θ )"]
+                    )
+                )
+            
+                temp1["θ - α"] = temp1["Zenith angle ( θ )"] - temp1["Panel Angle (α)"]
+            
+                temp1["Cos(θ)"] = np.cos(np.radians(temp1["Zenith angle ( θ )"]))
+                temp1["Cos(α)"] = np.cos(np.radians(temp1["Panel Angle (α)"]))
+                temp1["Cos(θ - α)"] = np.cos(np.radians(temp1["θ - α"]))
+            
+                temp1["DNI"] = temp1["GHI - DHI"] / temp1["Cos(α)"]
+            
+                prediction1 = (temp1["DNI"] * np.sum(df_weight["CL-1"])) / 1000000
+            
+                temp2 = df_bcal2.copy()
+            
+                temp2["DHI"] = df_fix["CL2-GHI"] * DHI / 100
+                temp2["GHI - DHI"] = df_fix["CL2-GHI"] - temp2["DHI"]
+            
+                temp2["Zenith angle ( θ )"] = np.where(
+                    temp2["Block No."] <= GHI_Max_Block,
+                    np.minimum(89, m1 * (temp2["Block No."] - GHI_Max_Block)),
+                    np.minimum(89, m2 * (temp2["Block No."] - GHI_Max_Block))
+                )
+            
+                temp2["Panel Angle (α)"] = np.where(
+                    temp2["Block No."] < GHI_Max_Block,
+                    np.where(
+                        temp2["Zenith angle ( θ )"] < abs(Tracking_angle_lim_E),
+                        temp2["Zenith angle ( θ )"],
+                        abs(Tracking_angle_lim_E)
+                    ),
+                    np.where(
+                        (temp2["Block No."] > GHI_Max_Block) &
+                        (temp2["Zenith angle ( θ )"] > Tracking_angle_lim_W),
+                        Tracking_angle_lim_W,
+                        temp2["Zenith angle ( θ )"]
+                    )
+                )
+            
+                temp2["θ - α"] = temp2["Zenith angle ( θ )"] - temp2["Panel Angle (α)"]
+            
+                temp2["Cos(θ)"] = np.cos(np.radians(temp2["Zenith angle ( θ )"]))
+                temp2["Cos(α)"] = np.cos(np.radians(temp2["Panel Angle (α)"]))
+                temp2["Cos(θ - α)"] = np.cos(np.radians(temp2["θ - α"]))
+            
+                temp2["DNI"] = temp2["GHI - DHI"] / temp2["Cos(α)"]
+            
+                prediction2 = (temp2["DNI"] * np.sum(df_weight["CL-2"])) / 1000000
+            
+                temp3 = df_bcal3.copy()
+            
+                temp3["DHI"] = df_fix["CL3-GHI"] * DHI / 100
+                temp3["GHI - DHI"] = df_fix["CL3-GHI"] - temp3["DHI"]
+            
+                temp3["Zenith angle ( θ )"] = np.where(
+                    temp1["Block No."] <= GHI_Max_Block,
+                    np.minimum(89, m1 * (temp3["Block No."] - GHI_Max_Block)),
+                    np.minimum(89, m2 * (temp3["Block No."] - GHI_Max_Block))
+                )
+            
+                temp3["Panel Angle (α)"] = np.where(
+                    temp3["Block No."] < GHI_Max_Block,
+                    np.where(
+                        temp3["Zenith angle ( θ )"] < abs(Tracking_angle_lim_E),
+                        temp3["Zenith angle ( θ )"],
+                        abs(Tracking_angle_lim_E)
+                    ),
+                    np.where(
+                        (temp3["Block No."] > GHI_Max_Block) &
+                        (temp3["Zenith angle ( θ )"] > Tracking_angle_lim_W),
+                        Tracking_angle_lim_W,
+                        temp3["Zenith angle ( θ )"]
+                    )
+                )
+            
+                temp3["θ - α"] = temp3["Zenith angle ( θ )"] - temp3["Panel Angle (α)"]
+            
+                temp3["Cos(θ)"] = np.cos(np.radians(temp3["Zenith angle ( θ )"]))
+                temp3["Cos(α)"] = np.cos(np.radians(temp3["Panel Angle (α)"]))
+                temp3["Cos(θ - α)"] = np.cos(np.radians(temp3["θ - α"]))
+            
+                temp3["DNI"] = temp3["GHI - DHI"] / temp3["Cos(α)"]
+            
+                prediction3 = (temp3["DNI"] * np.sum(df_weight["CL-3"])) / 1000000
+            
+                temp4 = df_bcal1.copy()
+            
+                temp4["DHI"] = df_fix["CL4-GHI"] * DHI / 100
+                temp4["GHI - DHI"] = df_fix["CL4-GHI"] - temp4["DHI"]
+            
+                temp4["Zenith angle ( θ )"] = np.where(
+                    temp4["Block No."] <= GHI_Max_Block,
+                    np.minimum(89, m1 * (temp4["Block No."] - GHI_Max_Block)),
+                    np.minimum(89, m2 * (temp4["Block No."] - GHI_Max_Block))
+                )
+            
+                temp4["Panel Angle (α)"] = np.where(
+                    temp4["Block No."] < GHI_Max_Block,
+                    np.where(
+                        temp4["Zenith angle ( θ )"] < abs(Tracking_angle_lim_E),
+                        temp4["Zenith angle ( θ )"],
+                        abs(Tracking_angle_lim_E)
+                    ),
+                    np.where(
+                        (temp4["Block No."] > GHI_Max_Block) &
+                        (temp4["Zenith angle ( θ )"] > Tracking_angle_lim_W),
+                        Tracking_angle_lim_W,
+                        temp4["Zenith angle ( θ )"]
+                    )
+                )
+            
+                temp4["θ - α"] = temp4["Zenith angle ( θ )"] - temp4["Panel Angle (α)"]
+            
+                temp4["Cos(θ)"] = np.cos(np.radians(temp4["Zenith angle ( θ )"]))
+                temp4["Cos(α)"] = np.cos(np.radians(temp4["Panel Angle (α)"]))
+                temp4["Cos(θ - α)"] = np.cos(np.radians(temp4["θ - α"]))
+            
+                temp4["DNI"] = temp4["GHI - DHI"] / temp4["Cos(α)"]
+            
+                prediction4 = (temp4["DNI"] * np.sum(df_weight["CL-4"])) / 1000000
+            
+                temp5 = df_bcal1.copy()
+            
+                temp5["DHI"] = df_fix["CL5-GHI"] * DHI / 100
+                temp5["GHI - DHI"] = df_fix["CL5-GHI"] - temp5["DHI"]
+            
+                temp5["Zenith angle ( θ )"] = np.where(
+                    temp5["Block No."] <= GHI_Max_Block,
+                    np.minimum(89, m1 * (temp5["Block No."] - GHI_Max_Block)),
+                    np.minimum(89, m2 * (temp5["Block No."] - GHI_Max_Block))
+                )
+            
+                temp5["Panel Angle (α)"] = np.where(
+                    temp5["Block No."] < GHI_Max_Block,
+                    np.where(
+                        temp5["Zenith angle ( θ )"] < abs(Tracking_angle_lim_E),
+                        temp5["Zenith angle ( θ )"],
+                        abs(Tracking_angle_lim_E)
+                    ),
+                    np.where(
+                        (temp5["Block No."] > GHI_Max_Block) &
+                        (temp5["Zenith angle ( θ )"] > Tracking_angle_lim_W),
+                        Tracking_angle_lim_W,
+                        temp5["Zenith angle ( θ )"]
+                    )
+                )
+            
+                temp5["θ - α"] = temp5["Zenith angle ( θ )"] - temp5["Panel Angle (α)"]
+            
+                temp5["Cos(θ)"] = np.cos(np.radians(temp5["Zenith angle ( θ )"]))
+                temp5["Cos(α)"] = np.cos(np.radians(temp5["Panel Angle (α)"]))
+                temp5["Cos(θ - α)"] = np.cos(np.radians(temp5["θ - α"]))
+            
+                temp5["DNI"] = temp5["GHI - DHI"] / temp5["Cos(α)"]
+            
+                prediction5 = (temp5["DNI"] * np.sum(df_weight["CL-5"])) / 1000000
+            
+                prediction = prediction1 + prediction2 + prediction3 + prediction4 + prediction5
+            
+                # Comparision
+            
+                mask = df_fix["Actual"] != 0
+            
+                from sklearn.metrics import mean_squared_error
+            
+                actual = df_fix["Actual"].values
+                prediction = prediction.values
+            
+                # Consider only daylight blocks
+                #mask = df_fix["GHI_Forecast"].values > 50
+            
+                actual = actual[mask]
+                prediction = prediction[mask]
+            
+                # Higher weights near peak generation
+                weights = actual / actual.max()
+            
+                # Weighted RMSE
+                block_error = np.mean(np.abs(actual - prediction)) / actual.max()
+            
+                # Peak error
+                peak_error = abs(actual.max() - prediction.max()) / actual.max()
+            
+                # Daily energy error
+                energy_error = abs(actual.sum() - prediction.sum()) / actual.sum()
+            
+                score = (
+                    0.80 * block_error +
+                    0.10 * peak_error +
+                    0.10 * energy_error
+                )
+            
+                return score
+            
+            
+            # ------------------ Parameter Bounds ------------------
+            
+            bounds = [
+                (0, 10),      # DHI (%)
+                (10, 30),     # GHI Starting Block
+                (65, 80),     # GHI Ending Block
+                (47, 53),     # GHI Max Block
+                (10, 70),     # Tracking East Limit
+                (10, 70)      # Tracking West Limit
+            ]
+            
+            # ------------------ Optimization ------------------
+            
+            import random
+    
+            if "params" not in st.session_state:
+    
+                progress = st.progress(0)
+                status = st.empty()
+    
+                quotes = [
+                    "☕ Vo kehte the kya ho tum, aaj hum kehte hai tum kya ho be?",
+                    "🌦 Aapka mann nahi kar raha bahar jaane ka?..",
+                    "😊 Jinke ghar sheeshe ke bane hote hai vo basement mai kapde change krte h...",
+                    "😋 Aromatic Rose Latte with Frothy Milk pine ka mann hor hai na...",
+                    "🥛 Garmi mai daalo dudh mai Ice🧊 Dudh bangya Very Nice - Dudh Dudh Dudh Dudh...",
+                    "🌟 Aapke face pr toh Modiji se bhi jyda glow hai..",
+                    "😁 Horaha hai benstokes Kaan mai ghusjao insaan ke...",
+                    "😗 Muskuraiye aap MAL mai hai...",
+                    "🥱 Hum na hote toh Operations ka kya hota?..",
+                    "😎 6:30 hote hi Billu MAL se faraar...",
+                    "😇 Guruji ne ek baat kahi thi....",
+                    "🎼 Karna hai kuchh kaam M se gaao...",
+                    "😠 Nahi karni Loss Correction, Now what to do?...",
+                    "💸 Iss Job ko chhod or chhod kar ameer ho.."
+                ]
+    
+                MAX_ITER = 40
+                last_quote = {"text": None}
+    
+                def random_quote():
+                    available = [q for q in quotes if q != last_quote["text"]]
+                    q = random.choice(available)
+                    last_quote["text"] = q
+                    return q
+                    
+                generation = {"count": 0}
+                current_quote = {"text": random_quote()}
+    
+                status.info(current_quote["text"])
+    
+                def callback(xk, convergence):
+    
+                    generation["count"] += 1
+                    progress.progress(generation["count"] / MAX_ITER)
+    
+                    # Change quote every 7 generations
+                    if generation["count"] % 7 == 1:
+                        current_quote["text"] = random_quote()
+    
+                    status.info(
+                        f"{current_quote['text']}\n\n"
+                        f"Generation {generation['count']} / {MAX_ITER}"
+                    )
+    
+                    return False
+    
+                with st.spinner("Ho raha hai aap tab tak saath waale se baat karlo...🗣"):
+    
+                    result = differential_evolution(
+                        objective,
+                        bounds=bounds,
+                        strategy="best1bin",
+                        maxiter=MAX_ITER,
+                        popsize=15,
+                        tol=0.001,
+                        mutation=(0.5,1),
+                        recombination=0.7,
+                        seed=42,
+                        polish=True,
+                        workers=1,
+                        callback=callback
+                    )
+    
+                progress.empty()
+                status.success("✅ Dekha Kitni Jaldi Hogaya!")
+    
+                best = np.round(result.x).astype(int)
+    
+                st.session_state.params = {
+                    "loss": float(best_loss),
+                    "DHI": int(best[0]),
+                    "start": int(best[1]),
+                    "end": int(best[2]),
+                    "max": int(best[3]),
+                    "east": int(best[4]),
+                    "west": int(best[5]),
+                }
+                st.session_state.loss = st.session_state.params["loss"]
+                st.session_state.dhi = st.session_state.params["DHI"]
+                st.session_state.start = st.session_state.params["start"]
+                st.session_state.end = st.session_state.params["end"]
+                st.session_state.max = st.session_state.params["max"]
+                st.session_state.east = st.session_state.params["east"]
+                st.session_state.west = st.session_state.params["west"]
+            
+            #print("Error Score:", result.fun)
+            #print("DHI:", dhi)
+            #print("GHI Starting Block:", GHI_Starting_Block)
+            #print("GHI Ending Block:", GHI_Ending_Block)
+            #print("GHI Max Block:", GHI_Max_Block)
+            #print("Tracking East Limit:", Tracking_angle_lim_E)
+            #print("Tracking West Limit:", Tracking_angle_lim_W)
+            #print("Efficiency Loss:", best_loss)
+    
+            if "params" in st.session_state:
+                defaults = {
+                    "loss": st.session_state.params["loss"],
+                    "dhi": st.session_state.params["DHI"],
+                    "start": st.session_state.params["start"],
+                    "end": st.session_state.params["end"],
+                    "max": st.session_state.params["max"],
+                    "east": st.session_state.params["east"],
+                    "west": st.session_state.params["west"],
+                }
+    
+                for k, v in defaults.items():
+                    if k not in st.session_state:
+                        st.session_state[k] = v
+                
+                st.subheader("Optimized Parameters")
+    
+                best_loss = st.number_input(
+                    "Efficiency Loss (%)",
+                    step=0.1,
+                    key="loss"
+                )
+    
+                col1, col2, col3 = st.columns(3)
+    
+                DHI = col1.number_input(
+                    "DHI (%)",
+                    step=1,
+                    key="dhi"
+                )
+    
+                GHI_Starting_Block = col2.number_input(
+                    "Starting Block",
+                    step=1,
+                    key="start"
+                )
+    
+                GHI_Ending_Block = col3.number_input(
+                    "Ending Block",
+                    step=1,
+                    key="end"
+                )
+    
+                col1, col2, col3 = st.columns(3)
+    
+                GHI_Max_Block = col1.number_input(
+                    "Max Block",
+                    step=1,
+                    key="max"
+                )
+    
+                Tracking_angle_lim_E = col2.number_input(
+                    "East Limit",
+                    step=1,
+                    key="east"
+                )
+    
+                Tracking_angle_lim_W = col3.number_input(
+                    "West Limit",
+                    step=1,
+                    key="west"
+                )
+    
+                #best_loss = st.session_state.loss
+                #DHI = st.session_state.dhi
+                #GHI_Starting_Block = st.session_state.start
+                #GHI_Ending_Block = st.session_state.end
+                #GHI_Max_Block = st.session_state.max
+                #Tracking_angle_lim_E = st.session_state.east
+                #Tracking_angle_lim_W = st.session_state.west
+            
+                # ------------------ Final Calculation Using Best Parameters ------------------
+                # User edited efficiency loss
+                df["Efficiency Losses(%)"] = best_loss
+    
+                # Recalculate
+                df["Net Efficiency (%)"] = (
+                    df["Standard PV Efficiency (%)"]
+                    - df["Efficiency Losses(%)"]
+                )
+    
+                df["Eff Area"] = (
+                    df["Total area(m2)"]
+                    * df["Net Efficiency (%)"]
+                ) / 100
+                
+                with st.expander("🔍 View Efficiency Calculations"):
+                    st.dataframe(
+                        df[
+                            [
+                                "Module Type",
+                                "Standard PV Efficiency (%)",
+                                "Efficiency Losses(%)",
+                                "Net Efficiency (%)",
+                                "Eff Area"
+                            ]
+                        ],
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+    
+    
+            
+            # ------------------ Final Calculation Using Best Parameters ------------------
+            
+            m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
+            m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
+            
+            df_bcal1["DHI"] = df_fix["CL1-GHI"] * DHI / 100
+            df_bcal1["GHI - DHI"] = df_fix["CL1-GHI"] - df_bcal1["DHI"]
+            
+            df_bcal1["Zenith angle ( θ )"] = np.where(
+                df_bcal1["Block No."] <= GHI_Max_Block,
+                np.minimum(89, m1 * (df_bcal1["Block No."] - GHI_Max_Block)),
+                np.minimum(89, m2 * (df_bcal1["Block No."] - GHI_Max_Block))
+            )
+            
+            df_bcal1["Panel Angle (α)"] = np.where(
+                df_bcal1["Block No."] < GHI_Max_Block,
+                np.where(
+                    df_bcal1["Zenith angle ( θ )"] < abs(Tracking_angle_lim_E),
+                    df_bcal1["Zenith angle ( θ )"],
+                    abs(Tracking_angle_lim_E)
+                ),
+                np.where(
+                    (df_bcal1["Block No."] > GHI_Max_Block) &
+                    (df_bcal1["Zenith angle ( θ )"] > Tracking_angle_lim_W),
+                    Tracking_angle_lim_W,
+                    df_bcal1["Zenith angle ( θ )"]
+                )
+            )
+            
+            df_bcal1["θ - α"] = df_bcal1["Zenith angle ( θ )"] - df_bcal1["Panel Angle (α)"]
+            df_bcal1["Cos(θ)"] = np.cos(np.radians(df_bcal1["Zenith angle ( θ )"]))
+            df_bcal1["Cos(α)"] = np.cos(np.radians(df_bcal1["Panel Angle (α)"]))
+            df_bcal1["Cos(θ - α)"] = np.cos(np.radians(df_bcal1["θ - α"]))
+            df_bcal1["DNI"] = df_bcal1["GHI - DHI"] / df_bcal1["Cos(α)"]
+            
+            df_trac["Fixed Power=I*Ƞ*A-CL1"] = (
+                df_bcal1["DNI"] * np.sum(df_weight["CL-1"])
+            ) / 1000000
+            
+            m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
+            m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
+            
+            df_bcal2["DHI"] = df_fix["CL2-GHI"] * DHI / 100
+            df_bcal2["GHI - DHI"] = df_fix["CL2-GHI"] - df_bcal2["DHI"]
+            
+            df_bcal2["Zenith angle ( θ )"] = np.where(
+                df_bcal2["Block No."] <= GHI_Max_Block,
+                np.minimum(89, m1 * (df_bcal2["Block No."] - GHI_Max_Block)),
+                np.minimum(89, m2 * (df_bcal2["Block No."] - GHI_Max_Block))
+            )
+            
+            df_bcal2["Panel Angle (α)"] = np.where(
+                df_bcal2["Block No."] < GHI_Max_Block,
+                np.where(
+                    df_bcal2["Zenith angle ( θ )"] < abs(Tracking_angle_lim_E),
+                    df_bcal2["Zenith angle ( θ )"],
+                    abs(Tracking_angle_lim_E)
+                ),
+                np.where(
+                    (df_bcal2["Block No."] > GHI_Max_Block) &
+                    (df_bcal2["Zenith angle ( θ )"] > Tracking_angle_lim_W),
+                    Tracking_angle_lim_W,
+                    df_bcal2["Zenith angle ( θ )"]
+                )
+            )
+            
+            df_bcal2["θ - α"] = df_bcal2["Zenith angle ( θ )"] - df_bcal2["Panel Angle (α)"]
+            df_bcal2["Cos(θ)"] = np.cos(np.radians(df_bcal2["Zenith angle ( θ )"]))
+            df_bcal2["Cos(α)"] = np.cos(np.radians(df_bcal2["Panel Angle (α)"]))
+            df_bcal2["Cos(θ - α)"] = np.cos(np.radians(df_bcal2["θ - α"]))
+            df_bcal2["DNI"] = df_bcal2["GHI - DHI"] / df_bcal2["Cos(α)"]
+            
+            df_trac["Fixed Power=I*Ƞ*A-CL2"] = (
+                df_bcal2["DNI"] * np.sum(df_weight["CL-2"])
+            ) / 1000000
+            
+            m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
+            m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
+            
+            df_bcal3["DHI"] = df_fix["CL3-GHI"] * DHI / 100
+            df_bcal3["GHI - DHI"] = df_fix["CL3-GHI"] - df_bcal3["DHI"]
+            
+            df_bcal3["Zenith angle ( θ )"] = np.where(
+                df_bcal3["Block No."] <= GHI_Max_Block,
+                np.minimum(89, m1 * (df_bcal3["Block No."] - GHI_Max_Block)),
+                np.minimum(89, m2 * (df_bcal3["Block No."] - GHI_Max_Block))
+            )
+            
+            df_bcal3["Panel Angle (α)"] = np.where(
+                df_bcal3["Block No."] < GHI_Max_Block,
+                np.where(
+                    df_bcal3["Zenith angle ( θ )"] < abs(Tracking_angle_lim_E),
+                    df_bcal3["Zenith angle ( θ )"],
+                    abs(Tracking_angle_lim_E)
+                ),
+                np.where(
+                    (df_bcal3["Block No."] > GHI_Max_Block) &
+                    (df_bcal3["Zenith angle ( θ )"] > Tracking_angle_lim_W),
+                    Tracking_angle_lim_W,
+                    df_bcal3["Zenith angle ( θ )"]
+                )
+            )
+            
+            df_bcal3["θ - α"] = df_bcal3["Zenith angle ( θ )"] - df_bcal3["Panel Angle (α)"]
+            df_bcal3["Cos(θ)"] = np.cos(np.radians(df_bcal3["Zenith angle ( θ )"]))
+            df_bcal3["Cos(α)"] = np.cos(np.radians(df_bcal3["Panel Angle (α)"]))
+            df_bcal3["Cos(θ - α)"] = np.cos(np.radians(df_bcal3["θ - α"]))
+            df_bcal3["DNI"] = df_bcal3["GHI - DHI"] / df_bcal3["Cos(α)"]
+            
+            df_trac["Fixed Power=I*Ƞ*A-CL3"] = (
+                df_bcal3["DNI"] * np.sum(df_weight["CL-3"])
+            ) / 1000000
+            
+            m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
+            m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
+            
+            df_bcal4["DHI"] = df_fix["CL4-GHI"] * DHI / 100
+            df_bcal4["GHI - DHI"] = df_fix["CL4-GHI"] - df_bcal4["DHI"]
+            
+            df_bcal4["Zenith angle ( θ )"] = np.where(
+                df_bcal4["Block No."] <= GHI_Max_Block,
+                np.minimum(89, m1 * (df_bcal4["Block No."] - GHI_Max_Block)),
+                np.minimum(89, m2 * (df_bcal4["Block No."] - GHI_Max_Block))
+            )
+            
+            df_bcal4["Panel Angle (α)"] = np.where(
+                df_bcal4["Block No."] < GHI_Max_Block,
+                np.where(
+                    df_bcal4["Zenith angle ( θ )"] < abs(Tracking_angle_lim_E),
+                    df_bcal4["Zenith angle ( θ )"],
+                    abs(Tracking_angle_lim_E)
+                ),
+                np.where(
+                    (df_bcal4["Block No."] > GHI_Max_Block) &
+                    (df_bcal4["Zenith angle ( θ )"] > Tracking_angle_lim_W),
+                    Tracking_angle_lim_W,
+                    df_bcal4["Zenith angle ( θ )"]
+                )
+            )
+            
+            df_bcal4["θ - α"] = df_bcal4["Zenith angle ( θ )"] - df_bcal4["Panel Angle (α)"]
+            df_bcal4["Cos(θ)"] = np.cos(np.radians(df_bcal4["Zenith angle ( θ )"]))
+            df_bcal4["Cos(α)"] = np.cos(np.radians(df_bcal4["Panel Angle (α)"]))
+            df_bcal4["Cos(θ - α)"] = np.cos(np.radians(df_bcal4["θ - α"]))
+            df_bcal4["DNI"] = df_bcal4["GHI - DHI"] / df_bcal4["Cos(α)"]
+            
+            df_trac["Fixed Power=I*Ƞ*A-CL4"] = (
+                df_bcal4["DNI"] * np.sum(df_weight["CL-4"])
+            ) / 1000000
+            
+            m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
+            m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
+            
+            df_bcal5["DHI"] = df_fix["CL5-GHI"] * DHI / 100
+            df_bcal5["GHI - DHI"] = df_fix["CL5-GHI"] - df_bcal5["DHI"]
+            
+            df_bcal5["Zenith angle ( θ )"] = np.where(
+                df_bcal5["Block No."] <= GHI_Max_Block,
+                np.minimum(89, m1 * (df_bcal5["Block No."] - GHI_Max_Block)),
+                np.minimum(89, m2 * (df_bcal5["Block No."] - GHI_Max_Block))
+            )
+            
+            df_bcal5["Panel Angle (α)"] = np.where(
+                df_bcal5["Block No."] < GHI_Max_Block,
+                np.where(
+                    df_bcal5["Zenith angle ( θ )"] < abs(Tracking_angle_lim_E),
+                    df_bcal5["Zenith angle ( θ )"],
+                    abs(Tracking_angle_lim_E)
+                ),
+                np.where(
+                    (df_bcal5["Block No."] > GHI_Max_Block) &
+                    (df_bcal5["Zenith angle ( θ )"] > Tracking_angle_lim_W),
+                    Tracking_angle_lim_W,
+                    df_bcal5["Zenith angle ( θ )"]
+                )
+            )
+            
+            df_bcal5["θ - α"] = df_bcal5["Zenith angle ( θ )"] - df_bcal5["Panel Angle (α)"]
+            df_bcal5["Cos(θ)"] = np.cos(np.radians(df_bcal5["Zenith angle ( θ )"]))
+            df_bcal5["Cos(α)"] = np.cos(np.radians(df_bcal5["Panel Angle (α)"]))
+            df_bcal5["Cos(θ - α)"] = np.cos(np.radians(df_bcal5["θ - α"]))
+            df_bcal5["DNI"] = df_bcal5["GHI - DHI"] / df_bcal5["Cos(α)"]
+            
+            df_trac["Fixed Power=I*Ƞ*A-CL5"] = (
+                df_bcal5["DNI"] * np.sum(df_weight["CL-5"])
+            ) / 1000000
+            
+            df_trac["Fixed Power=I*Ƞ*A"] = df_trac["Fixed Power=I*Ƞ*A-CL1"] + df_trac["Fixed Power=I*Ƞ*A-CL2"] + df_trac["Fixed Power=I*Ƞ*A-CL3"] + df_trac["Fixed Power=I*Ƞ*A-CL4"] + df_trac["Fixed Power=I*Ƞ*A-CL5"]
+            x = np.arange(1, 97)
+    
+                fig = go.Figure()
+    
+                fig.add_trace(
+                    go.Scatter(
+                        x=x,
+                        y=df_trac["Fixed Power=I*Ƞ*A"],
+                        mode="lines",
+                        name="Forecast",
+                        line=dict(color="#2563EB", width=3),
+                    )
+                )
+    
+                fig.add_trace(
+                    go.Scatter(
+                        x=x,
+                        y=df_fix["Actual"],
+                        mode="lines",
+                        name="Actual",
+                        line=dict(color="#DC2626", width=3),
+                    )
+                )
+    
+                fig.update_layout(
+                    title="Forecast vs Actual Power",
+                    template="plotly_white",
+                    height=500,
+                    hovermode="x unified",
+                    #xaxis=dict(
+                        #title="15 Minute Block",
+                        #dtick=4
+                    #),
+                    yaxis=dict(
+                        title="Power (MW)"
+                    ),
+                    legend=dict(
+                        orientation="h",
+                        y=1.08,
+                        x=0
+                    ),
+                    margin=dict(l=20, r=20, t=60, b=20)
+                )
+    
+                st.plotly_chart(fig, use_container_width=True)
+
     else: 
         if plant_type == "Fixed":
             df = pd.read_excel(uploaded_file, sheet_name="Area & Efficiency", header=[1])
