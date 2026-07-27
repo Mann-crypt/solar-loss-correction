@@ -37,60 +37,8 @@ else:
     ghi_cols = ["GHI_Forecast"]
     df_fix = pd.read_excel(uploaded_file, sheet_name="Fixed", header=[1])
 
-#df_fix = pd.read_excel(uploaded_file, sheet_name="Fixed", header=[1])
 df_fix.columns = df_fix.columns.str.strip()
 df_fix["Actual"] = df_fix["Actual"].fillna(0)
-
-null_indices = df_fix[df_fix["Date"].isna()].index
-if len(null_indices):
-    df_fix = df_fix.iloc[:df_fix.index.get_loc(null_indices[0])]
-
-df_fix = df_fix.iloc[:96].copy()
-
-st.subheader("Input Data")
-
-input_df = df_fix[ghi_cols + ["Actual"]].copy()
-
-edited_df = st.data_editor(
-    input_df,
-    use_container_width=True,
-    hide_index=True,
-    num_rows="fixed"
-)
-
-edited_df = edited_df.iloc[:96].reset_index(drop=True)
-
-for col in ghi_cols:
-    df_fix[col] = edited_df[col].values
-
-df_fix["Actual"] = edited_df["Actual"].values
-# Remove empty rows
-null_indices = df_fix[df_fix["Date"].isna()].index
-if len(null_indices) > 0:
-    first_null = df_fix.index.get_loc(null_indices[0])
-    df_fix = df_fix.iloc[:first_null]
-
-# Keep only first 96 blocks
-df_fix = df_fix.iloc[:96].copy()
-
-st.subheader("Input Data")
-
-# Create editable table
-input_df = df_fix[["GHI_Forecast", "Actual"]].copy()
-
-edited_df = st.data_editor(
-    input_df,
-    use_container_width=True,
-    hide_index=True,
-    num_rows="fixed"
-)
-
-# Ensure exactly 96 rows
-edited_df = edited_df.iloc[:96].reset_index(drop=True)
-
-# Update df_fix
-df_fix["GHI_Forecast"] = edited_df["GHI_Forecast"].values
-df_fix["Actual"] = edited_df["Actual"].values
 
 if len(df_fix) > 96:
     st.warning(
