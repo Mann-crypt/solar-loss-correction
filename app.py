@@ -873,7 +873,6 @@ if st.session_state.run_model:
                                 "Standard PV Efficiency (%)",
                                 "Efficiency Losses(%)",
                                 "Net Efficiency (%)",
-                                "Eff Area"
                             ]
                         ],
                         use_container_width=True,
