@@ -20,24 +20,16 @@ if uploaded_file is None:
     st.info("Pehle File toh upload karo!!!")
     st.stop()
 
-file_path = uploaded_file
-
+# Read workbook
 xls = pd.ExcelFile(uploaded_file)
 
+# Detect workbook type
 is_cluster = "Fixed-CL1" in xls.sheet_names
 
 if is_cluster:
-    sheet = "Fixed-CL1"
-    ghi_cols = [
-        "GHI_Forecast1",
-        "GHI_Forecast2",
-        "GHI_Forecast3",
-        "GHI_Forecast4",
-        "GHI_Forecast5",
-    ]
+    st.success("Cluster Workbook Detected")
 else:
-    sheet = "Fixed"
-    ghi_cols = ["GHI_Forecast"]
+    st.success("Traditional Workbook Detected")
 
 df_fix = pd.read_excel(uploaded_file, sheet_name=sheet, header=[1])
 df_fix.columns = df_fix.columns.str.strip()
