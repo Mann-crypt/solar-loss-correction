@@ -31,7 +31,16 @@ if is_cluster:
 else:
     st.success("Traditional Workbook Detected")
 
-df_fix = pd.read_excel(uploaded_file, sheet_name=sheet, header=[1])
+if is_cluster:
+    st.success("Cluster Workbook Detected")
+    sheet = "Fixed-CL1"
+    ghi_cols = ["CL1-GHI", "CL2-GHI", "CL3-GHI", "CL4-GHI", "CL5-GHI"]
+else:
+    st.success("Traditional Workbook Detected")
+    sheet = "Fixed"
+    ghi_cols = ["GHI_Forecast"]
+
+#df_fix = pd.read_excel(uploaded_file, sheet_name=sheet, header=[1])
 df_fix.columns = df_fix.columns.str.strip()
 df_fix["Actual"] = df_fix["Actual"].fillna(0)
 
@@ -52,10 +61,12 @@ edited_df = st.data_editor(
     num_rows="fixed"
 )
 
-for col in ghi_cols:
-    df_fix[col] = edited_df[col]
+edited_df = edited_df.iloc[:96].reset_index(drop=True)
 
-df_fix["Actual"] = edited_df["Actual"]
+for col in ghi_cols:
+    df_fix[col] = edited_df[col].values
+
+df_fix["Actual"] = edited_df["Actual"].values
 # Remove empty rows
 null_indices = df_fix[df_fix["Date"].isna()].index
 if len(null_indices) > 0:
