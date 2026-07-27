@@ -429,6 +429,30 @@ if st.session_state.run_model:
             df_bcal4 = pd.read_excel(uploaded_file, sheet_name="Backend Cal CL4")
             df_bcal5 = pd.read_excel(uploaded_file, sheet_name="Backend Cal CL5")
             df_trac = pd.read_excel(uploaded_file, sheet_name="Tracking", header=[1])
+
+            backend_list = [
+                df_bcal1,
+                df_bcal2,
+                df_bcal3,
+                df_bcal4,
+                df_bcal5
+            ]
+            
+            ghi_cols = [
+                "CL1-GHI",
+                "CL2-GHI",
+                "CL3-GHI",
+                "CL4-GHI",
+                "CL5-GHI"
+            ]
+            
+            weight_cols = [
+                "CL-1",
+                "CL-2",
+                "CL-3",
+                "CL-4",
+                "CL-5"
+            ]
             
             # ------------------ Objective Function ------------------
             
@@ -451,187 +475,44 @@ if st.session_state.run_model:
                 m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
                 m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
             
-                temp1 = df_bcal1.copy()
-            
-                temp1["DHI"] = df_fix["CL1-GHI"] * DHI / 100
-                temp1["GHI - DHI"] = df_fix["CL1-GHI"] - temp1["DHI"]
-            
-                temp1["Zenith angle ( θ )"] = np.where(
-                    temp1["Block No."] <= GHI_Max_Block,
-                    np.minimum(89, m1 * (temp1["Block No."] - GHI_Max_Block)),
-                    np.minimum(89, m2 * (temp1["Block No."] - GHI_Max_Block))
+                predictions = []
+
+                blocks = backend_list[0]["Block No."]
+                
+                zenith = np.where(
+                    blocks <= GHI_Max_Block,
+                    np.minimum(89, m1 * (blocks - GHI_Max_Block)),
+                    np.minimum(89, m2 * (blocks - GHI_Max_Block))
                 )
-            
-                temp1["Panel Angle (α)"] = np.where(
-                    temp1["Block No."] < GHI_Max_Block,
-                    np.where(
-                        temp1["Zenith angle ( θ )"] < abs(Tracking_angle_lim_E),
-                        temp1["Zenith angle ( θ )"],
-                        abs(Tracking_angle_lim_E)
-                    ),
-                    np.where(
-                        (temp1["Block No."] > GHI_Max_Block) &
-                        (temp1["Zenith angle ( θ )"] > Tracking_angle_lim_W),
-                        Tracking_angle_lim_W,
-                        temp1["Zenith angle ( θ )"]
-                    )
+                
+                panel = np.where(
+                    blocks < GHI_Max_Block,
+                    np.minimum(zenith, abs(Tracking_angle_lim_E)),
+                    np.minimum(zenith, Tracking_angle_lim_W)
                 )
-            
-                temp1["θ - α"] = temp1["Zenith angle ( θ )"] - temp1["Panel Angle (α)"]
-            
-                temp1["Cos(θ)"] = np.cos(np.radians(temp1["Zenith angle ( θ )"]))
-                temp1["Cos(α)"] = np.cos(np.radians(temp1["Panel Angle (α)"]))
-                temp1["Cos(θ - α)"] = np.cos(np.radians(temp1["θ - α"]))
-            
-                temp1["DNI"] = temp1["GHI - DHI"] / temp1["Cos(α)"]
-            
-                prediction1 = (temp1["DNI"] * np.sum(df_weight["CL-1"])) / 1000000
-            
-                temp2 = df_bcal2.copy()
-            
-                temp2["DHI"] = df_fix["CL2-GHI"] * DHI / 100
-                temp2["GHI - DHI"] = df_fix["CL2-GHI"] - temp2["DHI"]
-            
-                temp2["Zenith angle ( θ )"] = np.where(
-                    temp2["Block No."] <= GHI_Max_Block,
-                    np.minimum(89, m1 * (temp2["Block No."] - GHI_Max_Block)),
-                    np.minimum(89, m2 * (temp2["Block No."] - GHI_Max_Block))
-                )
-            
-                temp2["Panel Angle (α)"] = np.where(
-                    temp2["Block No."] < GHI_Max_Block,
-                    np.where(
-                        temp2["Zenith angle ( θ )"] < abs(Tracking_angle_lim_E),
-                        temp2["Zenith angle ( θ )"],
-                        abs(Tracking_angle_lim_E)
-                    ),
-                    np.where(
-                        (temp2["Block No."] > GHI_Max_Block) &
-                        (temp2["Zenith angle ( θ )"] > Tracking_angle_lim_W),
-                        Tracking_angle_lim_W,
-                        temp2["Zenith angle ( θ )"]
-                    )
-                )
-            
-                temp2["θ - α"] = temp2["Zenith angle ( θ )"] - temp2["Panel Angle (α)"]
-            
-                temp2["Cos(θ)"] = np.cos(np.radians(temp2["Zenith angle ( θ )"]))
-                temp2["Cos(α)"] = np.cos(np.radians(temp2["Panel Angle (α)"]))
-                temp2["Cos(θ - α)"] = np.cos(np.radians(temp2["θ - α"]))
-            
-                temp2["DNI"] = temp2["GHI - DHI"] / temp2["Cos(α)"]
-            
-                prediction2 = (temp2["DNI"] * np.sum(df_weight["CL-2"])) / 1000000
-            
-                temp3 = df_bcal3.copy()
-            
-                temp3["DHI"] = df_fix["CL3-GHI"] * DHI / 100
-                temp3["GHI - DHI"] = df_fix["CL3-GHI"] - temp3["DHI"]
-            
-                temp3["Zenith angle ( θ )"] = np.where(
-                    temp3["Block No."] <= GHI_Max_Block,
-                    np.minimum(89, m1 * (temp3["Block No."] - GHI_Max_Block)),
-                    np.minimum(89, m2 * (temp3["Block No."] - GHI_Max_Block))
-                )
-            
-                temp3["Panel Angle (α)"] = np.where(
-                    temp3["Block No."] < GHI_Max_Block,
-                    np.where(
-                        temp3["Zenith angle ( θ )"] < abs(Tracking_angle_lim_E),
-                        temp3["Zenith angle ( θ )"],
-                        abs(Tracking_angle_lim_E)
-                    ),
-                    np.where(
-                        (temp3["Block No."] > GHI_Max_Block) &
-                        (temp3["Zenith angle ( θ )"] > Tracking_angle_lim_W),
-                        Tracking_angle_lim_W,
-                        temp3["Zenith angle ( θ )"]
-                    )
-                )
-            
-                temp3["θ - α"] = temp3["Zenith angle ( θ )"] - temp3["Panel Angle (α)"]
-            
-                temp3["Cos(θ)"] = np.cos(np.radians(temp3["Zenith angle ( θ )"]))
-                temp3["Cos(α)"] = np.cos(np.radians(temp3["Panel Angle (α)"]))
-                temp3["Cos(θ - α)"] = np.cos(np.radians(temp3["θ - α"]))
-            
-                temp3["DNI"] = temp3["GHI - DHI"] / temp3["Cos(α)"]
-            
-                prediction3 = (temp3["DNI"] * np.sum(df_weight["CL-3"])) / 1000000
-            
-                temp4 = df_bcal4.copy()
-            
-                temp4["DHI"] = df_fix["CL4-GHI"] * DHI / 100
-                temp4["GHI - DHI"] = df_fix["CL4-GHI"] - temp4["DHI"]
-            
-                temp4["Zenith angle ( θ )"] = np.where(
-                    temp4["Block No."] <= GHI_Max_Block,
-                    np.minimum(89, m1 * (temp4["Block No."] - GHI_Max_Block)),
-                    np.minimum(89, m2 * (temp4["Block No."] - GHI_Max_Block))
-                )
-            
-                temp4["Panel Angle (α)"] = np.where(
-                    temp4["Block No."] < GHI_Max_Block,
-                    np.where(
-                        temp4["Zenith angle ( θ )"] < abs(Tracking_angle_lim_E),
-                        temp4["Zenith angle ( θ )"],
-                        abs(Tracking_angle_lim_E)
-                    ),
-                    np.where(
-                        (temp4["Block No."] > GHI_Max_Block) &
-                        (temp4["Zenith angle ( θ )"] > Tracking_angle_lim_W),
-                        Tracking_angle_lim_W,
-                        temp4["Zenith angle ( θ )"]
-                    )
-                )
-            
-                temp4["θ - α"] = temp4["Zenith angle ( θ )"] - temp4["Panel Angle (α)"]
-            
-                temp4["Cos(θ)"] = np.cos(np.radians(temp4["Zenith angle ( θ )"]))
-                temp4["Cos(α)"] = np.cos(np.radians(temp4["Panel Angle (α)"]))
-                temp4["Cos(θ - α)"] = np.cos(np.radians(temp4["θ - α"]))
-            
-                temp4["DNI"] = temp4["GHI - DHI"] / temp4["Cos(α)"]
-            
-                prediction4 = (temp4["DNI"] * np.sum(df_weight["CL-4"])) / 1000000
-            
-                temp5 = df_bcal5.copy()
-            
-                temp5["DHI"] = df_fix["CL5-GHI"] * DHI / 100
-                temp5["GHI - DHI"] = df_fix["CL5-GHI"] - temp5["DHI"]
-            
-                temp5["Zenith angle ( θ )"] = np.where(
-                    temp5["Block No."] <= GHI_Max_Block,
-                    np.minimum(89, m1 * (temp5["Block No."] - GHI_Max_Block)),
-                    np.minimum(89, m2 * (temp5["Block No."] - GHI_Max_Block))
-                )
-            
-                temp5["Panel Angle (α)"] = np.where(
-                    temp5["Block No."] < GHI_Max_Block,
-                    np.where(
-                        temp5["Zenith angle ( θ )"] < abs(Tracking_angle_lim_E),
-                        temp5["Zenith angle ( θ )"],
-                        abs(Tracking_angle_lim_E)
-                    ),
-                    np.where(
-                        (temp5["Block No."] > GHI_Max_Block) &
-                        (temp5["Zenith angle ( θ )"] > Tracking_angle_lim_W),
-                        Tracking_angle_lim_W,
-                        temp5["Zenith angle ( θ )"]
-                    )
-                )
-            
-                temp5["θ - α"] = temp5["Zenith angle ( θ )"] - temp5["Panel Angle (α)"]
-            
-                temp5["Cos(θ)"] = np.cos(np.radians(temp5["Zenith angle ( θ )"]))
-                temp5["Cos(α)"] = np.cos(np.radians(temp5["Panel Angle (α)"]))
-                temp5["Cos(θ - α)"] = np.cos(np.radians(temp5["θ - α"]))
-            
-                temp5["DNI"] = temp5["GHI - DHI"] / temp5["Cos(α)"]
-            
-                prediction5 = (temp5["DNI"] * np.sum(df_weight["CL-5"])) / 1000000
-            
-                prediction = prediction1 + prediction2 + prediction3 + prediction4 + prediction5
+                
+                cos_alpha = np.cos(np.radians(panel))
+                
+                weights = df_weight.sum()
+                
+                for backend, ghi_col, weight_col in zip(
+                        backend_list,
+                        ghi_cols,
+                        weight_cols):
+                
+                    ghi = df_fix[ghi_col].to_numpy()
+                
+                    dhi = ghi * DHI / 100
+                
+                    dni = (ghi - dhi) / cos_alpha
+                
+                    pred = (
+                        dni * weights[weight_col]
+                    ) / 1_000_000
+                
+                    predictions.append(pred)
+                
+                prediction = np.sum(predictions, axis=0)
             
                 # Comparision
             
@@ -640,7 +521,6 @@ if st.session_state.run_model:
                 from sklearn.metrics import mean_squared_error
             
                 actual = df_fix["Actual"].values
-                prediction = prediction.values
             
                 # Consider only daylight blocks
                 #mask = df_fix["GHI_Forecast"].values > 50
@@ -864,7 +744,13 @@ if st.session_state.run_model:
                     df["Standard PV Efficiency (%)"]
                     - df["Efficiency Losses(%)"]
                 )
-                
+                df_weight = pd.DataFrame({
+                    "CL-1": ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-1"].iloc[0],
+                    "CL-2": ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-2"].iloc[0],
+                    "CL-3": ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-3"].iloc[0],
+                    "CL-4": ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-4"].iloc[0],
+                    "CL-5": ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-5"].iloc[0],
+                })
                 with st.expander("🔍 View Efficiency Calculations"):
                     st.dataframe(
                         df[
@@ -886,189 +772,45 @@ if st.session_state.run_model:
             m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
             m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
             
-            df_bcal1["DHI"] = df_fix["CL1-GHI"] * DHI / 100
-            df_bcal1["GHI - DHI"] = df_fix["CL1-GHI"] - df_bcal1["DHI"]
-            
-            df_bcal1["Zenith angle ( θ )"] = np.where(
-                df_bcal1["Block No."] <= GHI_Max_Block,
-                np.minimum(89, m1 * (df_bcal1["Block No."] - GHI_Max_Block)),
-                np.minimum(89, m2 * (df_bcal1["Block No."] - GHI_Max_Block))
+            blocks = backend_list[0]["Block No."]
+
+            zenith = np.where(
+                blocks <= GHI_Max_Block,
+                np.minimum(89, m1 * (blocks - GHI_Max_Block)),
+                np.minimum(89, m2 * (blocks - GHI_Max_Block))
             )
             
-            df_bcal1["Panel Angle (α)"] = np.where(
-                df_bcal1["Block No."] < GHI_Max_Block,
+            panel = np.where(
+                blocks < GHI_Max_Block,
+                np.minimum(zenith, abs(Tracking_angle_lim_E)),
                 np.where(
-                    df_bcal1["Zenith angle ( θ )"] < abs(Tracking_angle_lim_E),
-                    df_bcal1["Zenith angle ( θ )"],
-                    abs(Tracking_angle_lim_E)
-                ),
-                np.where(
-                    (df_bcal1["Block No."] > GHI_Max_Block) &
-                    (df_bcal1["Zenith angle ( θ )"] > Tracking_angle_lim_W),
+                    (blocks > GHI_Max_Block) & (zenith > Tracking_angle_lim_W),
                     Tracking_angle_lim_W,
-                    df_bcal1["Zenith angle ( θ )"]
+                    zenith
                 )
             )
             
-            df_bcal1["θ - α"] = df_bcal1["Zenith angle ( θ )"] - df_bcal1["Panel Angle (α)"]
-            df_bcal1["Cos(θ)"] = np.cos(np.radians(df_bcal1["Zenith angle ( θ )"]))
-            df_bcal1["Cos(α)"] = np.cos(np.radians(df_bcal1["Panel Angle (α)"]))
-            df_bcal1["Cos(θ - α)"] = np.cos(np.radians(df_bcal1["θ - α"]))
-            df_bcal1["DNI"] = df_bcal1["GHI - DHI"] / df_bcal1["Cos(α)"]
+            cos_alpha = np.cos(np.radians(panel))
             
-            df_trac["Fixed Power=I*Ƞ*A-CL1"] = (
-                df_bcal1["DNI"] * np.sum(df_weight["CL-1"])
-            ) / 1000000
+            weights = df_weight.sum()
             
-            m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
-            m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
+            forecast = np.zeros(len(df_fix))
             
-            df_bcal2["DHI"] = df_fix["CL2-GHI"] * DHI / 100
-            df_bcal2["GHI - DHI"] = df_fix["CL2-GHI"] - df_bcal2["DHI"]
+            for ghi_col, weight_col in zip(
+                    ghi_cols,
+                    weight_cols):
             
-            df_bcal2["Zenith angle ( θ )"] = np.where(
-                df_bcal2["Block No."] <= GHI_Max_Block,
-                np.minimum(89, m1 * (df_bcal2["Block No."] - GHI_Max_Block)),
-                np.minimum(89, m2 * (df_bcal2["Block No."] - GHI_Max_Block))
-            )
+                ghi = df_fix[ghi_col].to_numpy()
             
-            df_bcal2["Panel Angle (α)"] = np.where(
-                df_bcal2["Block No."] < GHI_Max_Block,
-                np.where(
-                    df_bcal2["Zenith angle ( θ )"] < abs(Tracking_angle_lim_E),
-                    df_bcal2["Zenith angle ( θ )"],
-                    abs(Tracking_angle_lim_E)
-                ),
-                np.where(
-                    (df_bcal2["Block No."] > GHI_Max_Block) &
-                    (df_bcal2["Zenith angle ( θ )"] > Tracking_angle_lim_W),
-                    Tracking_angle_lim_W,
-                    df_bcal2["Zenith angle ( θ )"]
-                )
-            )
+                dhi = ghi * DHI / 100
             
-            df_bcal2["θ - α"] = df_bcal2["Zenith angle ( θ )"] - df_bcal2["Panel Angle (α)"]
-            df_bcal2["Cos(θ)"] = np.cos(np.radians(df_bcal2["Zenith angle ( θ )"]))
-            df_bcal2["Cos(α)"] = np.cos(np.radians(df_bcal2["Panel Angle (α)"]))
-            df_bcal2["Cos(θ - α)"] = np.cos(np.radians(df_bcal2["θ - α"]))
-            df_bcal2["DNI"] = df_bcal2["GHI - DHI"] / df_bcal2["Cos(α)"]
+                dni = (ghi - dhi) / cos_alpha
             
-            df_trac["Fixed Power=I*Ƞ*A-CL2"] = (
-                df_bcal2["DNI"] * np.sum(df_weight["CL-2"])
-            ) / 1000000
+                forecast += (
+                    dni * weights[weight_col]
+                ) / 1_000_000
             
-            m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
-            m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
-            
-            df_bcal3["DHI"] = df_fix["CL3-GHI"] * DHI / 100
-            df_bcal3["GHI - DHI"] = df_fix["CL3-GHI"] - df_bcal3["DHI"]
-            
-            df_bcal3["Zenith angle ( θ )"] = np.where(
-                df_bcal3["Block No."] <= GHI_Max_Block,
-                np.minimum(89, m1 * (df_bcal3["Block No."] - GHI_Max_Block)),
-                np.minimum(89, m2 * (df_bcal3["Block No."] - GHI_Max_Block))
-            )
-            
-            df_bcal3["Panel Angle (α)"] = np.where(
-                df_bcal3["Block No."] < GHI_Max_Block,
-                np.where(
-                    df_bcal3["Zenith angle ( θ )"] < abs(Tracking_angle_lim_E),
-                    df_bcal3["Zenith angle ( θ )"],
-                    abs(Tracking_angle_lim_E)
-                ),
-                np.where(
-                    (df_bcal3["Block No."] > GHI_Max_Block) &
-                    (df_bcal3["Zenith angle ( θ )"] > Tracking_angle_lim_W),
-                    Tracking_angle_lim_W,
-                    df_bcal3["Zenith angle ( θ )"]
-                )
-            )
-            
-            df_bcal3["θ - α"] = df_bcal3["Zenith angle ( θ )"] - df_bcal3["Panel Angle (α)"]
-            df_bcal3["Cos(θ)"] = np.cos(np.radians(df_bcal3["Zenith angle ( θ )"]))
-            df_bcal3["Cos(α)"] = np.cos(np.radians(df_bcal3["Panel Angle (α)"]))
-            df_bcal3["Cos(θ - α)"] = np.cos(np.radians(df_bcal3["θ - α"]))
-            df_bcal3["DNI"] = df_bcal3["GHI - DHI"] / df_bcal3["Cos(α)"]
-            
-            df_trac["Fixed Power=I*Ƞ*A-CL3"] = (
-                df_bcal3["DNI"] * np.sum(df_weight["CL-3"])
-            ) / 1000000
-            
-            m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
-            m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
-            
-            df_bcal4["DHI"] = df_fix["CL4-GHI"] * DHI / 100
-            df_bcal4["GHI - DHI"] = df_fix["CL4-GHI"] - df_bcal4["DHI"]
-            
-            df_bcal4["Zenith angle ( θ )"] = np.where(
-                df_bcal4["Block No."] <= GHI_Max_Block,
-                np.minimum(89, m1 * (df_bcal4["Block No."] - GHI_Max_Block)),
-                np.minimum(89, m2 * (df_bcal4["Block No."] - GHI_Max_Block))
-            )
-            
-            df_bcal4["Panel Angle (α)"] = np.where(
-                df_bcal4["Block No."] < GHI_Max_Block,
-                np.where(
-                    df_bcal4["Zenith angle ( θ )"] < abs(Tracking_angle_lim_E),
-                    df_bcal4["Zenith angle ( θ )"],
-                    abs(Tracking_angle_lim_E)
-                ),
-                np.where(
-                    (df_bcal4["Block No."] > GHI_Max_Block) &
-                    (df_bcal4["Zenith angle ( θ )"] > Tracking_angle_lim_W),
-                    Tracking_angle_lim_W,
-                    df_bcal4["Zenith angle ( θ )"]
-                )
-            )
-            
-            df_bcal4["θ - α"] = df_bcal4["Zenith angle ( θ )"] - df_bcal4["Panel Angle (α)"]
-            df_bcal4["Cos(θ)"] = np.cos(np.radians(df_bcal4["Zenith angle ( θ )"]))
-            df_bcal4["Cos(α)"] = np.cos(np.radians(df_bcal4["Panel Angle (α)"]))
-            df_bcal4["Cos(θ - α)"] = np.cos(np.radians(df_bcal4["θ - α"]))
-            df_bcal4["DNI"] = df_bcal4["GHI - DHI"] / df_bcal4["Cos(α)"]
-            
-            df_trac["Fixed Power=I*Ƞ*A-CL4"] = (
-                df_bcal4["DNI"] * np.sum(df_weight["CL-4"])
-            ) / 1000000
-            
-            m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
-            m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
-            
-            df_bcal5["DHI"] = df_fix["CL5-GHI"] * DHI / 100
-            df_bcal5["GHI - DHI"] = df_fix["CL5-GHI"] - df_bcal5["DHI"]
-            
-            df_bcal5["Zenith angle ( θ )"] = np.where(
-                df_bcal5["Block No."] <= GHI_Max_Block,
-                np.minimum(89, m1 * (df_bcal5["Block No."] - GHI_Max_Block)),
-                np.minimum(89, m2 * (df_bcal5["Block No."] - GHI_Max_Block))
-            )
-            
-            df_bcal5["Panel Angle (α)"] = np.where(
-                df_bcal5["Block No."] < GHI_Max_Block,
-                np.where(
-                    df_bcal5["Zenith angle ( θ )"] < abs(Tracking_angle_lim_E),
-                    df_bcal5["Zenith angle ( θ )"],
-                    abs(Tracking_angle_lim_E)
-                ),
-                np.where(
-                    (df_bcal5["Block No."] > GHI_Max_Block) &
-                    (df_bcal5["Zenith angle ( θ )"] > Tracking_angle_lim_W),
-                    Tracking_angle_lim_W,
-                    df_bcal5["Zenith angle ( θ )"]
-                )
-            )
-            
-            df_bcal5["θ - α"] = df_bcal5["Zenith angle ( θ )"] - df_bcal5["Panel Angle (α)"]
-            df_bcal5["Cos(θ)"] = np.cos(np.radians(df_bcal5["Zenith angle ( θ )"]))
-            df_bcal5["Cos(α)"] = np.cos(np.radians(df_bcal5["Panel Angle (α)"]))
-            df_bcal5["Cos(θ - α)"] = np.cos(np.radians(df_bcal5["θ - α"]))
-            df_bcal5["DNI"] = df_bcal5["GHI - DHI"] / df_bcal5["Cos(α)"]
-            
-            df_trac["Fixed Power=I*Ƞ*A-CL5"] = (
-                df_bcal5["DNI"] * np.sum(df_weight["CL-5"])
-            ) / 1000000
-            
-            df_trac["Fixed Power=I*Ƞ*A"] = df_trac["Fixed Power=I*Ƞ*A-CL1"] + df_trac["Fixed Power=I*Ƞ*A-CL2"] + df_trac["Fixed Power=I*Ƞ*A-CL3"] + df_trac["Fixed Power=I*Ƞ*A-CL4"] + df_trac["Fixed Power=I*Ƞ*A-CL5"]
+            df_trac["Fixed Power=I*Ƞ*A"] = forecast
             x = np.arange(1, 97)
     
             fig = go.Figure()
