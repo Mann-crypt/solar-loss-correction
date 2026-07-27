@@ -488,7 +488,11 @@ if st.session_state.run_model:
                     panel = np.where(
                         blocks < GHI_Max_Block,
                         np.minimum(zenith, abs(Tracking_angle_lim_E)),
-                        np.minimum(zenith, Tracking_angle_lim_W)
+                        np.where(
+                            (blocks > GHI_Max_Block) & (zenith > Tracking_angle_lim_W),
+                            Tracking_angle_lim_W,
+                            zenith
+                        )
                     )
                     
                     cos_alpha = np.cos(np.radians(panel))
