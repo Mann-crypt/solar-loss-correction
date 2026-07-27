@@ -431,12 +431,12 @@ if st.session_state.run_model:
             df["Efficiency Losses(%)"] = best_loss
             # ------------------ Read Data ------------------
 
-            df_bcal1 = pd.read_excel(file_path, sheet_name="Backend Cal CL1")
-            df_bcal2 = pd.read_excel(file_path, sheet_name="Backend Cal CL2")
-            df_bcal3 = pd.read_excel(file_path, sheet_name="Backend Cal CL3")
-            df_bcal4 = pd.read_excel(file_path, sheet_name="Backend Cal CL4")
-            df_bcal5 = pd.read_excel(file_path, sheet_name="Backend Cal CL5")
-            df_trac = pd.read_excel(file_path, sheet_name="Tracking", header=[1])
+            df_bcal1 = pd.read_excel(uploaded_file, sheet_name="Backend Cal CL1")
+            df_bcal2 = pd.read_excel(uploaded_file, sheet_name="Backend Cal CL2")
+            df_bcal3 = pd.read_excel(uploaded_file, sheet_name="Backend Cal CL3")
+            df_bcal4 = pd.read_excel(uploaded_file, sheet_name="Backend Cal CL4")
+            df_bcal5 = pd.read_excel(uploaded_file, sheet_name="Backend Cal CL5")
+            df_trac = pd.read_excel(uploaded_file, sheet_name="Tracking", header=[1])
             
             # ------------------ Objective Function ------------------
             
