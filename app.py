@@ -622,7 +622,7 @@ if st.session_state.run_model:
                     progress.progress(generation["count"] / MAX_ITER)
     
                     # Change quote every 7 generations
-                    if generation["count"] % 3 == 1:
+                    if generation["count"] % 6 == 1:
                         current_quote["text"] = random_quote()
     
                     status.info(
@@ -663,6 +663,7 @@ if st.session_state.run_model:
                     "east": int(best[4]),
                     "west": int(best[5]),
                 }
+                print(st.session_state.params)
                 st.session_state.loss = st.session_state.params["loss"]
                 st.session_state.dhi = st.session_state.params["DHI"]
                 st.session_state.start = st.session_state.params["start"]
