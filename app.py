@@ -16,21 +16,44 @@ uploaded_file = st.file_uploader(
     key="excel_uploader"
 )
 
-if uploaded_file is None:
-    st.info("Pehle File toh upload karo!!!")
-    st.stop()
+xls = pd.ExcelFile(uploaded_file)
 
-if "last_file" not in st.session_state:
-    st.session_state.last_file = None
+if "Fixed-CL1" in xls.sheet_names:
+    sheet = "Fixed-CL1"
+    ghi_cols = [
+        "GHI_Forecast1",
+        "GHI_Forecast2",
+        "GHI_Forecast3",
+        "GHI_Forecast4",
+        "GHI_Forecast5",
+    ]
+else:
+    sheet = "Fixed"
+    ghi_cols = ["GHI_Forecast"]
 
-if uploaded_file is not None:
-    if st.session_state.last_file != uploaded_file.name:
-        st.session_state.last_file = uploaded_file.name
-        st.session_state.pop("params", None)
-        st.session_state.run_model = False
-        
-file_path = uploaded_file
+df_fix = pd.read_excel(uploaded_file, sheet_name=sheet, header=[1])
+df_fix.columns = df_fix.columns.str.strip()
+df_fix["Actual"] = df_fix["Actual"].fillna(0)
 
+null_indices = df_fix[df_fix["Date"].isna()].index
+if len(null_indices):
+    df_fix = df_fix.iloc[:df_fix.index.get_loc(null_indices[0])]
+
+df_fix = df_fix.iloc[:96].copy()
+
+input_df = df_fix[ghi_cols + ["Actual"]].copy()
+
+edited_df = st.data_editor(
+    input_df,
+    use_container_width=True,
+    hide_index=True,
+    num_rows="fixed"
+)
+
+for col in ghi_cols:
+    df_fix[col] = edited_df[col]
+
+df_fix["Actual"] = edited_df["Actual"]
 # Read Fixed sheet first
 df_fix = pd.read_excel(file_path, sheet_name="Fixed", header=[1])
 df_fix.columns = df_fix.columns.str.strip()
