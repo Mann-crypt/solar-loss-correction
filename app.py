@@ -27,11 +27,11 @@ xls = pd.ExcelFile(uploaded_file)
 is_cluster = "Fixed-CL1" in xls.sheet_names
 
 if is_cluster:
-    st.success("Cluster Workbook Detected")
+    st.success("Arey Yarrr!! phir se Cluster")
     sheet = "Fixed-CL1"
     ghi_cols = ["CL1-GHI", "CL2-GHI", "CL3-GHI", "CL4-GHI", "CL5-GHI"]
 else:
-    st.success("Traditional Workbook Detected")
+    st.success("Arey Waah!! no Cluster")
     sheet = "Fixed"
     ghi_cols = ["GHI_Forecast"]
 
@@ -359,8 +359,6 @@ if st.session_state.run_model:
             # Maximum possible loss
             max_loss = df["Standard PV Efficiency (%)"].min()
             
-            #peak_error = abs(actual_peak - predicted_peak) / actual_peak * 100
-            
             results = []
             
             for loss in np.arange(0, max_loss + 0.01, 0.1):
@@ -429,31 +427,7 @@ if st.session_state.run_model:
             df_weight["CL-4"] = ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-4"].values[0:1]
             df_weight["CL-5"] = ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-5"].values[0:1]
                 
-            df_fix["CL1_Fixed Power=I*Ƞ*A"] = (
-                df_fix["POA fixed"] * np.sum(df_weight["CL-1"])
-            ) / 1000000
             
-            df_fix["CL2_Fixed Power=I*Ƞ*A"] = (
-                df_fix["POA fixed-CL2"] * np.sum(df_weight["CL-2"])
-            ) / 1000000
-            
-            df_fix["CL3_Fixed Power=I*Ƞ*A"] = (
-                df_fix["POA fixed-CL3"] * np.sum(df_weight["CL-3"])
-            ) / 1000000
-            
-            df_fix["CL4_Fixed Power=I*Ƞ*A"] = (
-                df_fix["POA fixed-CL4"] * np.sum(df_weight["CL-4"])
-            ) / 1000000
-            
-            df_fix["CL5_Fixed Power=I*Ƞ*A"] = (
-                df_fix["POA fixed-CL5"] * np.sum(df_weight["CL-5"])
-            ) / 1000000
-            
-            df_fix["Total Power (CL1+CL2+…)"] = df_fix["CL1_Fixed Power=I*Ƞ*A"] + df_fix["CL2_Fixed Power=I*Ƞ*A"] + df_fix["CL3_Fixed Power=I*Ƞ*A"] + df_fix["CL4_Fixed Power=I*Ƞ*A"] + df_fix["CL5_Fixed Power=I*Ƞ*A"]
-            st.metric(
-                "Efficiency Loss",
-                f"{best_loss:.2f}%"
-            )
             # ------------------ Read Data ------------------
 
             df_bcal1 = pd.read_excel(uploaded_file, sheet_name="Backend Cal CL1")
@@ -666,22 +640,6 @@ if st.session_state.run_model:
                     return False
     
                 with st.spinner("Ho raha hai aap tab tak saath waale se baat karlo...🗣"):
-                    st.write("Actual sum", df_fix["Actual"].sum())
-                    st.write("Actual max", df_fix["Actual"].max())
-                    
-                    st.write("Weights")
-                    st.write(df_weight.sum())
-                    
-                    st.write("CL1 sum", df_fix["CL1-GHI"].sum())
-                    st.write("Block count", len(backend_list[0]))
-                    st.write(df["Total area(m2)"].sum())
-
-                    st.write(df["Net Efficiency (%)"].sum())
-                    
-                    st.write(df_w)
-                    
-                    st.write(df_weight.sum())
-    
                     result = differential_evolution(
                         objective,
                         bounds=bounds,
@@ -699,17 +657,6 @@ if st.session_state.run_model:
     
                 progress.empty()
                 status.success("✅ Dekha Kitni Jaldi Hogaya!")
-                st.write("Optimizer score:", result.fun)
-
-                best = np.round(result.x).astype(int)
-                
-                st.write("Optimizer parameters:", best.tolist())
-                
-                st.write(
-                    "Rounded score:",
-                    objective(best)
-                )
-    
                 st.session_state.params = {
                     "loss": float(best_loss),
                     "DHI": int(best[0]),
