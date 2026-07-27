@@ -128,19 +128,19 @@ if st.session_state.run_model:
             df_fix["Sin(a)"] = np.sin(np.radians(df_fix["Elevation angle a"]))
             df_fix["GHI*sin(a)"] = df_fix["CL1-GHI"] * df_fix["Sin(a)"]
             df_fix["GHI*sin(a+b)"] = df_fix["CL1-GHI"] * df_fix["SIN(a+b)"]
-            df_fix["POA fixed"] = df_fix["GHI*sin(a)"] / df_fix["Sin(a)"]
+            df_fix["POA fixed"] = df_fix["GHI*sin(a+b)"] / df_fix["Sin(a)"]
             df_fix["GHI*sin(a)-CL2"] = df_fix["CL2-GHI"] * df_fix["Sin(a)"]
             df_fix["GHI*sin(a+b)-CL2"] = df_fix["CL2-GHI"] * df_fix["SIN(a+b)"]
-            df_fix["POA fixed-CL2"] = df_fix["GHI*sin(a)-CL2"] / df_fix["Sin(a)"]
+            df_fix["POA fixed-CL2"] = df_fix["GHI*sin(a+b)-CL2"] / df_fix["Sin(a)"]
             df_fix["GHI*sin(a)-CL3"] = df_fix["CL3-GHI"] * df_fix["Sin(a)"]
             df_fix["GHI*sin(a+b)-CL3"] = df_fix["CL3-GHI"] * df_fix["SIN(a+b)"]
-            df_fix["POA fixed-CL3"] = df_fix["GHI*sin(a)-CL3"] / df_fix["Sin(a)"]
+            df_fix["POA fixed-CL3"] = df_fix["GHI*sin(a+b)-CL3"] / df_fix["Sin(a)"]
             df_fix["GHI*sin(a)-CL4"] = df_fix["CL4-GHI"] * df_fix["Sin(a)"]
             df_fix["GHI*sin(a+b)-CL4"] = df_fix["CL4-GHI"] * df_fix["SIN(a+b)"]
-            df_fix["POA fixed-CL4"] = df_fix["GHI*sin(a)-CL4"] / df_fix["Sin(a)"]
+            df_fix["POA fixed-CL4"] = df_fix["GHI*sin(a+b)-CL4"] / df_fix["Sin(a)"]
             df_fix["GHI*sin(a)-CL5"] = df_fix["CL5-GHI"] * df_fix["Sin(a)"]
             df_fix["GHI*sin(a+b)-CL5"] = df_fix["CL5-GHI"] * df_fix["SIN(a+b)"]
-            df_fix["POA fixed-CL5"] = df_fix["GHI*sin(a)-CL5"] / df_fix["Sin(a)"]
+            df_fix["POA fixed-CL5"] = df_fix["GHI*sin(a+b)-CL5"] / df_fix["Sin(a)"]
             
             
             # Maximum possible loss
@@ -323,13 +323,6 @@ if st.session_state.run_model:
                 'Unnamed: 3': 'Month',
             })
             month_lookup = df_tilt.set_index('Month')['Fixed'].to_dict()
-            df_ghi = pd.read_excel(uploaded_file, sheet_name="Result", usecols=[0, 1, 2, 3, 4, 5])
-            df_ghi = df_ghi.fillna(0)
-            df_fix = pd.read_excel(uploaded_file, sheet_name="Fixed-CL1", header=[1])
-            df_fix.columns = df_fix.columns.str.strip()
-            null_indices = df_fix[df_fix['Date'].isna()].index
-            first_null_pos = df_fix.index.get_loc(null_indices[0])
-            df_fix = df_fix.iloc[:first_null_pos]
             
             df_fix["Date"] = pd.Timestamp.today()
             first_date = pd.Timestamp.today().replace(month=1, day=1).normalize()
@@ -348,19 +341,19 @@ if st.session_state.run_model:
             df_fix["Sin(a)"] = np.sin(np.radians(df_fix["Elevation angle a"]))
             df_fix["GHI*sin(a)"] = df_fix["CL1-GHI"] * df_fix["Sin(a)"]
             df_fix["GHI*sin(a+b)"] = df_fix["CL1-GHI"] * df_fix["SIN(a+b)"]
-            df_fix["POA fixed"] = df_fix["GHI*sin(a)"] / df_fix["Sin(a)"]
+            df_fix["POA fixed"] = df_fix["GHI*sin(a+b)"] / df_fix["Sin(a)"]
             df_fix["GHI*sin(a)-CL2"] = df_fix["CL2-GHI"] * df_fix["Sin(a)"]
             df_fix["GHI*sin(a+b)-CL2"] = df_fix["CL2-GHI"] * df_fix["SIN(a+b)"]
-            df_fix["POA fixed-CL2"] = df_fix["GHI*sin(a)-CL2"] / df_fix["Sin(a)"]
+            df_fix["POA fixed-CL2"] = df_fix["GHI*sin(a+b)-CL2"] / df_fix["Sin(a)"]
             df_fix["GHI*sin(a)-CL3"] = df_fix["CL3-GHI"] * df_fix["Sin(a)"]
             df_fix["GHI*sin(a+b)-CL3"] = df_fix["CL3-GHI"] * df_fix["SIN(a+b)"]
-            df_fix["POA fixed-CL3"] = df_fix["GHI*sin(a)-CL3"] / df_fix["Sin(a)"]
+            df_fix["POA fixed-CL3"] = df_fix["GHI*sin(a+b)-CL3"] / df_fix["Sin(a)"]
             df_fix["GHI*sin(a)-CL4"] = df_fix["CL4-GHI"] * df_fix["Sin(a)"]
             df_fix["GHI*sin(a+b)-CL4"] = df_fix["CL4-GHI"] * df_fix["SIN(a+b)"]
-            df_fix["POA fixed-CL4"] = df_fix["GHI*sin(a)-CL4"] / df_fix["Sin(a)"]
+            df_fix["POA fixed-CL4"] = df_fix["GHI*sin(a+b)-CL4"] / df_fix["Sin(a)"]
             df_fix["GHI*sin(a)-CL5"] = df_fix["CL5-GHI"] * df_fix["Sin(a)"]
             df_fix["GHI*sin(a+b)-CL5"] = df_fix["CL5-GHI"] * df_fix["SIN(a+b)"]
-            df_fix["POA fixed-CL5"] = df_fix["GHI*sin(a)-CL5"] / df_fix["Sin(a)"]
+            df_fix["POA fixed-CL5"] = df_fix["GHI*sin(a+b)-CL5"] / df_fix["Sin(a)"]
             
             
             # Maximum possible loss
