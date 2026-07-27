@@ -40,6 +40,15 @@ else:
 df_fix.columns = df_fix.columns.str.strip()
 df_fix["Actual"] = df_fix["Actual"].fillna(0)
 
+# Remove empty rows
+null_indices = df_fix[df_fix["Date"].isna()].index
+if len(null_indices) > 0:
+    first_null = df_fix.index.get_loc(null_indices[0])
+    df_fix = df_fix.iloc[:first_null]
+
+# Keep only first 96 blocks
+df_fix = df_fix.iloc[:96].copy()
+
 st.subheader("Input Data")
 
 input_df = df_fix[ghi_cols + ["Actual"]].copy()
@@ -57,21 +66,6 @@ for col in ghi_cols:
     df_fix[col] = edited_df[col].values
 
 df_fix["Actual"] = edited_df["Actual"].values
-
-# Remove empty rows
-null_indices = df_fix[df_fix["Date"].isna()].index
-if len(null_indices) > 0:
-    first_null = df_fix.index.get_loc(null_indices[0])
-    df_fix = df_fix.iloc[:first_null]
-
-# Keep only first 96 blocks
-df_fix = df_fix.iloc[:96].copy()
-
-if len(df_fix) > 96:
-    st.warning(
-        f"The uploaded file contains {len(df_fix)} rows. "
-        "Only the first 96 blocks will be used."
-    )
 
 df_fix = df_fix.iloc[:96].copy()
 
