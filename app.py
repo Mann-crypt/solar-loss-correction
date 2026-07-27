@@ -251,7 +251,7 @@ if st.session_state.run_model:
                                 #"Module Type",
                                 #"Standard PV Efficiency (%)",
                                 #"Efficiency Losses(%)",
-                                "Net Efficiency (%)",
+                                #"Net Efficiency (%)",
                                 "Eff Area"
                             ]
                         ],
