@@ -35,12 +35,14 @@ if is_cluster:
     st.success("Cluster Workbook Detected")
     sheet = "Fixed-CL1"
     ghi_cols = ["CL1-GHI", "CL2-GHI", "CL3-GHI", "CL4-GHI", "CL5-GHI"]
+    df_fix = pd.read_excel(uploaded_file, sheet_name="Fixed-CL1", header=[1])
 else:
     st.success("Traditional Workbook Detected")
     sheet = "Fixed"
     ghi_cols = ["GHI_Forecast"]
+    df_fix = pd.read_excel(uploaded_file, sheet_name="Fixed", header=[1])
 
-df_fix = pd.read_excel(uploaded_file, sheet_name="Fixed", header=[1])
+#df_fix = pd.read_excel(uploaded_file, sheet_name="Fixed", header=[1])
 df_fix.columns = df_fix.columns.str.strip()
 df_fix["Actual"] = df_fix["Actual"].fillna(0)
 
