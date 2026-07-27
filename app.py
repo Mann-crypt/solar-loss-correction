@@ -1332,6 +1332,8 @@ if st.session_state.run_model:
                         workers=1,
                         callback=callback
                     )
+
+                st.write(result.fun)
     
                 progress.empty()
                 status.success("✅ Dekha Kitni Jaldi Hogaya!")
