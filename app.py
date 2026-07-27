@@ -694,7 +694,7 @@ if st.session_state.run_model:
                 for k, v in defaults.items():
                     if k not in st.session_state:
                         st.session_state[k] = v
-                
+    
                 st.subheader("Optimized Parameters")
     
                 best_loss = st.number_input(
@@ -827,7 +827,6 @@ if st.session_state.run_model:
                 ) / 1_000_000
             
             df_trac["Fixed Power=I*Ƞ*A"] = forecast
-            st.write(objective([0, 30, 75, 48, 10, 36]))
             x = np.arange(1, 97)
     
             fig = go.Figure()
@@ -1366,6 +1365,7 @@ if st.session_state.run_model:
             #print("Tracking East Limit:", Tracking_angle_lim_E)
             #print("Tracking West Limit:", Tracking_angle_lim_W)
             #print("Efficiency Loss:", best_loss)
+            print(st.session_state.params)
     
             if "params" in st.session_state:
                 defaults = {
