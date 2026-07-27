@@ -633,6 +633,14 @@ if st.session_state.run_model:
                     return False
     
                 with st.spinner("Ho raha hai aap tab tak saath waale se baat karlo...🗣"):
+                    st.write("Actual sum", df_fix["Actual"].sum())
+                    st.write("Actual max", df_fix["Actual"].max())
+                    
+                    st.write("Weights")
+                    st.write(df_weight.sum())
+                    
+                    st.write("CL1 sum", df_fix["CL1-GHI"].sum())
+                    st.write("Block count", len(backend_list[0]))
     
                     result = differential_evolution(
                         objective,
