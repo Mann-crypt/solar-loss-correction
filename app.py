@@ -40,6 +40,24 @@ else:
 df_fix.columns = df_fix.columns.str.strip()
 df_fix["Actual"] = df_fix["Actual"].fillna(0)
 
+st.subheader("Input Data")
+
+input_df = df_fix[ghi_cols + ["Actual"]].copy()
+
+edited_df = st.data_editor(
+    input_df,
+    use_container_width=True,
+    hide_index=True,
+    num_rows="fixed"
+)
+
+edited_df = edited_df.iloc[:96].reset_index(drop=True)
+
+for col in ghi_cols:
+    df_fix[col] = edited_df[col].values
+
+df_fix["Actual"] = edited_df["Actual"].values
+
 # Remove empty rows
 null_indices = df_fix[df_fix["Date"].isna()].index
 if len(null_indices) > 0:
