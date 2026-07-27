@@ -62,9 +62,15 @@ edited_df = st.data_editor(
 edited_df = edited_df.iloc[:96].reset_index(drop=True)
 
 for col in ghi_cols:
-    df_fix[col] = edited_df[col].values
+    df_fix[col] = (
+        pd.to_numeric(edited_df[col], errors="coerce")
+        .fillna(0)
+    )
 
-df_fix["Actual"] = edited_df["Actual"].values
+df_fix["Actual"] = (
+    pd.to_numeric(edited_df["Actual"], errors="coerce")
+    .fillna(0)
+)
 
 df_fix = df_fix.iloc[:96].copy()
 
