@@ -85,15 +85,15 @@ if st.button("🚀 Hit me Hard!!", use_container_width=True, type="primary"):
 if st.session_state.run_model:
     if is_cluster:
         if plant_type == "Fixed":
-            df = pd.read_excel(file_path, sheet_name="Area & Efficiency", header=[1], usecols=range(8))
+            df = pd.read_excel(uploaded_file, sheet_name="Area & Efficiency", header=[1], usecols=range(8))
             null_indices = df[df['Module Type'].isna()].index
             first_null_pos = df.index.get_loc(null_indices[0])
             df = df.iloc[:first_null_pos]
             df.columns = df.columns.str.strip()
-            df_w = pd.read_excel(file_path, sheet_name="Area & Efficiency", header=2, usecols=[12, 13, 14, 15, 16])
-            df_st = pd.read_excel(file_path, sheet_name="Forecast Config", header=[8])
+            df_w = pd.read_excel(uploaded_file, sheet_name="Area & Efficiency", header=2, usecols=[12, 13, 14, 15, 16])
+            df_st = pd.read_excel(uploaded_file, sheet_name="Forecast Config", header=[8])
             lat = float(df_st.loc[0, "Lat"])
-            df_tilt = pd.read_excel(file_path, sheet_name="Config Tilt Angle", header=[7])
+            df_tilt = pd.read_excel(uploaded_file, sheet_name="Config Tilt Angle", header=[7])
             df_tilt.columns = df_tilt.columns.str.strip()
             null_indices = df_tilt[df_tilt['Fixed'].isna()].index
             first_null_pos = df_tilt.index.get_loc(null_indices[0])
@@ -104,9 +104,9 @@ if st.session_state.run_model:
                 'Unnamed: 3': 'Month',
             })
             month_lookup = df_tilt.set_index('Month')['Fixed'].to_dict()
-            df_ghi = pd.read_excel(file_path, sheet_name="Result", usecols=[0, 1, 2, 3, 4, 5])
+            df_ghi = pd.read_excel(uploaded_file, sheet_name="Result", usecols=[0, 1, 2, 3, 4, 5])
             df_ghi = df_ghi.fillna(0)
-            df_fix = pd.read_excel(file_path, sheet_name="Fixed-CL1", header=[1])
+            df_fix = pd.read_excel(uploaded_file, sheet_name="Fixed-CL1", header=[1])
             df_fix.columns = df_fix.columns.str.strip()
             null_indices = df_fix[df_fix['Date'].isna()].index
             first_null_pos = df_fix.index.get_loc(null_indices[0])
@@ -307,16 +307,16 @@ if st.session_state.run_model:
             
     else: 
         if plant_type == "Fixed":
-            df = pd.read_excel(file_path, sheet_name="Area & Efficiency", header=[1])
+            df = pd.read_excel(uploaded_file, sheet_name="Area & Efficiency", header=[1])
             df.columns = df.columns.str.strip()
             null_indices = df[df['Module Type'].isna()].index
             first_null_pos = df.index.get_loc(null_indices[0])
             df = df.iloc[:first_null_pos]
     
-            df_st = pd.read_excel(file_path, sheet_name="Forecast Config", header=[8])
+            df_st = pd.read_excel(uploaded_file, sheet_name="Forecast Config", header=[8])
             lat = float(df_st.loc[0, "Lat"])
     
-            df_tilt = pd.read_excel(file_path, sheet_name="Config Tilt Angle", header=[7])
+            df_tilt = pd.read_excel(uploaded_file, sheet_name="Config Tilt Angle", header=[7])
             df_tilt.columns = df_tilt.columns.str.strip()
             null_indices = df_tilt[df_tilt['Fixed'].isna()].index
             df_tilt["Fixed"] = df_tilt["Fixed"].fillna(0)
@@ -329,7 +329,7 @@ if st.session_state.run_model:
             })
             month_lookup = df_tilt.set_index('Month')['Fixed'].to_dict()
     
-            df_fix = pd.read_excel(file_path, sheet_name="Fixed", header=[1])
+            df_fix = pd.read_excel(uploaded_file, sheet_name="Fixed", header=[1])
             df_fix["GHI_Forecast"] = edited_df["GHI_Forecast"]
             df_fix["Actual"] = edited_df["Actual"]
             df_fix.columns = df_fix.columns.str.strip()
@@ -478,16 +478,16 @@ if st.session_state.run_model:
     
             st.plotly_chart(fig, use_container_width=True)
         elif plant_type == "Tracking":
-            df = pd.read_excel(file_path, sheet_name="Area & Efficiency", header=[1])
+            df = pd.read_excel(uploaded_file, sheet_name="Area & Efficiency", header=[1])
             df.columns = df.columns.str.strip()
             null_indices = df[df['Module Type'].isna()].index
             first_null_pos = df.index.get_loc(null_indices[0])
             df = df.iloc[:first_null_pos]
     
-            df_st = pd.read_excel(file_path, sheet_name="Forecast Config", header=[8])
+            df_st = pd.read_excel(uploaded_file, sheet_name="Forecast Config", header=[8])
             lat = float(df_st.loc[0, "Lat"])
     
-            df_tilt = pd.read_excel(file_path, sheet_name="Config Tilt Angle", header=[7])
+            df_tilt = pd.read_excel(uploaded_file, sheet_name="Config Tilt Angle", header=[7])
             df_tilt.columns = df_tilt.columns.str.strip()
             null_indices = df_tilt[df_tilt['Fixed'].isna()].index
             first_null_pos = df_tilt.index.get_loc(null_indices[0])
@@ -501,7 +501,7 @@ if st.session_state.run_model:
             df_tilt = df_tilt.dropna(how='all', axis=1)
             #month_lookup = df_tilt.set_index('Month')['Fixed'].to_dict()
     
-            df_fix = pd.read_excel(file_path, sheet_name="Fixed", header=[1])
+            df_fix = pd.read_excel(uploaded_file, sheet_name="Fixed", header=[1])
             df_fix.columns = df_fix.columns.str.strip()
             df_fix["GHI_Forecast"] = edited_df["GHI_Forecast"]
             df_fix["Actual"] = edited_df["Actual"]
@@ -586,8 +586,8 @@ if st.session_state.run_model:
             ) / 1_000_000
             # ------------------ Read Data ------------------
     
-            df_bcal = pd.read_excel(file_path, sheet_name="Backend Cal")
-            df_trac = pd.read_excel(file_path, sheet_name="Tracking", header=[1])
+            df_bcal = pd.read_excel(uploaded_file, sheet_name="Backend Cal")
+            df_trac = pd.read_excel(uploaded_file, sheet_name="Tracking", header=[1])
     
             # ------------------ Objective Function ------------------
     
