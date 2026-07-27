@@ -322,7 +322,7 @@ if st.session_state.run_model:
                 'Unnamed: 2': 'Month_Num',
                 'Unnamed: 3': 'Month',
             })
-            month_lookup = df_tilt.set_index('Month')['Fixed'].to_dict()
+            #month_lookup = df_tilt.set_index('Month')['Fixed'].to_dict()
             
             df_fix["Date"] = pd.Timestamp.today()
             first_date = pd.Timestamp.today().replace(month=1, day=1).normalize()
@@ -336,7 +336,7 @@ if st.session_state.run_model:
             )
             df_fix["Elevation angle a"] = (90 - lat + df_fix["Declination Angle ∆"])
             df_fix["Tilt Angle b"] = df_fix["Date"].dt.strftime('%B').map(month_lookup)
-            df_fix["a+b"] = df_fix["Elevation angle a"] + df_fix["Tilt Angle b"]
+            df_fix["a+b"] = df_fix["Elevation angle a"] + 0
             df_fix["SIN(a+b)"] = np.sin(np.radians(df_fix["a+b"]))
             df_fix["Sin(a)"] = np.sin(np.radians(df_fix["Elevation angle a"]))
             df_fix["GHI*sin(a)"] = df_fix["CL1-GHI"] * df_fix["Sin(a)"]
