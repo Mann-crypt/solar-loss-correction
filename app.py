@@ -16,6 +16,21 @@ uploaded_file = st.file_uploader(
     key="excel_uploader"
 )
 
+if uploaded_file is None:
+    st.info("Pehle File toh upload karo!!!")
+    st.stop()
+
+if "last_file" not in st.session_state:
+    st.session_state.last_file = None
+
+if uploaded_file is not None:
+    if st.session_state.last_file != uploaded_file.name:
+        st.session_state.last_file = uploaded_file.name
+        st.session_state.pop("params", None)
+        st.session_state.run_model = False
+        
+file_path = uploaded_file
+
 xls = pd.ExcelFile(uploaded_file)
 
 if "Fixed-CL1" in xls.sheet_names:
@@ -54,6 +69,7 @@ for col in ghi_cols:
     df_fix[col] = edited_df[col]
 
 df_fix["Actual"] = edited_df["Actual"]
+
 # Read Fixed sheet first
 df_fix = pd.read_excel(file_path, sheet_name="Fixed", header=[1])
 df_fix.columns = df_fix.columns.str.strip()
