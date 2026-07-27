@@ -577,7 +577,7 @@ if st.session_state.run_model:
             ]
             
             # ------------------ Optimization ------------------
-            
+    
             import random
     
             if "params" not in st.session_state:
@@ -622,7 +622,7 @@ if st.session_state.run_model:
                     progress.progress(generation["count"] / MAX_ITER)
     
                     # Change quote every 7 generations
-                    if generation["count"] % 6 == 1:
+                    if generation["count"] % 7 == 1:
                         current_quote["text"] = random_quote()
     
                     status.info(
@@ -651,8 +651,16 @@ if st.session_state.run_model:
     
                 progress.empty()
                 status.success("✅ Dekha Kitni Jaldi Hogaya!")
-    
+                st.write("Optimizer score:", result.fun)
+
                 best = np.round(result.x).astype(int)
+                
+                st.write("Optimizer parameters:", best.tolist())
+                
+                st.write(
+                    "Rounded score:",
+                    objective(best)
+                )
     
                 st.session_state.params = {
                     "loss": float(best_loss),
@@ -663,7 +671,6 @@ if st.session_state.run_model:
                     "east": int(best[4]),
                     "west": int(best[5]),
                 }
-                print(st.session_state.params)
                 st.session_state.loss = st.session_state.params["loss"]
                 st.session_state.dhi = st.session_state.params["DHI"]
                 st.session_state.start = st.session_state.params["start"]
@@ -695,7 +702,7 @@ if st.session_state.run_model:
                 for k, v in defaults.items():
                     if k not in st.session_state:
                         st.session_state[k] = v
-    
+                
                 st.subheader("Optimized Parameters")
     
                 best_loss = st.number_input(
@@ -751,128 +758,98 @@ if st.session_state.run_model:
                 #GHI_Max_Block = st.session_state.max
                 #Tracking_angle_lim_E = st.session_state.east
                 #Tracking_angle_lim_W = st.session_state.west
+    
+    
             
                 # ------------------ Final Calculation Using Best Parameters ------------------
-                # User edited efficiency loss
-                df["Efficiency Losses(%)"] = best_loss
+                
+                m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
+                m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
+                
+                blocks = backend_list[0]["Block No."]
     
-                # Recalculate
-                df["Net Efficiency (%)"] = (
-                    df["Standard PV Efficiency (%)"]
-                    - df["Efficiency Losses(%)"]
+                zenith = np.where(
+                    blocks <= GHI_Max_Block,
+                    np.minimum(89, m1 * (blocks - GHI_Max_Block)),
+                    np.minimum(89, m2 * (blocks - GHI_Max_Block))
                 )
-                df_weight = pd.DataFrame({
-                    "CL-1": ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-1"].iloc[0],
-                    "CL-2": ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-2"].iloc[0],
-                    "CL-3": ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-3"].iloc[0],
-                    "CL-4": ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-4"].iloc[0],
-                    "CL-5": ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-5"].iloc[0],
-                })
-                with st.expander("🔍 View Efficiency Calculations"):
-                    st.dataframe(
-                        df[
-                            [
-                                "Module Type",
-                                "Standard PV Efficiency (%)",
-                                "Efficiency Losses(%)",
-                                "Net Efficiency (%)",
-                            ]
-                        ],
-                        use_container_width=True,
-                        hide_index=True,
+                
+                panel = np.where(
+                    blocks < GHI_Max_Block,
+                    np.minimum(zenith, abs(Tracking_angle_lim_E)),
+                    np.where(
+                        (blocks > GHI_Max_Block) & (zenith > Tracking_angle_lim_W),
+                        Tracking_angle_lim_W,
+                        zenith
                     )
-    
-    
-            
-            # ------------------ Final Calculation Using Best Parameters ------------------
-            
-            m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
-            m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
-            
-            blocks = backend_list[0]["Block No."]
-
-            zenith = np.where(
-                blocks <= GHI_Max_Block,
-                np.minimum(89, m1 * (blocks - GHI_Max_Block)),
-                np.minimum(89, m2 * (blocks - GHI_Max_Block))
-            )
-            
-            panel = np.where(
-                blocks < GHI_Max_Block,
-                np.minimum(zenith, abs(Tracking_angle_lim_E)),
-                np.where(
-                    (blocks > GHI_Max_Block) & (zenith > Tracking_angle_lim_W),
-                    Tracking_angle_lim_W,
-                    zenith
                 )
-            )
-            
-            cos_alpha = np.cos(np.radians(panel))
-            
-            weights = df_weight.sum()
-            
-            forecast = np.zeros(len(df_fix))
-            
-            for ghi_col, weight_col in zip(
-                    ghi_cols,
-                    weight_cols):
-            
-                ghi = df_fix[ghi_col].to_numpy()
-            
-                dhi = ghi * DHI / 100
-            
-                dni = (ghi - dhi) / cos_alpha
-            
-                forecast += (
-                    dni * weights[weight_col]
-                ) / 1_000_000
-            
-            df_trac["Fixed Power=I*Ƞ*A"] = forecast
-            x = np.arange(1, 97)
+                
+                cos_alpha = np.cos(np.radians(panel))
+                
+                weights = df_weight.sum()
+                
+                forecast = np.zeros(len(df_fix))
+                
+                for ghi_col, weight_col in zip(
+                        ghi_cols,
+                        weight_cols):
+                
+                    ghi = df_fix[ghi_col].to_numpy()
+                
+                    dhi = ghi * DHI / 100
+                
+                    dni = (ghi - dhi) / cos_alpha
+                
+                    forecast += (
+                        dni * weights[weight_col]
+                    ) / 1_000_000
+                
+                df_trac["Fixed Power=I*Ƞ*A"] = forecast
+                x = np.arange(1, 97)
+        
+                fig = go.Figure()
     
-            fig = go.Figure()
-
-            fig.add_trace(
-                go.Scatter(
-                    x=x,
-                    y=df_trac["Fixed Power=I*Ƞ*A"],
-                    mode="lines",
-                    name="Forecast",
-                    line=dict(color="#2563EB", width=3),
+                fig.add_trace(
+                    go.Scatter(
+                        x=x,
+                        y=df_trac["Fixed Power=I*Ƞ*A"],
+                        mode="lines",
+                        name="Forecast",
+                        line=dict(color="#2563EB", width=3),
+                    )
                 )
-            )
-
-            fig.add_trace(
-                go.Scatter(
-                    x=x,
-                    y=df_fix["Actual"],
-                    mode="lines",
-                    name="Actual",
-                    line=dict(color="#DC2626", width=3),
+    
+                fig.add_trace(
+                    go.Scatter(
+                        x=x,
+                        y=df_fix["Actual"],
+                        mode="lines",
+                        name="Actual",
+                        line=dict(color="#DC2626", width=3),
+                    )
                 )
-            )
-
-            fig.update_layout(
-                title="Forecast vs Actual Power",
-                template="plotly_white",
-                height=500,
-                hovermode="x unified",
-                #xaxis=dict(
-                    #title="15 Minute Block",
-                    #dtick=4
-                #),
-                yaxis=dict(
-                    title="Power (MW)"
-                ),
-                legend=dict(
-                    orientation="h",
-                    y=1.08,
-                    x=0
-                ),
-                margin=dict(l=20, r=20, t=60, b=20)
-            )
-
-            st.plotly_chart(fig, use_container_width=True)
+    
+                fig.update_layout(
+                    title="Forecast vs Actual Power",
+                    template="plotly_white",
+                    height=500,
+                    hovermode="x unified",
+                    #xaxis=dict(
+                        #title="15 Minute Block",
+                        #dtick=4
+                    #),
+                    yaxis=dict(
+                        title="Power (MW)"
+                    ),
+                    legend=dict(
+                        orientation="h",
+                        y=1.08,
+                        x=0
+                    ),
+                    margin=dict(l=20, r=20, t=60, b=20)
+                )
+    
+                st.plotly_chart(fig, use_container_width=True)
 
     else: 
         if plant_type == "Fixed":
