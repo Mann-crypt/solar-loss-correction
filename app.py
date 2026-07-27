@@ -248,11 +248,11 @@ if st.session_state.run_model:
                     st.dataframe(
                         df[
                             [
-                                #"Module Type",
-                                #"Standard PV Efficiency (%)",
-                                #"Efficiency Losses(%)",
-                                #"Net Efficiency (%)",
-                                "Eff Area"
+                                "Module Type",
+                                "Standard PV Efficiency (%)",
+                                "Efficiency Losses(%)",
+                                "Net Efficiency (%)",
+                                "Total area(m2)"
                             ]
                         ],
                         use_container_width=True,
