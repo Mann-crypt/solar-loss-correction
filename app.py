@@ -640,6 +640,7 @@ if st.session_state.run_model:
                     return False
     
                 with st.spinner("Ho raha hai aap tab tak saath waale se baat karlo...🗣"):
+    
                     result = differential_evolution(
                         objective,
                         bounds=bounds,
@@ -657,6 +658,17 @@ if st.session_state.run_model:
     
                 progress.empty()
                 status.success("✅ Dekha Kitni Jaldi Hogaya!")
+                st.write("Optimizer score:", result.fun)
+
+                best = np.round(result.x).astype(int)
+                
+                st.write("Optimizer parameters:", best.tolist())
+                
+                st.write(
+                    "Rounded score:",
+                    objective(best)
+                )
+    
                 st.session_state.params = {
                     "loss": float(best_loss),
                     "DHI": int(best[0]),
