@@ -529,7 +529,7 @@ if st.session_state.run_model:
                 temp3["GHI - DHI"] = df_fix["CL3-GHI"] - temp3["DHI"]
             
                 temp3["Zenith angle ( θ )"] = np.where(
-                    temp1["Block No."] <= GHI_Max_Block,
+                    temp3["Block No."] <= GHI_Max_Block,
                     np.minimum(89, m1 * (temp3["Block No."] - GHI_Max_Block)),
                     np.minimum(89, m2 * (temp3["Block No."] - GHI_Max_Block))
                 )
@@ -559,7 +559,7 @@ if st.session_state.run_model:
             
                 prediction3 = (temp3["DNI"] * np.sum(df_weight["CL-3"])) / 1000000
             
-                temp4 = df_bcal1.copy()
+                temp4 = df_bcal4.copy()
             
                 temp4["DHI"] = df_fix["CL4-GHI"] * DHI / 100
                 temp4["GHI - DHI"] = df_fix["CL4-GHI"] - temp4["DHI"]
@@ -595,7 +595,7 @@ if st.session_state.run_model:
             
                 prediction4 = (temp4["DNI"] * np.sum(df_weight["CL-4"])) / 1000000
             
-                temp5 = df_bcal1.copy()
+                temp5 = df_bcal5.copy()
             
                 temp5["DHI"] = df_fix["CL5-GHI"] * DHI / 100
                 temp5["GHI - DHI"] = df_fix["CL5-GHI"] - temp5["DHI"]
@@ -726,7 +726,7 @@ if st.session_state.run_model:
                     progress.progress(generation["count"] / MAX_ITER)
     
                     # Change quote every 7 generations
-                    if generation["count"] % 7 == 1:
+                    if generation["count"] % 3 == 1:
                         current_quote["text"] = random_quote()
     
                     status.info(
@@ -864,11 +864,6 @@ if st.session_state.run_model:
                     df["Standard PV Efficiency (%)"]
                     - df["Efficiency Losses(%)"]
                 )
-    
-                df["Eff Area"] = (
-                    df["Total area(m2)"]
-                    * df["Net Efficiency (%)"]
-                ) / 100
                 
                 with st.expander("🔍 View Efficiency Calculations"):
                     st.dataframe(
