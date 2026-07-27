@@ -827,7 +827,7 @@ if st.session_state.run_model:
                 ) / 1_000_000
             
             df_trac["Fixed Power=I*Ƞ*A"] = forecast
-            st.write(objective([0, 30, 75, 48, 10, 36]))
+            st.write(objective([0, 30, 65, 47, 70, 70]))
             x = np.arange(1, 97)
     
             fig = go.Figure()
