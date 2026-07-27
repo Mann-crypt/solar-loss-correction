@@ -40,7 +40,7 @@ else:
     sheet = "Fixed"
     ghi_cols = ["GHI_Forecast"]
 
-#df_fix = pd.read_excel(uploaded_file, sheet_name=sheet, header=[1])
+df_fix = pd.read_excel(uploaded_file, sheet_name="Fixed", header=[1])
 df_fix.columns = df_fix.columns.str.strip()
 df_fix["Actual"] = df_fix["Actual"].fillna(0)
 
