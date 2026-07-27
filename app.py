@@ -641,6 +641,13 @@ if st.session_state.run_model:
                     
                     st.write("CL1 sum", df_fix["CL1-GHI"].sum())
                     st.write("Block count", len(backend_list[0]))
+                    st.write(df["Total area(m2)"].sum())
+
+                    st.write(df["Net Efficiency (%)"].sum())
+                    
+                    st.write(df_w)
+                    
+                    st.write(df_weight.sum())
     
                     result = differential_evolution(
                         objective,
