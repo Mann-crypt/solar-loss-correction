@@ -679,6 +679,7 @@ if st.session_state.run_model:
             #print("Tracking East Limit:", Tracking_angle_lim_E)
             #print("Tracking West Limit:", Tracking_angle_lim_W)
             #print("Efficiency Loss:", best_loss)
+            print(st.session_state.params)
     
             if "params" in st.session_state:
                 defaults = {
