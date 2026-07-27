@@ -20,20 +20,13 @@ if uploaded_file is None:
     st.info("Pehle File toh upload karo!!!")
     st.stop()
 
-if "last_file" not in st.session_state:
-    st.session_state.last_file = None
-
-if uploaded_file is not None:
-    if st.session_state.last_file != uploaded_file.name:
-        st.session_state.last_file = uploaded_file.name
-        st.session_state.pop("params", None)
-        st.session_state.run_model = False
-        
 file_path = uploaded_file
 
 xls = pd.ExcelFile(uploaded_file)
 
-if "Fixed-CL1" in xls.sheet_names:
+is_cluster = "Fixed-CL1" in xls.sheet_names
+
+if is_cluster:
     sheet = "Fixed-CL1"
     ghi_cols = [
         "GHI_Forecast1",
@@ -56,6 +49,8 @@ if len(null_indices):
 
 df_fix = df_fix.iloc[:96].copy()
 
+st.subheader("Input Data")
+
 input_df = df_fix[ghi_cols + ["Actual"]].copy()
 
 edited_df = st.data_editor(
@@ -69,12 +64,6 @@ for col in ghi_cols:
     df_fix[col] = edited_df[col]
 
 df_fix["Actual"] = edited_df["Actual"]
-
-# Read Fixed sheet first
-df_fix = pd.read_excel(file_path, sheet_name="Fixed", header=[1])
-df_fix.columns = df_fix.columns.str.strip()
-df_fix["Actual"] = df_fix["Actual"].fillna(0)
-
 # Remove empty rows
 null_indices = df_fix[df_fix["Date"].isna()].index
 if len(null_indices) > 0:
