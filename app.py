@@ -28,11 +28,6 @@ is_cluster = "Fixed-CL1" in xls.sheet_names
 
 if is_cluster:
     st.success("Cluster Workbook Detected")
-else:
-    st.success("Traditional Workbook Detected")
-
-if is_cluster:
-    st.success("Cluster Workbook Detected")
     sheet = "Fixed-CL1"
     ghi_cols = ["CL1-GHI", "CL2-GHI", "CL3-GHI", "CL4-GHI", "CL5-GHI"]
     df_fix = pd.read_excel(uploaded_file, sheet_name="Fixed-CL1", header=[1])
