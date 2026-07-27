@@ -248,7 +248,7 @@ if st.session_state.run_model:
                     st.dataframe(
                         df[
                             [
-                                "Module Type",
+                                #"Module Type",
                                 #"Standard PV Efficiency (%)",
                                 #"Efficiency Losses(%)",
                                 "Net Efficiency (%)",
