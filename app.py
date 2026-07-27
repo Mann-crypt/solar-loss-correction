@@ -523,7 +523,7 @@ if st.session_state.run_model:
                 actual = df_fix["Actual"].values
             
                 # Consider only daylight blocks
-                #mask = df_fix["GHI_Forecast"].values > 50
+                mask = ghi_cols.values > 50
             
                 actual = actual[mask]
                 prediction = prediction[mask]
