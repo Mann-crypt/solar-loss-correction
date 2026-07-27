@@ -648,7 +648,7 @@ if st.session_state.run_model:
                         workers=1,
                         callback=callback
                     )
-                    print(st.session_state.params)
+                print(st.session_state.params)
     
                 progress.empty()
                 status.success("✅ Dekha Kitni Jaldi Hogaya!")
