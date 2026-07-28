@@ -5,49 +5,21 @@ import plotly.graph_objects as go
 from scipy.optimize import differential_evolution
 from sklearn.metrics import mean_absolute_percentage_error
 import streamlit as st
-import zipfile
-from io import BytesIO
-from pathlib import Path
 
 st.set_page_config(page_title="Solar Loss Correction", layout="wide")
 
 st.title("Kuchu Puchu🥰 - Aao Tumhari Loss Correction Kardu!!")
 
-import os
+uploaded_file = st.file_uploader(
+    "Yaha Feko!!",
+    type=["xlsx"],
+    key="excel_uploader"
+)
 
-ROOT = r"C:\Users\Manjot Singh\Desktop\Work"
+if uploaded_file is None:
+    st.info("Pehle File toh upload karo!!!")
+    st.stop()
 
-st.write("Current working directory:", os.getcwd())
-st.write("ROOT exists:", os.path.exists(ROOT))
-
-states = sorted([
-    f for f in os.listdir(ROOT)
-    if os.path.isdir(os.path.join(ROOT, f))
-])
-
-state = st.selectbox("State", states)
-
-pss_path = os.path.join(ROOT, state)
-
-pss = sorted([
-    f for f in os.listdir(pss_path)
-    if os.path.isdir(os.path.join(pss_path, f))
-])
-
-selected_pss = st.selectbox("PSS", pss)
-
-file_path = os.path.join(pss_path, selected_pss)
-
-files = sorted([
-    f for f in os.listdir(file_path)
-    if f.endswith(".xlsx")
-])
-
-selected_file = st.selectbox("Loss Correction Sheet", files)
-
-excel_path = os.path.join(file_path, selected_file)
-
-df = pd.read_excel(excel_path)
 # Read workbook
 xls = pd.ExcelFile(uploaded_file)
 
