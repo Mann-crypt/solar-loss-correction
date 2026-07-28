@@ -13,95 +13,38 @@ st.set_page_config(page_title="Solar Loss Correction", layout="wide")
 
 st.title("Kuchu Puchu🥰 - Aao Tumhari Loss Correction Kardu!!")
 
-uploaded_file = st.file_uploader(
-    "Yaha Feko!!",
-    type=["xlsx", "zip"],
-    key="excel_uploader"
-)
+import os
 
-if uploaded_file is None:
-    st.info("Pehle File toh upload karo!!!")
-    st.stop()
+ROOT = r"D:\Solar Data"
 
-# ------------------------------
-# If ZIP uploaded
-# ------------------------------
+states = sorted([
+    f for f in os.listdir(ROOT)
+    if os.path.isdir(os.path.join(ROOT, f))
+])
 
-if uploaded_file.name.lower().endswith(".zip"):
+state = st.selectbox("State", states)
 
-    z = zipfile.ZipFile(BytesIO(uploaded_file.read()))
+pss_path = os.path.join(ROOT, state)
 
-    excel_files = [
-        f for f in z.namelist()
-        if f.lower().endswith(".xlsx")
-        and not Path(f).name.startswith("~$")
-    ]
+pss = sorted([
+    f for f in os.listdir(pss_path)
+    if os.path.isdir(os.path.join(pss_path, f))
+])
 
-    if len(excel_files) == 0:
-        st.error("ZIP me koi Excel file nahi mili.")
-        st.stop()
+selected_pss = st.selectbox("PSS", pss)
 
-    file_info = []
+file_path = os.path.join(pss_path, selected_pss)
 
-    for f in excel_files:
+files = sorted([
+    f for f in os.listdir(file_path)
+    if f.endswith(".xlsx")
+])
 
-        parts = Path(f).parts
+selected_file = st.selectbox("Loss Correction Sheet", files)
 
-        # Expected:
-        # State/PSS/File.xlsx
+excel_path = os.path.join(file_path, selected_file)
 
-        if len(parts) >= 3:
-            state = parts[-3]
-            pss = parts[-2]
-        else:
-            state = "Unknown"
-            pss = "Unknown"
-
-        file_info.append({
-            "state": state,
-            "pss": pss,
-            "path": f
-        })
-
-    states = sorted(set(x["state"] for x in file_info))
-
-    selected_state = st.selectbox(
-        "Select State",
-        states
-    )
-
-    pss_list = sorted(
-        set(
-            x["pss"]
-            for x in file_info
-            if x["state"] == selected_state
-        )
-    )
-
-    selected_pss = st.selectbox(
-        "Select PSS",
-        pss_list
-    )
-
-    files = [
-        x
-        for x in file_info
-        if x["state"] == selected_state
-        and x["pss"] == selected_pss
-    ]
-
-    selected_file = st.selectbox(
-        "Select Loss Correction Sheet",
-        [Path(x["path"]).name for x in files]
-    )
-
-    selected_path = next(
-        x["path"]
-        for x in files
-        if Path(x["path"]).name == selected_file
-    )
-
-    excel_bytes = BytesIO(z.read(selected_path))
+df = pd.read_excel(excel_path)
 # Read workbook
 xls = pd.ExcelFile(uploaded_file)
 
