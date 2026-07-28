@@ -17,7 +17,8 @@ import os
 
 ROOT = r"C:\Users\Manjot Singh\Desktop\Work"
 
-print(os.path.exists(ROOT))
+st.write("Current working directory:", os.getcwd())
+st.write("ROOT exists:", os.path.exists(ROOT))
 
 states = sorted([
     f for f in os.listdir(ROOT)
