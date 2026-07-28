@@ -17,6 +17,8 @@ import os
 
 ROOT = r"C:\Users\Manjot Singh\Desktop\Work"
 
+print(os.path.exists(ROOT))
+
 states = sorted([
     f for f in os.listdir(ROOT)
     if os.path.isdir(os.path.join(ROOT, f))
