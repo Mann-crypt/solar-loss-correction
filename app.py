@@ -14,6 +14,7 @@ st.set_page_config(page_title="Solar Loss Correction", layout="wide")
 st.title("Kuchu Puchu🥰 - Aao Tumhari Loss Correction Kardu!!")
 
 import os
+streamlit run app.py
 
 ROOT = r"C:\Users\Manjot Singh\Desktop\Work"
 
