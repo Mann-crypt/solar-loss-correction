@@ -15,7 +15,7 @@ st.title("Kuchu Puchu🥰 - Aao Tumhari Loss Correction Kardu!!")
 
 import os
 
-ROOT = r"D:\Solar Data"
+ROOT = r"C:\Users\Manjot Singh\Desktop\Work"
 
 states = sorted([
     f for f in os.listdir(ROOT)
