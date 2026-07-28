@@ -5,6 +5,9 @@ import plotly.graph_objects as go
 from scipy.optimize import differential_evolution
 from sklearn.metrics import mean_absolute_percentage_error
 import streamlit as st
+import zipfile
+from io import BytesIO
+from pathlib import Path
 
 st.set_page_config(page_title="Solar Loss Correction", layout="wide")
 
@@ -12,7 +15,7 @@ st.title("Kuchu Puchu🥰 - Aao Tumhari Loss Correction Kardu!!")
 
 uploaded_file = st.file_uploader(
     "Yaha Feko!!",
-    type=["xlsx"],
+    type=["xlsx", "zip"],
     key="excel_uploader"
 )
 
@@ -20,6 +23,85 @@ if uploaded_file is None:
     st.info("Pehle File toh upload karo!!!")
     st.stop()
 
+# ------------------------------
+# If ZIP uploaded
+# ------------------------------
+
+if uploaded_file.name.lower().endswith(".zip"):
+
+    z = zipfile.ZipFile(BytesIO(uploaded_file.read()))
+
+    excel_files = [
+        f for f in z.namelist()
+        if f.lower().endswith(".xlsx")
+        and not Path(f).name.startswith("~$")
+    ]
+
+    if len(excel_files) == 0:
+        st.error("ZIP me koi Excel file nahi mili.")
+        st.stop()
+
+    file_info = []
+
+    for f in excel_files:
+
+        parts = Path(f).parts
+
+        # Expected:
+        # State/PSS/File.xlsx
+
+        if len(parts) >= 3:
+            state = parts[-3]
+            pss = parts[-2]
+        else:
+            state = "Unknown"
+            pss = "Unknown"
+
+        file_info.append({
+            "state": state,
+            "pss": pss,
+            "path": f
+        })
+
+    states = sorted(set(x["state"] for x in file_info))
+
+    selected_state = st.selectbox(
+        "Select State",
+        states
+    )
+
+    pss_list = sorted(
+        set(
+            x["pss"]
+            for x in file_info
+            if x["state"] == selected_state
+        )
+    )
+
+    selected_pss = st.selectbox(
+        "Select PSS",
+        pss_list
+    )
+
+    files = [
+        x
+        for x in file_info
+        if x["state"] == selected_state
+        and x["pss"] == selected_pss
+    ]
+
+    selected_file = st.selectbox(
+        "Select Loss Correction Sheet",
+        [Path(x["path"]).name for x in files]
+    )
+
+    selected_path = next(
+        x["path"]
+        for x in files
+        if Path(x["path"]).name == selected_file
+    )
+
+    excel_bytes = BytesIO(z.read(selected_path))
 # Read workbook
 xls = pd.ExcelFile(uploaded_file)
 
