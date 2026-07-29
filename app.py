@@ -1249,7 +1249,6 @@ if st.session_state.run_model:
                 )
     
                 cos_alpha = np.cos(np.radians(panel))
-                temp["Cos(θ - α)"] = np.cos(np.radians(temp["θ - α"]))
     
                 dni = g_minus_d / cos_alpha
                 eff_area = df["Eff Area"].sum()
