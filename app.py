@@ -48,14 +48,9 @@ if len(null_indices) > 0:
 # Keep only first 96 blocks
 df_fix = df_fix.iloc[:96].copy()
 
-st.subheader("Input Data")
-
-input_df = df_fix[ghi_cols + ["Actual"]].copy()
-
 original_df = input_df.copy()
 
-# Only one editable grid
-input_df = st.data_editor(
+edited_df = st.data_editor(
     input_df,
     use_container_width=True,
     hide_index=True,
@@ -63,24 +58,15 @@ input_df = st.data_editor(
     key="editor"
 )
 
-# Compare with original
-changed = input_df.ne(original_df)
+# Check if anything changed
+if not edited_df.equals(original_df):
+    st.toast("✅ Input data updated!", icon="✨")
 
-# Update your main dataframe
-for col in input_df.columns:
-    df_fix[col] = input_df[col].values
+# Update dataframe
+for col in ghi_cols:
+    df_fix[col] = edited_df[col].values
 
-# Optional: Show verification with highlights
-
-
-input_df.style.apply(
-    lambda row: [
-        "background-color:#90EE90" if changed.iloc[row.name, j] else ""
-        for j in range(len(row))
-    ],
-    axis=1,
-),
-use_container_width=True,
+df_fix["Actual"] = edited_df["Actual"].values
 
 edited_df = edited_df.iloc[:96].reset_index(drop=True)
 
