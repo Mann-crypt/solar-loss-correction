@@ -1232,41 +1232,41 @@ if st.session_state.run_model:
                 m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
                 m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
     
-                temp = df_bcal.copy()
+                ghi = ghi_arrays[0]
+
+                dhi = ghi * DHI / 100
+                
+                g_minus_d = ghi - dhi
     
                 temp["DHI"] = df_fix["GHI_Forecast"] * DHI / 100
                 temp["GHI - DHI"] = df_fix["GHI_Forecast"] - temp["DHI"]
     
-                temp["Zenith angle ( θ )"] = np.where(
-                    temp["Block No."] <= GHI_Max_Block,
-                    np.minimum(89, m1 * (temp["Block No."] - GHI_Max_Block)),
-                    np.minimum(89, m2 * (temp["Block No."] - GHI_Max_Block))
+                zenith = np.where(
+                    blocks <= GHI_Max_Block,
+                    np.minimum(89, m1 * (blocks - GHI_Max_Block)),
+                    np.minimum(89, m2 * (blocks - GHI_Max_Block))
                 )
     
-                temp["Panel Angle (α)"] = np.where(
-                    temp["Block No."] < GHI_Max_Block,
+                panel = np.where(
+                    blocks < GHI_Max_Block,
+                    np.minimum(zenith, abs(Tracking_angle_lim_E)),
                     np.where(
-                        temp["Zenith angle ( θ )"] < abs(Tracking_angle_lim_E),
-                        temp["Zenith angle ( θ )"],
-                        abs(Tracking_angle_lim_E)
-                    ),
-                    np.where(
-                        (temp["Block No."] > GHI_Max_Block) &
-                        (temp["Zenith angle ( θ )"] > Tracking_angle_lim_W),
+                        (blocks > GHI_Max_Block) & (zenith > Tracking_angle_lim_W),
                         Tracking_angle_lim_W,
-                        temp["Zenith angle ( θ )"]
+                        zenith
                     )
                 )
     
                 temp["θ - α"] = temp["Zenith angle ( θ )"] - temp["Panel Angle (α)"]
     
                 temp["Cos(θ)"] = np.cos(np.radians(temp["Zenith angle ( θ )"]))
-                temp["Cos(α)"] = np.cos(np.radians(temp["Panel Angle (α)"]))
+                cos_alpha = np.cos(np.radians(panel))
                 temp["Cos(θ - α)"] = np.cos(np.radians(temp["θ - α"]))
     
-                temp["DNI"] = temp["GHI - DHI"] / temp["Cos(α)"]
+                dni = g_minus_d / cos_alpha
+                eff_area = df["Eff Area"].sum()
     
-                prediction = (temp["DNI"] * df["Eff Area"].sum()) / 1_000_000
+                prediction = dni * eff_area / 1_000_000
     
                 mask = df_fix["Actual"] != 0
     
@@ -1276,7 +1276,7 @@ if st.session_state.run_model:
                 prediction = prediction.values
     
                 # Consider only daylight blocks
-                mask = df_fix["GHI_Forecast"].values > 50
+                #mask = df_fix["GHI_Forecast"].values > 50
     
                 actual = actual[mask]
                 prediction = prediction[mask]
