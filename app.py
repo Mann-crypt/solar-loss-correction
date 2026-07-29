@@ -1260,7 +1260,6 @@ if st.session_state.run_model:
                 from sklearn.metrics import mean_squared_error
     
                 actual = df_fix["Actual"].values
-                prediction = prediction.values
     
                 # Consider only daylight blocks
                 #mask = df_fix["GHI_Forecast"].values > 50
