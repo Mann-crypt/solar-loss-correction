@@ -1205,13 +1205,6 @@ if st.session_state.run_model:
                 for col in ghi_cols
             ]
             
-            weight_sum = np.array([
-                df_weight["CL-1"].sum(),
-                df_weight["CL-2"].sum(),
-                df_weight["CL-3"].sum(),
-                df_weight["CL-4"].sum(),
-                df_weight["CL-5"].sum(),
-            ])
     
             def objective(x):
     
