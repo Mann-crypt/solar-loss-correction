@@ -543,7 +543,7 @@ if st.session_state.run_model:
                     
                     cos_alpha = np.clip(cos_alpha, 1e-6, None)
 
-                    for i, ghi in enumerate(ghi_arrays):
+                    for i, ghi in enumerate(ghi_cols):
                     
                         dhi = ghi * DHI / 100
                     
