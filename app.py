@@ -267,20 +267,25 @@ if st.session_state.run_model:
                 f"{best_loss:.2f}%"
             )
             
+            display_df = df[
+                [
+                    "Module Type",
+                    "Standard PV Efficiency (%)",
+                    "Efficiency Losses(%)",
+                    "Net Efficiency (%)",
+                    "Total area(m2)"
+                ]
+            ].copy()
+            
+            num_cols = display_df.select_dtypes(include="number").columns
+            display_df[num_cols] = display_df[num_cols].round(2)
+            
             with st.expander("🔍 View Efficiency Calculations"):
-                    st.dataframe(
-                        df[
-                            [
-                                "Module Type",
-                                "Standard PV Efficiency (%)",
-                                "Efficiency Losses(%)",
-                                "Net Efficiency (%)",
-                                "Total area(m2)"
-                            ]
-                        ],
-                        use_container_width=True,
-                        hide_index=True,
-                    )
+                st.dataframe(
+                    display_df,
+                    use_container_width=True,
+                    hide_index=True,
+                )
                 
             x = np.arange(1, 97)
     
@@ -795,17 +800,22 @@ if st.session_state.run_model:
                     - df["Efficiency Losses(%)"]
                 )
                 
+                display_df = df[
+                    [
+                        "Module Type",
+                        "Standard PV Efficiency (%)",
+                        "Efficiency Losses(%)",
+                        "Net Efficiency (%)",
+                        "Total area(m2)"
+                    ]
+                ].copy()
+                
+                num_cols = display_df.select_dtypes(include="number").columns
+                display_df[num_cols] = display_df[num_cols].round(2)
+            
                 with st.expander("🔍 View Efficiency Calculations"):
                     st.dataframe(
-                        df[
-                            [
-                                "Module Type",
-                                "Standard PV Efficiency (%)",
-                                "Efficiency Losses(%)",
-                                "Net Efficiency (%)",
-                                "Total area(m2)"
-                            ]
-                        ],
+                        display_df,
                         use_container_width=True,
                         hide_index=True,
                     )
@@ -1010,20 +1020,28 @@ if st.session_state.run_model:
                 f"{best_loss:.2f}%"
             )
             
+            display_df = df[
+                [
+                    "Module Type",
+                    "Standard PV Efficiency (%)",
+                    "Efficiency Losses(%)",
+                    "Net Efficiency (%)",
+                    "Total area(m2)"
+                ]
+            ].copy()
+            
+            num_cols = display_df.select_dtypes(include="number").columns
+            display_df[num_cols] = display_df[num_cols].round(2)
+        
             with st.expander("🔍 View Efficiency Calculations"):
-                    st.dataframe(
-                        df[
-                            [
-                                "Module Type",
-                                "Standard PV Efficiency (%)",
-                                "Efficiency Losses(%)",
-                                "Net Efficiency (%)",
-                                "Eff Area"
-                            ]
-                        ],
-                        use_container_width=True,
-                        hide_index=True,
-                    )
+                st.dataframe(
+                    display_df,
+                    use_container_width=True,
+                    hide_index=True,
+                )
+            
+            num_cols = display_df.select_dtypes(include="number").columns
+            display_df[num_cols] = display_df[num_cols].round(2)
                 
             x = np.arange(1, 97)
     
@@ -1474,17 +1492,22 @@ if st.session_state.run_model:
                     * df["Net Efficiency (%)"]
                 ) / 100
                 
+                display_df = df[
+                    [
+                        "Module Type",
+                        "Standard PV Efficiency (%)",
+                        "Efficiency Losses(%)",
+                        "Net Efficiency (%)",
+                        "Total area(m2)"
+                    ]
+                ].copy()
+                
+                num_cols = display_df.select_dtypes(include="number").columns
+                display_df[num_cols] = display_df[num_cols].round(2)
+            
                 with st.expander("🔍 View Efficiency Calculations"):
                     st.dataframe(
-                        df[
-                            [
-                                "Module Type",
-                                "Standard PV Efficiency (%)",
-                                "Efficiency Losses(%)",
-                                "Net Efficiency (%)",
-                                "Eff Area"
-                            ]
-                        ],
+                        display_df,
                         use_container_width=True,
                         hide_index=True,
                     )
