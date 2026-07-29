@@ -71,18 +71,17 @@ for col in input_df.columns:
     df_fix[col] = input_df[col].values
 
 # Optional: Show verification with highlights
-st.subheader("Updated Cells")
 
-st.dataframe(
-    input_df.style.apply(
-        lambda row: [
-            "background-color:#90EE90" if changed.iloc[row.name, j] else ""
-            for j in range(len(row))
-        ],
-        axis=1,
-    ),
-    use_container_width=True,
-)
+
+input_df.style.apply(
+    lambda row: [
+        "background-color:#90EE90" if changed.iloc[row.name, j] else ""
+        for j in range(len(row))
+    ],
+    axis=1,
+),
+use_container_width=True,
+
 edited_df = edited_df.iloc[:96].reset_index(drop=True)
 
 for col in ghi_cols:
