@@ -41,7 +41,35 @@ uploaded_file = st.file_uploader(
 if uploaded_file is None:
     st.info("Pehle File toh upload karo!!!")
     st.stop()
+    
+# ---------- Detect new uploaded file ----------
+if "last_uploaded_file" not in st.session_state:
+    st.session_state.last_uploaded_file = uploaded_file.name
 
+elif st.session_state.last_uploaded_file != uploaded_file.name:
+
+    # Clear cached functions
+    st.cache_data.clear()
+
+    # Remove previous optimization
+    st.session_state.pop("params", None)
+    st.session_state.pop("run_model", None)
+
+    # Remove all user-editable values
+    for key in [
+        "loss",
+        "dhi",
+        "start",
+        "end",
+        "max",
+        "east",
+        "west",
+    ]:
+        st.session_state.pop(key, None)
+
+    st.session_state.last_uploaded_file = uploaded_file.name
+
+    st.rerun()
 # Read workbook
 xls = pd.ExcelFile(uploaded_file)
 
