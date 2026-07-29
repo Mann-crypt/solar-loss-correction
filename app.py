@@ -499,6 +499,25 @@ if st.session_state.run_model:
             ]
             
             # ------------------ Objective Function ------------------
+            actual = df_fix["Actual"].to_numpy(dtype=np.float64)
+
+            mask = actual != 0
+            actual = actual[mask]
+            
+            blocks = backend_list[0]["Block No."].to_numpy(dtype=np.float64)
+            
+            ghi_arrays = [
+                df_fix[col].to_numpy(dtype=np.float64)
+                for col in ghi_cols
+            ]
+            
+            weight_sum = np.array([
+                df_weight["CL-1"].sum(),
+                df_weight["CL-2"].sum(),
+                df_weight["CL-3"].sum(),
+                df_weight["CL-4"].sum(),
+                df_weight["CL-5"].sum(),
+            ], dtype=np.float64)
             
             def objective(x):
                 try:
@@ -543,7 +562,9 @@ if st.session_state.run_model:
                     
                     cos_alpha = np.clip(cos_alpha, 1e-6, None)
 
-                    for i, ghi in enumerate(ghi_cols):
+                    prediction = np.zeros_like(blocks, dtype=np.float64)
+
+                    for i, ghi in enumerate(ghi_arrays):
                     
                         dhi = ghi * DHI / 100
                     
