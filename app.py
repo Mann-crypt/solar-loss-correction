@@ -62,35 +62,43 @@ edited_df = st.data_editor(
     key="editor"
 )
 
-changed_rows = (edited_df != original_df).any(axis=1)
+edited_numeric = edited_df.copy()
+
+edited_numeric[ghi_cols] = edited_numeric[ghi_cols].apply(
+    pd.to_numeric,
+    errors="coerce"
+).fillna(0)
+
+edited_numeric["Actual"] = (
+    pd.to_numeric(edited_numeric["Actual"], errors="coerce")
+    .fillna(0)
+)
+
+changed_rows = (
+    edited_numeric.ne(original_df.fillna(0))
+).any(axis=1)
 
 if changed_rows.any():
     st.success(f"✅ {changed_rows.sum()} rows updated")
-
-# Check if anything changed
-if not edited_df.equals(original_df):
-    st.toast("✅ Input data updated!", icon="✨")
-
-# Update dataframe
-for col in ghi_cols:
-    df_fix[col] = edited_df[col].values
-
-df_fix["Actual"] = edited_df["Actual"].values
+    st.toast("✨ Input data updated!")
 
 edited_df = edited_df.iloc[:96].reset_index(drop=True)
 
-for col in ghi_cols:
-    df_fix[col] = (
-        pd.to_numeric(edited_df[col], errors="coerce")
-        .fillna(0)
-    )
+# Convert everything to numeric.
+# Any text or invalid value becomes 0.
+edited_df[ghi_cols] = edited_df[ghi_cols].apply(
+    pd.to_numeric,
+    errors="coerce"
+).fillna(0)
 
-df_fix["Actual"] = (
+edited_df["Actual"] = (
     pd.to_numeric(edited_df["Actual"], errors="coerce")
     .fillna(0)
 )
 
-df_fix = df_fix.iloc[:96].copy()
+# Update df_fix only once
+df_fix.loc[:, ghi_cols] = edited_df[ghi_cols].values
+df_fix.loc[:, "Actual"] = edited_df["Actual"].values
 
 plant_type = st.radio(
     "Plant Type",
