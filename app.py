@@ -48,6 +48,10 @@ if len(null_indices) > 0:
 # Keep only first 96 blocks
 df_fix = df_fix.iloc[:96].copy()
 
+st.subheader("Input Data")
+
+input_df = df_fix[ghi_cols + ["Actual"]].copy()
+
 original_df = input_df.copy()
 
 edited_df = st.data_editor(
