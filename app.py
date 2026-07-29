@@ -1198,7 +1198,7 @@ if st.session_state.run_model:
             mask = actual != 0
             actual = actual[mask]
             
-            blocks = backend_list[0]["Block No."].to_numpy(dtype=np.float64)
+            blocks = df_bcal["Block No."].to_numpy(dtype=np.float64)
             
             ghi_arrays = [
                 df_fix[col].to_numpy(dtype=np.float64)
