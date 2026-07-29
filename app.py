@@ -52,6 +52,31 @@ st.subheader("Input Data")
 
 input_df = df_fix[ghi_cols + ["Actual"]].copy()
 
+st.markdown("""
+<style>
+@keyframes pulseGlow {
+    0% {
+        box-shadow: 0 0 0px rgba(34,197,94,0);
+        transform: scale(1);
+    }
+    50% {
+        box-shadow: 0 0 18px rgba(34,197,94,.6);
+        transform: scale(1.01);
+    }
+    100% {
+        box-shadow: 0 0 0px rgba(34,197,94,0);
+        transform: scale(1);
+    }
+}
+
+.editor-highlight{
+    border-radius:12px;
+    animation:pulseGlow 1s ease-in-out;
+}
+</style>
+""", unsafe_allow_html=True)
+st.markdown('<div class="editor-highlight">', unsafe_allow_html=True)
+
 edited_df = st.data_editor(
     input_df,
     use_container_width=True,
@@ -60,9 +85,7 @@ edited_df = st.data_editor(
     key="editor"
 )
 
-if changed_rows.any():
-    st.balloons()
-
+st.markdown("</div>", unsafe_allow_html=True)
 edited_df = edited_df.iloc[:96].reset_index(drop=True)
 
 for col in ghi_cols:
