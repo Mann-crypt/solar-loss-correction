@@ -5,6 +5,28 @@ import plotly.graph_objects as go
 from scipy.optimize import differential_evolution
 from sklearn.metrics import mean_absolute_percentage_error
 import streamlit as st
+import streamlit.components.v1 as components
+
+components.html("""
+<script>
+
+let timer;
+
+function resetTimer(){
+    clearTimeout(timer);
+    timer = setTimeout(()=>{
+        window.location.reload();
+    },300000); // 5 minutes
+}
+
+["mousemove","mousedown","keydown","scroll","touchstart"].forEach(e=>{
+    document.addEventListener(e,resetTimer);
+});
+
+resetTimer();
+
+</script>
+""", height=0)
 
 st.set_page_config(page_title="Solar Loss Correction", layout="wide")
 
