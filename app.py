@@ -52,36 +52,36 @@ st.subheader("Input Data")
 
 input_df = df_fix[ghi_cols + ["Actual"]].copy()
 
-st.markdown("""
-<style>
-@keyframes pulseGlow {
-    0% {
-        box-shadow: 0 0 0 rgba(34,197,94,0);
-        transform: scale(1);
-    }
-    50% {
-        box-shadow: 0 0 18px rgba(34,197,94,.6);
-        transform: scale(1.01);
-    }
-    100% {
-        box-shadow: 0 0 0 rgba(34,197,94,0);
-        transform: scale(1);
-    }
-}
+original_df = input_df.copy()
 
-div[data-testid="stDataEditor"]{
-    border-radius:12px;
-    animation:pulseGlow 1s ease-in-out;
-}
-</style>
-""", unsafe_allow_html=True)
-
-edited_df = st.data_editor(
+# Only one editable grid
+input_df = st.data_editor(
     input_df,
     use_container_width=True,
     hide_index=True,
     num_rows="fixed",
     key="editor"
+)
+
+# Compare with original
+changed = input_df.ne(original_df)
+
+# Update your main dataframe
+for col in input_df.columns:
+    df_fix[col] = input_df[col].values
+
+# Optional: Show verification with highlights
+st.subheader("Updated Cells")
+
+st.dataframe(
+    input_df.style.apply(
+        lambda row: [
+            "background-color:#90EE90" if changed.iloc[row.name, j] else ""
+            for j in range(len(row))
+        ],
+        axis=1,
+    ),
+    use_container_width=True,
 )
 edited_df = edited_df.iloc[:96].reset_index(drop=True)
 
