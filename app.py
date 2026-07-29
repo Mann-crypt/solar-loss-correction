@@ -533,43 +533,27 @@ if st.session_state.run_model:
                     
                     cos_alpha = np.cos(np.radians(panel))
                     
-                    weights = df_weight.sum()
-                    
-                    for backend, ghi_col, weight_col in zip(
-                            backend_list,
-                            ghi_cols,
-                            weight_cols):
-                    
-                        ghi = df_fix[ghi_col].to_numpy()
+                    cos_alpha = np.clip(cos_alpha, 1e-6, None)
+
+                    for i, ghi in enumerate(ghi_arrays):
                     
                         dhi = ghi * DHI / 100
-                        cos_alpha = np.clip(cos_alpha, 1e-6, None)
+                    
                         dni = (ghi - dhi) / cos_alpha
                     
-                        pred = (
-                            dni * weights[weight_col]
+                        prediction += (
+                            dni * weight_sum[i]
                         ) / 1_000_000
-                    
-                        predictions.append(pred)
-                    
-                    prediction = np.sum(predictions, axis=0)
                 
                     # Comparision
                 
-                    mask = df_fix["Actual"] != 0
-                
-                    from sklearn.metrics import mean_squared_error
-                
-                    actual = df_fix["Actual"].values
                 
                     # Consider only daylight blocks
                     #mask = ghi_cols > 50
                 
-                    actual = actual[mask]
                     prediction = prediction[mask]
                 
                     # Higher weights near peak generation
-                    weights = actual / actual.max()
                 
                     # Weighted RMSE
                     block_error = np.mean(np.abs(actual - prediction)) / actual.max()
@@ -1207,6 +1191,27 @@ if st.session_state.run_model:
             df_trac = pd.read_excel(uploaded_file, sheet_name="Tracking", header=[1])
     
             # ------------------ Objective Function ------------------
+            # ---------- Precompute once ----------
+
+            actual = df_fix["Actual"].to_numpy(dtype=np.float64)
+            
+            mask = actual != 0
+            actual = actual[mask]
+            
+            blocks = backend_list[0]["Block No."].to_numpy(dtype=np.float64)
+            
+            ghi_arrays = [
+                df_fix[col].to_numpy(dtype=np.float64)
+                for col in ghi_cols
+            ]
+            
+            weight_sum = np.array([
+                df_weight["CL-1"].sum(),
+                df_weight["CL-2"].sum(),
+                df_weight["CL-3"].sum(),
+                df_weight["CL-4"].sum(),
+                df_weight["CL-5"].sum(),
+            ])
     
             def objective(x):
     
