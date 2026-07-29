@@ -52,12 +52,31 @@ st.subheader("Input Data")
 
 input_df = df_fix[ghi_cols + ["Actual"]].copy()
 
+original_df = input_df.copy()
+
 edited_df = st.data_editor(
     input_df,
     use_container_width=True,
     hide_index=True,
-    num_rows="fixed"
+    num_rows="fixed",
+    key="editor"
 )
+
+changed_rows = (edited_df != original_df).any(axis=1)
+
+if changed_rows.any():
+    st.success(f"✅ {changed_rows.sum()} rows updated")
+
+    st.dataframe(
+        edited_df.style.apply(
+            lambda row: [
+                "background-color:#d1fae5" if changed_rows.loc[row.name] else ""
+                for _ in row
+            ],
+            axis=1
+        ),
+        use_container_width=True,
+    )
 
 edited_df = edited_df.iloc[:96].reset_index(drop=True)
 
