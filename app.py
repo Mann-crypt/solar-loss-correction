@@ -62,6 +62,11 @@ edited_df = st.data_editor(
     key="editor"
 )
 
+changed_rows = (edited_df != original_df).any(axis=1)
+
+if changed_rows.any():
+    st.success(f"✅ {changed_rows.sum()} rows updated")
+
 # Check if anything changed
 if not edited_df.equals(original_df):
     st.toast("✅ Input data updated!", icon="✨")
