@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 from scipy.optimize import differential_evolution
 from sklearn.metrics import mean_absolute_percentage_error
 import streamlit as st
-st.write(st.__version__)
+
 st.set_page_config(page_title="Solar Loss Correction", layout="wide")
 
 st.title("Pasima Pakam Ravi, 3-4 Loss Correction kar chuke hai!!😎")
@@ -27,11 +27,11 @@ xls = pd.ExcelFile(uploaded_file)
 is_cluster = "Fixed-CL1" in xls.sheet_names
 
 if is_cluster:
-    st.success("Arey Yarrr!! phir se Cluster")
+    #st.success("Arey Yarrr!! phir se Cluster")
     sheet = "Fixed-CL1"
     ghi_cols = ["CL1-GHI", "CL2-GHI", "CL3-GHI", "CL4-GHI", "CL5-GHI"]
 else:
-    st.success("Arey Waah!! no Cluster")
+    #st.success("Arey Waah!! no Cluster")
     sheet = "Fixed"
     ghi_cols = ["GHI_Forecast"]
 
@@ -101,7 +101,7 @@ plant_type = st.radio(
 if "run_model" not in st.session_state:
     st.session_state.run_model = False
 
-if st.button("🚀 Hit me Hard!!", use_container_width=True, type="primary"):
+if st.button("🚀 Dabao magar pyaar se!!", use_container_width=True, type="primary"):
     st.session_state.pop("params", None)   # Delete old optimized values
     st.session_state.run_model = True
 
