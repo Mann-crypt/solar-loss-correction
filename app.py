@@ -52,6 +52,8 @@ st.subheader("Input Data")
 
 input_df = df_fix[ghi_cols + ["Actual"]].copy()
 
+original_df = input_df.copy()
+
 edited_df = st.data_editor(
     input_df,
     use_container_width=True,
