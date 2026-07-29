@@ -842,6 +842,12 @@ if st.session_state.run_model:
                 )
                 
                 cos_alpha = np.cos(np.radians(panel))
+
+                df_weight["CL-1"] = ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-1"].values[0:1]
+                df_weight["CL-2"] = ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-2"].values[0:1]
+                df_weight["CL-3"] = ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-3"].values[0:1]
+                df_weight["CL-4"] = ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-4"].values[0:1]
+                df_weight["CL-5"] = ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-5"].values[0:1]
                 
                 weights = df_weight.sum()
                 
