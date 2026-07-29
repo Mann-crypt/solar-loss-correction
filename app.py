@@ -1231,8 +1231,6 @@ if st.session_state.run_model:
                 
                 g_minus_d = ghi - dhi
     
-                temp["DHI"] = df_fix["GHI_Forecast"] * DHI / 100
-                temp["GHI - DHI"] = df_fix["GHI_Forecast"] - temp["DHI"]
     
                 zenith = np.where(
                     blocks <= GHI_Max_Block,
@@ -1250,9 +1248,6 @@ if st.session_state.run_model:
                     )
                 )
     
-                temp["θ - α"] = temp["Zenith angle ( θ )"] - temp["Panel Angle (α)"]
-    
-                temp["Cos(θ)"] = np.cos(np.radians(temp["Zenith angle ( θ )"]))
                 cos_alpha = np.cos(np.radians(panel))
                 temp["Cos(θ - α)"] = np.cos(np.radians(temp["θ - α"]))
     
