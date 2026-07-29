@@ -52,8 +52,6 @@ st.subheader("Input Data")
 
 input_df = df_fix[ghi_cols + ["Actual"]].copy()
 
-original_df = input_df.copy()
-
 edited_df = st.data_editor(
     input_df,
     use_container_width=True,
@@ -62,21 +60,22 @@ edited_df = st.data_editor(
     key="editor"
 )
 
-changed_rows = (edited_df != original_df).any(axis=1)
+def highlight_changes(df_new, df_old):
+    styles = pd.DataFrame("", index=df_new.index, columns=df_new.columns)
 
-if changed_rows.any():
-    st.success(f"✅ {changed_rows.sum()} rows updated")
+    mask = df_new.ne(df_old)
 
-    st.dataframe(
-        edited_df.style.apply(
-            lambda row: [
-                "background-color:#d1fae5" if changed_rows.loc[row.name] else ""
-                for _ in row
-            ],
-            axis=1
-        ),
-        use_container_width=True,
-    )
+    styles[mask] = "background-color:#FFF59D"
+
+    return styles
+
+st.dataframe(
+    edited_df.style.apply(
+        lambda _: highlight_changes(edited_df, original_df),
+        axis=None
+    ),
+    use_container_width=True,
+)
 
 edited_df = edited_df.iloc[:96].reset_index(drop=True)
 
