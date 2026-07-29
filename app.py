@@ -56,7 +56,7 @@ st.markdown("""
 <style>
 @keyframes pulseGlow {
     0% {
-        box-shadow: 0 0 0px rgba(34,197,94,0);
+        box-shadow: 0 0 0 rgba(34,197,94,0);
         transform: scale(1);
     }
     50% {
@@ -64,18 +64,17 @@ st.markdown("""
         transform: scale(1.01);
     }
     100% {
-        box-shadow: 0 0 0px rgba(34,197,94,0);
+        box-shadow: 0 0 0 rgba(34,197,94,0);
         transform: scale(1);
     }
 }
 
-.editor-highlight{
+div[data-testid="stDataEditor"]{
     border-radius:12px;
     animation:pulseGlow 1s ease-in-out;
 }
 </style>
 """, unsafe_allow_html=True)
-st.markdown('<div class="editor-highlight">', unsafe_allow_html=True)
 
 edited_df = st.data_editor(
     input_df,
@@ -84,8 +83,6 @@ edited_df = st.data_editor(
     num_rows="fixed",
     key="editor"
 )
-
-st.markdown("</div>", unsafe_allow_html=True)
 edited_df = edited_df.iloc[:96].reset_index(drop=True)
 
 for col in ghi_cols:
