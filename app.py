@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 from scipy.optimize import differential_evolution
 from sklearn.metrics import mean_absolute_percentage_error
 import streamlit as st
-
+st.write(st.__version__)
 st.set_page_config(page_title="Solar Loss Correction", layout="wide")
 
 st.title("Pasima Pakam Ravi, 3-4 Loss Correction kar chuke hai!!😎")
