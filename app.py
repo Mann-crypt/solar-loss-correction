@@ -1524,42 +1524,43 @@ if st.session_state.run_model:
                     )
     
     
+                # ---------- Fast final calculation ----------
+
                 m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
                 m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
-    
-                df_bcal["DHI"] = df_fix["GHI_Forecast"] * DHI / 100
-                df_bcal["GHI - DHI"] = df_fix["GHI_Forecast"] - df_bcal["DHI"]
-    
-                df_bcal["Zenith angle ( θ )"] = np.where(
-                    df_bcal["Block No."] <= GHI_Max_Block,
-                    np.minimum(89, m1 * (df_bcal["Block No."] - GHI_Max_Block)),
-                    np.minimum(89, m2 * (df_bcal["Block No."] - GHI_Max_Block))
+                
+                ghi = df_fix["GHI_Forecast"].to_numpy(dtype=np.float64)
+                blocks = df_bcal["Block No."].to_numpy(dtype=np.float64)
+                
+                dhi = ghi * DHI / 100.0
+                ghi_minus_dhi = ghi - dhi
+                
+                zenith = np.where(
+                    blocks <= GHI_Max_Block,
+                    np.minimum(89.0, m1 * (blocks - GHI_Max_Block)),
+                    np.minimum(89.0, m2 * (blocks - GHI_Max_Block))
                 )
-    
-                df_bcal["Panel Angle (α)"] = np.where(
-                    df_bcal["Block No."] < GHI_Max_Block,
+                
+                panel = np.where(
+                    blocks < GHI_Max_Block,
+                    np.minimum(zenith, abs(Tracking_angle_lim_E)),
                     np.where(
-                        df_bcal["Zenith angle ( θ )"] < abs(Tracking_angle_lim_E),
-                        df_bcal["Zenith angle ( θ )"],
-                        abs(Tracking_angle_lim_E)
-                    ),
-                    np.where(
-                        (df_bcal["Block No."] > GHI_Max_Block) &
-                        (df_bcal["Zenith angle ( θ )"] > Tracking_angle_lim_W),
+                        (blocks > GHI_Max_Block) & (zenith > Tracking_angle_lim_W),
                         Tracking_angle_lim_W,
-                        df_bcal["Zenith angle ( θ )"]
+                        zenith
                     )
                 )
-    
-                df_bcal["θ - α"] = df_bcal["Zenith angle ( θ )"] - df_bcal["Panel Angle (α)"]
-                df_bcal["Cos(θ)"] = np.cos(np.radians(df_bcal["Zenith angle ( θ )"]))
-                df_bcal["Cos(α)"] = np.cos(np.radians(df_bcal["Panel Angle (α)"]))
-                df_bcal["Cos(θ - α)"] = np.cos(np.radians(df_bcal["θ - α"]))
-                df_bcal["DNI"] = df_bcal["GHI - DHI"] / df_bcal["Cos(α)"]
-    
-                df_trac["Fixed Power=I*Ƞ*A"] = (
-                    df_bcal["DNI"] * df["Eff Area"].sum()
-                ) / 1000000
+                
+                cos_alpha = np.cos(np.radians(panel))
+                cos_alpha = np.clip(cos_alpha, 1e-6, None)
+                
+                dni = ghi_minus_dhi / cos_alpha
+                
+                eff_area = df["Eff Area"].sum()
+                
+                forecast = dni * eff_area / 1_000_000
+                
+                df_trac["Fixed Power=I*Ƞ*A"] = forecast
     
                 x = np.arange(1, 97)
     
