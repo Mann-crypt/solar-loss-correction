@@ -42,56 +42,30 @@ st.markdown("""
 <style>
 
 [data-testid="stSidebar"]{
-    background: linear-gradient(180deg,#061b2d,#0d2f45,#143f57);
+background:#111827;
 }
 
-.sidebar-title{
-    font-size:34px;
-    font-weight:900;
-    color:white;
-    text-align:center;
-    margin-top:10px;
-    margin-bottom:5px;
-    letter-spacing:2px;
-}
-
-.sidebar-sub{
-    text-align:center;
-    color:#6ee7ff;
-    font-size:14px;
-    margin-bottom:25px;
-}
-
-.dev{
-    position:fixed;
-    bottom:15px;
-    left:18px;
-    color:white;
-    opacity:0.8;
-    font-size:13px;
+.stButton>button{
+border-radius:15px;
+height:55px;
+font-size:18px;
 }
 
 </style>
-""", unsafe_allow_html=True)
+""",unsafe_allow_html=True)
 
 with st.sidebar:
 
-    st.title("☀ Solar Suite")
+    st.markdown("# ☀ Solar Suite")
 
-    tabs = st.radio(
-        "",
-        [
-            "🏠 Home",
-            "📉 Loss Correction",
-            "📈 RT Correction",
-            "⚙ Settings"
-        ]
-    )
+    loss=st.button("📉 Loss Correction",use_container_width=True)
 
-    st.divider()
+    rt=st.button("📈 RT Correction",use_container_width=True)
 
+    st.write("")
+    st.write("")
     st.caption("Developed by")
-    st.write("**Manjot Singh**")
+    st.write("### Manjot Singh")
 if page == "⚡ Loss Correction":
     st.title("Pasima Pakam Ravi, 3-4 Loss Correction kar chuke hai!!😎")
 
