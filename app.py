@@ -1779,7 +1779,7 @@ elif page == "RT Correction":
                 df["Trend"]
             )
             
-            df["Actual"] = actual
+            actual = df["Actual"]
             mask = actual > 0   
             pred=prediction[mask]
             act=actual[mask]
