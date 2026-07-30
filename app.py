@@ -35,26 +35,22 @@ import streamlit as st
 st.set_page_config(layout="wide")
 
 with st.sidebar:
-    st.image(
-        "https://img.icons8.com/fluency/96/solar-panel.png",
-        width=70
-    )
 
-    st.title("Solar Suite")
+    st.markdown("## 🌞 Solar Operations")
 
-    st.divider()
+    st.success("Ready")
 
-    page = st.selectbox(
-        "Choose Module",
-        [
-            "⚡ Loss Correction",
-            "📈 RT Correction",
-        ]
-    )
+    st.markdown("---")
 
-    st.divider()
+    if st.button("⚡ Loss Correction", use_container_width=True):
+        st.session_state.page = "loss"
 
-    st.caption("Version 1.0")
+    if st.button("📈 RT Correction", use_container_width=True):
+        st.session_state.page = "rt"
+
+    st.markdown("---")
+
+    st.caption("MAL Internal Tool")
 if page == "⚡ Loss Correction":
     st.title("Pasima Pakam Ravi, 3-4 Loss Correction kar chuke hai!!😎")
 
