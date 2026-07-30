@@ -1717,7 +1717,7 @@ if page == "Loss Correction":
                     st.plotly_chart(fig, use_container_width=True)
 
 elif page == "RT Correction":
-    st.title("Let's Correct Real Time🤔?!!")
+    st.title("Guruji ne kaha tha RT Correct kardo bhyii🛐!!")
 
     if "rt_input" not in st.session_state:
         st.session_state.rt_input = pd.DataFrame({
