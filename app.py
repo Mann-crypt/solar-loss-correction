@@ -1760,7 +1760,7 @@ elif page == "RT Correction":
     trend = df["Trend"].to_numpy(dtype=float)
     blocks = df["Blocks"].to_numpy(dtype=float)
     
-    mask = actual > 0
+    mask = actual > 0.5
     
     # ---------------- Objective ----------------
     
