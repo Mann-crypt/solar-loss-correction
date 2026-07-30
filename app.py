@@ -32,18 +32,14 @@ st.set_page_config(page_title="Solar Loss Correction", layout="wide")
 
 import streamlit as st
 
-st.sidebar.markdown("---")
-
-page = st.sidebar.selectbox(
-    "Choose Module",
+page = st.segmented_control(
+    "Module",
     [
         "⚡ Loss Correction",
         "📈 RT Correction"
-    ]
+    ],
+    default="⚡ Loss Correction"
 )
-
-st.sidebar.markdown("---")
-st.sidebar.caption("Version 1.0")
 if page == "⚡ Loss Correction":
     st.title("Pasima Pakam Ravi, 3-4 Loss Correction kar chuke hai!!😎")
 
