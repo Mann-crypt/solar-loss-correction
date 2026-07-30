@@ -38,48 +38,45 @@ st.set_page_config(
     layout="wide"
 )
 
-st.markdown("""
-<style>
+st.sidebar.markdown("""
+<h1 style='text-align:center;
+background: linear-gradient(90deg,#00c6ff,#0072ff);
+-webkit-background-clip:text;
+-webkit-text-fill-color:transparent;
+font-size:40px;
+font-weight:800;'>
+⚡ Solar Suite
+</h1>
 
-div.stButton>button{
-background:rgba(255,255,255,.08);
-backdrop-filter:blur(20px);
-border:1px solid rgba(255,255,255,.2);
-border-radius:20px;
-height:75px;
-font-size:20px;
-font-weight:bold;
-transition:.3s;
-}
-
-div.stButton>button:hover{
-transform:scale(1.03);
-}
-
-</style>
+<p style='text-align:center;color:gray;font-size:14px'>
+Loss Correction Platform
+</p>
 """, unsafe_allow_html=True)
 
-st.sidebar.markdown("# ☀ Solar Suite")
+st.sidebar.divider()
 
-loss = st.sidebar.button(
-    "📉  Loss Correction",
-    use_container_width=True
+if "page" not in st.session_state:
+    st.session_state.page = "Loss Correction"
+
+if st.sidebar.button("☀️ Loss Correction", use_container_width=True):
+    st.session_state.page = "Loss Correction"
+
+if st.sidebar.button("📈 RT Correction", use_container_width=True):
+    st.session_state.page = "RT Correction"
+
+st.sidebar.divider()
+
+st.sidebar.markdown(
+"""
+<div style='text-align:center;color:gray;font-size:13px'>
+Developed by<br>
+<b>Manjot Singh</b>
+</div>
+""",
+unsafe_allow_html=True
 )
 
-rt = st.sidebar.button(
-    "⚡  RT Correction",
-    use_container_width=True
-)
-
-forecast = st.sidebar.button(
-    "☀ Forecast",
-    use_container_width=True
-)
-
-history = st.sidebar.button(
-    "📊 Reports",
-    use_container_width=True
-)
+page = st.session_state.page
 if page == "⚡ Loss Correction":
     st.title("Pasima Pakam Ravi, 3-4 Loss Correction kar chuke hai!!😎")
 
