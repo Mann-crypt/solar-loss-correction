@@ -1745,30 +1745,6 @@ elif page == "RT Correction":
     ]
     
     df["Blocks"] = np.arange(1,97)
-    
-    # ---------------- Editable Data ----------------
-    
-    edited = st.data_editor(
-        df[["Trend","Actual"]],
-        hide_index=True,
-        use_container_width=True,
-        num_rows="fixed"
-    )
-    
-    df["Trend"] = pd.to_numeric(
-        edited["Trend"],
-        errors="coerce"
-    ).fillna(0)
-    
-    df["Actual"] = pd.to_numeric(
-        edited["Actual"],
-        errors="coerce"
-    ).fillna(0)
-    
-    actual = df["Actual"].values
-    
-    mask = actual > 0
-    
     # ---------------- Optimize ----------------
     
     if "rt_params" not in st.session_state:
