@@ -56,7 +56,12 @@ font-size:18px;
 
 with st.sidebar:
 
-    st.markdown("# ☀ Solar Suite")
+    st.image(
+        "https://img.icons8.com/color/96/solar-panel.png",
+        width=80
+    )
+
+    st.title("Solar Suite")
 
     loss=st.button("📉 Loss Correction",use_container_width=True)
 
