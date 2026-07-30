@@ -32,31 +32,72 @@ st.set_page_config(page_title="Solar Loss Correction", layout="wide")
 
 import streamlit as st
 
+st.set_page_config(
+    page_title="Solar Suite",
+    page_icon="☀️",
+    layout="wide"
+)
+
+st.markdown("""
+<style>
+
+[data-testid="stSidebar"]{
+    background: linear-gradient(180deg,#061b2d,#0d2f45,#143f57);
+}
+
+.sidebar-title{
+    font-size:34px;
+    font-weight:900;
+    color:white;
+    text-align:center;
+    margin-top:10px;
+    margin-bottom:5px;
+    letter-spacing:2px;
+}
+
+.sidebar-sub{
+    text-align:center;
+    color:#6ee7ff;
+    font-size:14px;
+    margin-bottom:25px;
+}
+
+.dev{
+    position:fixed;
+    bottom:15px;
+    left:18px;
+    color:white;
+    opacity:0.8;
+    font-size:13px;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
 with st.sidebar:
 
     st.markdown(
-        """
-# 🌞 Solar Suite
+        "<div class='sidebar-title'>☀ Solar Suite</div>",
+        unsafe_allow_html=True
+    )
 
-### Welcome 👋
-
-Choose a module below.
-"""
+    st.markdown(
+        "<div class='sidebar-sub'>Liquid Edition</div>",
+        unsafe_allow_html=True
     )
 
     page = st.radio(
-        "",
+        "Select Tool",
         [
-            "⚡ Loss Correction",
-            "📈 RT Correction",
-            "📊 Reports",
-            "⚙ Settings"
+            "📉 Loss Correction",
+            "📈 RT Correction"
         ]
     )
 
-    st.divider()
-
-    st.success("🟢 System Healthy")
+    st.markdown(
+        "<div class='dev'>Developed by<br><b>Manjot Singh</b></div>",
+        unsafe_allow_html=True
+    )
 if page == "⚡ Loss Correction":
     st.title("Pasima Pakam Ravi, 3-4 Loss Correction kar chuke hai!!😎")
 
