@@ -76,16 +76,27 @@ st.markdown("""
 
 with st.sidebar:
 
-    st.markdown("# ☀ Solar Suite")
+    st.image(
+        "https://img.icons8.com/color/96/solar-panel.png",
+        width=80
+    )
 
-    st.markdown('<div class="card">📉 Loss Correction</div>',unsafe_allow_html=True)
+    st.title("Solar Suite")
 
-    st.markdown('<div class="card">📈 RT Correction</div>',unsafe_allow_html=True)
+    page = st.selectbox(
+        "Module",
+        [
+            "Loss Correction",
+            "RT Correction"
+        ]
+    )
 
-    st.markdown("---")
+    st.divider()
+
+    st.metric("Version","1.0")
 
     st.caption("Developed by")
-    st.write("**Manjot Singh**")
+    st.success("Manjot Singh")
 
 if page == "⚡ Loss Correction":
     st.title("Pasima Pakam Ravi, 3-4 Loss Correction kar chuke hai!!😎")
