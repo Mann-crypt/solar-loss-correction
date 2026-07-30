@@ -65,8 +65,23 @@ st.sidebar.divider()
 st.sidebar.markdown(
 """
 <div style='text-align:center;color:gray;font-size:13px'>
-Developed by<br>
+Developer:<br>
 <b>Manjot Singh</b>
+</div>
+<div style='text-align:center;color:gray;font-size:13px'>
+Scripter Writer:<br>
+<b>Tushar Sharma</b>
+</div>
+<div style='text-align:center;color:gray;font-size:13px'>
+Challenger<br>
+<b>Aarav Sharma</b>
+</div>
+<div style='text-align:center;color:gray;font-size:13px'>
+Tester:<br>
+<b>Jatin Chaturvedi</b>
+<div style='text-align:center;color:gray;font-size:13px'>
+Improviser:<br>
+<b>Ujala Agrahari</b>
 </div>
 """,
 unsafe_allow_html=True
