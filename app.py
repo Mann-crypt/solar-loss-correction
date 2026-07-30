@@ -1719,17 +1719,22 @@ if page == "Loss Correction":
 elif page == "RT Correction":
     st.title("📈 RT Correction")
 
-    input_df = pd.DataFrame({
-        "Actual": np.zeros(96),
-        "Trend": np.zeros(96)
-    })
+    if "rt_input" not in st.session_state:
+        st.session_state.rt_input = pd.DataFrame({
+            "Actual": np.zeros(96),
+            "Trend": np.zeros(96)
+        })
     
     edited_df = st.data_editor(
-        input_df,
-        num_rows="fixed",
+        st.session_state.rt_input,
+        key="rt_editor",
         use_container_width=True,
-        hide_index=True
+        hide_index=True,
+        num_rows="fixed"
     )
+    
+    st.session_state.rt_input = edited_df.copy()
+    df = edited_df.copy()
     
     df = edited_df.copy()
     
@@ -1747,7 +1752,32 @@ elif page == "RT Correction":
     df["Blocks"] = np.arange(1,97)
     # ---------------- Optimize ----------------
     
-    if "rt_params" not in st.session_state:
+    if st.button("🚀 Optimize RT Parameters"):
+
+        with st.spinner("Optimizing..."):
+    
+            result = differential_evolution(
+                objective,
+                bounds=[
+                    (0.3,0.3),
+                    (5,40),
+                    (55,95),
+                    (35,40)
+                ],
+                popsize=20,
+                maxiter=100,
+                polish=True,
+                seed=42
+            )
+    
+        w,n1,n2,b = result.x
+    
+        st.session_state.rt_params = {
+            "w": float(w),
+            "n1": int(round(n1)),
+            "n2": int(round(n2)),
+            "b": int(round(b))
+        }
     
         def objective(x):
     
@@ -1780,44 +1810,28 @@ elif page == "RT Correction":
             )
             
             actual = df["Actual"]
-            mask = actual > 0   
+            mask = actual > 0
+            if mask.sum() == 0:
+                return 1e9
             pred=prediction[mask]
             act=actual[mask]
+            if act.max() == 0:
+                return 1e9
+            
+            if act.sum() == 0:
+                return 1e9
     
             block=np.mean(np.abs(act-pred))/act.max()
             peak=abs(act.max()-pred.max())/act.max()
             energy=abs(act.sum()-pred.sum())/act.sum()
+            if np.isnan(pred).any() or np.isinf(pred).any():
+                return 1e9
     
             return (
                 0.80*block+
                 0.10*peak+
                 0.10*energy
             )
-    
-        with st.spinner("Optimizing..."):
-    
-            result=differential_evolution(
-                objective,
-                bounds=[
-                    (0.3,0.3),
-                    (5,40),
-                    (55,95),
-                    (35,40)
-                ],
-                popsize=20,
-                maxiter=100,
-                polish=True,
-                seed=42
-            )
-    
-        w,n1,n2,b=result.x
-    
-        st.session_state.rt_params={
-            "w":float(w),
-            "n1":int(round(n1)),
-            "n2":int(round(n2)),
-            "b":int(round(b))
-        }
     
     # ---------------- User Inputs ----------------
     
