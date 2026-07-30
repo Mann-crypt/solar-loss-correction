@@ -73,7 +73,7 @@ Scripter Writer:<br>
 <b>Tushar Sharma</b>
 </div>
 <div style='text-align:center;color:gray;font-size:13px'>
-Challenger<br>
+Challenger:<br>
 <b>Aarav Sharma</b>
 </div>
 <div style='text-align:center;color:gray;font-size:13px'>
@@ -82,6 +82,10 @@ Tester:<br>
 <div style='text-align:center;color:gray;font-size:13px'>
 Improviser:<br>
 <b>Ujala Agrahari</b>
+</div>
+<div style='text-align:center;color:gray;font-size:13px'>
+Suggested by:<br>
+<b>Garima Bajetha</b>
 </div>
 """,
 unsafe_allow_html=True
