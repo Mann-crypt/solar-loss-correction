@@ -1736,10 +1736,6 @@ elif page == "RT Correction":
     st.session_state.rt_input = edited_df.copy()
     df = edited_df.copy()
     
-    df = edited_df.copy()
-    
-    df["Blocks"] = np.arange(1,97)
-    
     # ---------------- Time Blocks ----------------
     
     start = datetime.strptime("00:00", "%H:%M")
@@ -1798,7 +1794,7 @@ elif page == "RT Correction":
             trend
         )
     
-        pred = prediction[mask]
+        pred = projection[mask]
         act = actual[mask]
     
         block_error = np.mean(np.abs(act - pred)) / act.max()
@@ -1903,7 +1899,6 @@ elif page == "RT Correction":
     )
     
     df["Projection"] = projection
-    df["RT Forecast"] = prediction
     
     # ---------------- Graph ----------------
     
@@ -1917,13 +1912,6 @@ elif page == "RT Correction":
         )
     )
     
-    fig.add_trace(
-        go.Scatter(
-            x=df["Blocks"],
-            y=df["RT Forecast"],
-            name="RT Forecast"
-        )
-    )
     
     fig.add_trace(
         go.Scatter(
