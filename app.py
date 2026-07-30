@@ -32,35 +32,27 @@ st.set_page_config(page_title="Solar Loss Correction", layout="wide")
 
 import streamlit as st
 
-st.set_page_config(layout="wide")
-
-st.markdown("""
-<style>
-[data-testid="stSidebar"]{
-    background: linear-gradient(
-        180deg,
-        #16222A,
-        #3A6073
-    );
-}
-
-[data-testid="stSidebar"] *{
-    color:white;
-}
-</style>
-""", unsafe_allow_html=True)
-
 with st.sidebar:
 
-    st.title("🌞 Solar Suite")
+    st.image("logo.png", width=120)
+
+    st.title("Solar Correction Suite")
+
+    st.caption("Internal Operations Tool")
+
+    st.divider()
 
     page = st.radio(
         "",
         [
             "⚡ Loss Correction",
-            "📈 RT Correction"
+            "📈 RT Correction",
         ]
     )
+
+    st.divider()
+
+    st.caption("© 2026")
 if page == "⚡ Loss Correction":
     st.title("Pasima Pakam Ravi, 3-4 Loss Correction kar chuke hai!!😎")
 
