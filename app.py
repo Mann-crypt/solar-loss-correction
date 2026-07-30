@@ -41,40 +41,45 @@ st.set_page_config(
 st.markdown("""
 <style>
 
-[data-testid="stSidebar"]{
-background:#111827;
+div.stButton>button{
+background:rgba(255,255,255,.08);
+backdrop-filter:blur(20px);
+border:1px solid rgba(255,255,255,.2);
+border-radius:20px;
+height:75px;
+font-size:20px;
+font-weight:bold;
+transition:.3s;
 }
 
-.stButton>button{
-border-radius:15px;
-height:55px;
-font-size:18px;
+div.stButton>button:hover{
+transform:scale(1.03);
 }
 
 </style>
-""",unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
-with st.sidebar:
+st.sidebar.markdown("# ☀ Solar Suite")
 
-    st.image(
-        "https://img.icons8.com/color/96/solar-panel.png",
-        width=80
-    )
+loss = st.sidebar.button(
+    "📉  Loss Correction",
+    use_container_width=True
+)
 
-    st.title("Solar Suite")
+rt = st.sidebar.button(
+    "⚡  RT Correction",
+    use_container_width=True
+)
 
-    page = st.selectbox(
-        "Module",
-        [
-            "Loss Correction",
-            "RT Correction"
-        ]
-    )
+forecast = st.sidebar.button(
+    "☀ Forecast",
+    use_container_width=True
+)
 
-    st.write("")
-    st.write("")
-    st.caption("Developed by")
-    st.write("### Manjot Singh")
+history = st.sidebar.button(
+    "📊 Reports",
+    use_container_width=True
+)
 if page == "⚡ Loss Correction":
     st.title("Pasima Pakam Ravi, 3-4 Loss Correction kar chuke hai!!😎")
 
