@@ -68,23 +68,30 @@ Renewable Energy Analytics
 </p>
 """, unsafe_allow_html=True)
 
-st.sidebar.markdown("### Navigation")
+st.sidebar.divider()
 
-if st.sidebar.button("⚡ Loss Correction", use_container_width=True):
-    st.session_state.page="Loss"
+if "page" not in st.session_state:
+    st.session_state.page = "Loss Correction"
+
+if st.sidebar.button("☀️ Loss Correction", use_container_width=True):
+    st.session_state.page = "Loss Correction"
 
 if st.sidebar.button("📈 RT Correction", use_container_width=True):
-    st.session_state.page="RT"
+    st.session_state.page = "RT Correction"
 
 st.sidebar.divider()
 
-st.sidebar.info("""
-**Version:** 2.0
+st.sidebar.markdown(
+"""
+<div style='text-align:center;color:gray;font-size:13px'>
+Developed by<br>
+<b>Manjot Singh</b>
+</div>
+""",
+unsafe_allow_html=True
+)
 
-**Developer**
-
-Manjot Singh
-""")
+page = st.session_state.page
 if page == "⚡ Loss Correction":
     st.title("Pasima Pakam Ravi, 3-4 Loss Correction kar chuke hai!!😎")
 
