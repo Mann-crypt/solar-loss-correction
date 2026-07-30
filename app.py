@@ -34,27 +34,28 @@ import streamlit as st
 
 st.set_page_config(layout="wide")
 
+st.markdown("""
+<style>
+[data-testid="stSidebar"]{
+    background: linear-gradient(
+        180deg,
+        #16222A,
+        #3A6073
+    );
+}
+
+[data-testid="stSidebar"] *{
+    color:white;
+}
+</style>
+""", unsafe_allow_html=True)
+
 with st.sidebar:
 
-    st.markdown(
-        """
-        <div style="
-            background:#0E8A16;
-            padding:18px;
-            border-radius:10px;
-            color:white;
-            text-align:center;
-        ">
-        <h2>🌞 Solar Suite</h2>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    st.write("")
+    st.title("🌞 Solar Suite")
 
     page = st.radio(
-        "Module",
+        "",
         [
             "⚡ Loss Correction",
             "📈 RT Correction"
