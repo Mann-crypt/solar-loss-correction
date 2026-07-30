@@ -744,7 +744,7 @@ if page == "Loss Correction":
                         "💸 Iss Job ko chhod or chhod kar ameer ho.."
                     ]
         
-                    MAX_ITER = 40
+                    MAX_ITER = 100
                     last_quote = {"text": None}
         
                     def random_quote():
@@ -764,7 +764,7 @@ if page == "Loss Correction":
                         progress.progress(generation["count"] / MAX_ITER)
         
                         # Change quote every 7 generations
-                        if generation["count"] % 7 == 1:
+                        if generation["count"] % 20 == 1:
                             current_quote["text"] = random_quote()
         
                         status.info(
@@ -1447,7 +1447,7 @@ if page == "Loss Correction":
                         "💸 Iss Job ko chhod or chhod kar ameer ho.."
                     ]
         
-                    MAX_ITER = 40
+                    MAX_ITER = 100
                     last_quote = {"text": None}
         
                     def random_quote():
@@ -1467,7 +1467,7 @@ if page == "Loss Correction":
                         progress.progress(generation["count"] / MAX_ITER)
         
                         # Change quote every 7 generations
-                        if generation["count"] % 7 == 1:
+                        if generation["count"] % 20 == 1:
                             current_quote["text"] = random_quote()
         
                         status.info(
