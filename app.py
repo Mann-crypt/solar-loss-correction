@@ -32,18 +32,21 @@ st.set_page_config(page_title="Solar Loss Correction", layout="wide")
 
 import streamlit as st
 
-loss, rt = st.tabs(
-    [
-        "⚡ Loss Correction",
-        "📈 RT Correction"
-    ]
-)
+st.set_page_config(layout="wide")
 
-with loss:
-    st.title("⚡ Loss Correction")
+st.title("🌞 Solar Correction Suite")
 
-with rt:
-    st.title("📈 RT Correction")
+col1, col2 = st.columns(2)
+
+with col1:
+    if st.button("⚡ Loss Correction", use_container_width=True):
+        st.session_state.page = "Loss"
+
+with col2:
+    if st.button("📈 RT Correction", use_container_width=True):
+        st.session_state.page = "RT"
+
+page = st.session_state.get("page", "Loss")
 if page == "⚡ Loss Correction":
     st.title("Pasima Pakam Ravi, 3-4 Loss Correction kar chuke hai!!😎")
 
