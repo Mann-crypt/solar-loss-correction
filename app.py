@@ -34,25 +34,29 @@ import streamlit as st
 
 with st.sidebar:
 
-    st.image("logo.png", width=120)
+    st.markdown(
+        """
+# 🌞 Solar Suite
 
-    st.title("Solar Correction Suite")
+### Welcome 👋
 
-    st.caption("Internal Operations Tool")
-
-    st.divider()
+Choose a module below.
+"""
+    )
 
     page = st.radio(
         "",
         [
             "⚡ Loss Correction",
             "📈 RT Correction",
+            "📊 Reports",
+            "⚙ Settings"
         ]
     )
 
     st.divider()
 
-    st.caption("© 2026")
+    st.success("🟢 System Healthy")
 if page == "⚡ Loss Correction":
     st.title("Pasima Pakam Ravi, 3-4 Loss Correction kar chuke hai!!😎")
 
