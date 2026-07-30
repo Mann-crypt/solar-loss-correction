@@ -1717,7 +1717,7 @@ if page == "Loss Correction":
                     st.plotly_chart(fig, use_container_width=True)
 
 elif page == "RT Correction":
-    st.title("📈 RT Correction")
+    st.title("Let's Correct Real Time🤔?!!")
 
     if "rt_input" not in st.session_state:
         st.session_state.rt_input = pd.DataFrame({
@@ -1812,7 +1812,7 @@ elif page == "RT Correction":
     
     # ---------------- Optimize ----------------
     
-    if st.button("🚀 Optimize RT Parameters", use_container_width=True):
+    if st.button("🚀 Dabaiye na!!", use_container_width=True, type="primary"):
     
         with st.spinner("Optimizing..."):
     
