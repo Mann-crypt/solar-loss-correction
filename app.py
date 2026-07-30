@@ -36,21 +36,27 @@ st.set_page_config(layout="wide")
 
 with st.sidebar:
 
-    st.markdown("## 🌞 Solar Operations")
+    st.title("🌞 Solar Suite")
 
-    st.success("Ready")
+    st.metric(
+        "Status",
+        "Online"
+    )
 
-    st.markdown("---")
+    st.metric(
+        "Modules",
+        2
+    )
 
-    if st.button("⚡ Loss Correction", use_container_width=True):
-        st.session_state.page = "loss"
+    st.divider()
 
-    if st.button("📈 RT Correction", use_container_width=True):
-        st.session_state.page = "rt"
-
-    st.markdown("---")
-
-    st.caption("MAL Internal Tool")
+    page = st.radio(
+        "",
+        [
+            "⚡ Loss Correction",
+            "📈 RT Correction"
+        ]
+    )
 if page == "⚡ Loss Correction":
     st.title("Pasima Pakam Ravi, 3-4 Loss Correction kar chuke hai!!😎")
 
