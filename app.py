@@ -36,22 +36,25 @@ st.set_page_config(layout="wide")
 
 with st.sidebar:
 
-    st.title("🌞 Solar Suite")
-
-    st.metric(
-        "Status",
-        "Online"
+    st.markdown(
+        """
+        <div style="
+            background:#0E8A16;
+            padding:18px;
+            border-radius:10px;
+            color:white;
+            text-align:center;
+        ">
+        <h2>🌞 Solar Suite</h2>
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
-    st.metric(
-        "Modules",
-        2
-    )
-
-    st.divider()
+    st.write("")
 
     page = st.radio(
-        "",
+        "Module",
         [
             "⚡ Loss Correction",
             "📈 RT Correction"
