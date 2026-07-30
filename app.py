@@ -1717,10 +1717,21 @@ if page == "Loss Correction":
 elif page == "RT Correction":
     st.title("📈 RT Correction")
 
-    uploaded_file = r"C:\Users\Manjot Singh\Desktop\1.RT_Ref_Fixed.xlsx"
+    input_df = pd.DataFrame({
+        "Actual": np.zeros(96),
+        "Trend": np.zeros(96)
+    })
     
-    df = pd.read_excel(uploaded_file)
-    df = df.iloc[:, :7].copy()
+    edited_df = st.data_editor(
+        input_df,
+        num_rows="fixed",
+        use_container_width=True,
+        hide_index=True
+    )
+    
+    df = edited_df.copy()
+    
+    df["Blocks"] = np.arange(1,97)
     
     # ---------------- Time Blocks ----------------
     
