@@ -34,19 +34,27 @@ import streamlit as st
 
 st.set_page_config(layout="wide")
 
-col1, col2 = st.columns(2)
+with st.sidebar:
+    st.image(
+        "https://img.icons8.com/fluency/96/solar-panel.png",
+        width=70
+    )
 
-with col1:
-    loss = st.button("⚡ Loss Correction", use_container_width=True)
+    st.title("Solar Suite")
 
-with col2:
-    rt = st.button("📈 RT Correction", use_container_width=True)
+    st.divider()
 
-if loss:
-    st.title("⚡ Loss Correction")
+    page = st.radio(
+        "Navigation",
+        [
+            "⚡ Loss Correction",
+            "📈 RT Correction",
+        ]
+    )
 
-if rt:
-    st.title("📈 RT Correction")
+    st.divider()
+
+    st.caption("Version 1.0")
 if page == "⚡ Loss Correction":
     st.title("Pasima Pakam Ravi, 3-4 Loss Correction kar chuke hai!!😎")
 
