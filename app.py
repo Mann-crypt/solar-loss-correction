@@ -1882,20 +1882,6 @@ elif page == "RT Correction":
     df["Projection"]=projection
     df["RT Forecast"]=prediction
     
-    # ---------------- Metrics ----------------
-    
-    block_error=np.mean(np.abs(act-pred))/act.max()
-    peak_error=abs(act.max()-pred.max())/act.max()
-    energy_error=abs(act.sum()-pred.sum())/act.sum()
-    
-    score=(
-        0.80*block_error+
-        0.10*peak_error+
-        0.10*energy_error
-    )
-    
-    st.metric("Score",round(score,5))
-    
     # ---------------- Graph ----------------
     
     fig=go.Figure()
