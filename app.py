@@ -76,28 +76,19 @@ st.markdown("""
 
 with st.sidebar:
 
-    st.markdown(
-        "<div class='sidebar-title'>☀ Solar Suite</div>",
-        unsafe_allow_html=True
-    )
+    st.markdown("# ☀ Solar Suite")
 
-    st.markdown(
-        "<div class='sidebar-sub'>Liquid Edition</div>",
-        unsafe_allow_html=True
-    )
+    if st.button("📉 Loss Correction", use_container_width=True):
+        page="Loss"
 
-    page = st.radio(
-        "Select Tool",
-        [
-            "📉 Loss Correction",
-            "📈 RT Correction"
-        ]
-    )
+    if st.button("📈 RT Correction", use_container_width=True):
+        page="RT"
 
-    st.markdown(
-        "<div class='dev'>Developed by<br><b>Manjot Singh</b></div>",
-        unsafe_allow_html=True
-    )
+    st.divider()
+
+    st.caption("Developed by")
+    st.write("### Manjot Singh")
+
 if page == "⚡ Loss Correction":
     st.title("Pasima Pakam Ravi, 3-4 Loss Correction kar chuke hai!!😎")
 
