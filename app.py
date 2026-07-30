@@ -33,27 +33,37 @@ st.set_page_config(page_title="Solar Loss Correction", layout="wide")
 import streamlit as st
 
 st.sidebar.markdown("""
-<h1 style='text-align:center'>
+<h1 style="
+text-align:center;
+font-size:42px;
+font-weight:900;
+color:#00D4FF;
+">
 ⚡ Solar Suite
 </h1>
-""",unsafe_allow_html=True)
 
-st.sidebar.markdown("#### Select Module")
+<p style="text-align:center;color:#9AA0A6">
+Renewable Energy Analytics
+</p>
+""", unsafe_allow_html=True)
 
-loss=st.sidebar.button("☀️ Loss Correction",use_container_width=True,type="primary")
-rt=st.sidebar.button("📊 RT Correction",use_container_width=True)
+st.sidebar.markdown("### Navigation")
 
-if loss:
+if st.sidebar.button("⚡ Loss Correction", use_container_width=True):
     st.session_state.page="Loss"
 
-if rt:
+if st.sidebar.button("📈 RT Correction", use_container_width=True):
     st.session_state.page="RT"
 
-st.sidebar.markdown("---")
-st.sidebar.markdown(
-"<center>👨‍💻 Developed by<br><b>Manjot Singh</b></center>",
-unsafe_allow_html=True
-)
+st.sidebar.divider()
+
+st.sidebar.info("""
+**Version:** 2.0
+
+**Developer**
+
+Manjot Singh
+""")
 if page == "⚡ Loss Correction":
     st.title("Pasima Pakam Ravi, 3-4 Loss Correction kar chuke hai!!😎")
 
