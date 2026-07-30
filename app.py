@@ -1778,7 +1778,8 @@ elif page == "RT Correction":
                 w*projection+(1-w)*df["Trend"],
                 df["Trend"]
             )
-    
+            
+            mask = actual > 0   
             pred=prediction[mask]
             act=actual[mask]
     
