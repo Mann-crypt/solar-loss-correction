@@ -32,13 +32,9 @@ st.set_page_config(page_title="Solar Loss Correction", layout="wide")
 
 import streamlit as st
 
-page = st.segmented_control(
+page = st.pills(
     "Module",
-    [
-        "⚡ Loss Correction",
-        "📈 RT Correction"
-    ],
-    default="⚡ Loss Correction"
+    ["⚡ Loss Correction", "📈 RT Correction"]
 )
 if page == "⚡ Loss Correction":
     st.title("Pasima Pakam Ravi, 3-4 Loss Correction kar chuke hai!!😎")
