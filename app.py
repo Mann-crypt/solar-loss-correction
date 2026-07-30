@@ -63,9 +63,13 @@ with st.sidebar:
 
     st.title("Solar Suite")
 
-    st.markdown('<div class="card">📉 Loss Correction</div>',unsafe_allow_html=True)
-
-    st.markdown('<div class="card">📈 RT Correction</div>',unsafe_allow_html=True)
+    page = st.selectbox(
+        "Module",
+        [
+            "Loss Correction",
+            "RT Correction"
+        ]
+    )
 
     st.write("")
     st.write("")
