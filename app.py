@@ -1717,14 +1717,7 @@ if page == "Loss Correction":
 elif page == "RT Correction":
     st.title("📈 RT Correction")
 
-    uploaded_file = st.file_uploader(
-        "Upload RT Reference File",
-        type="xlsx",
-        key="rt_file"
-    )
-    
-    if uploaded_file is None:
-        st.stop()
+    uploaded_file = r"C:\Users\Manjot Singh\Desktop\1.RT_Ref_Fixed.xlsx"
     
     df = pd.read_excel(uploaded_file)
     df = df.iloc[:, :7].copy()
