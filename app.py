@@ -34,25 +34,19 @@ import streamlit as st
 
 st.set_page_config(layout="wide")
 
-st.set_page_config(layout="wide")
-
-st.title("🌞 Solar Correction Suite")
-
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("⚡ Loss Correction")
-    st.write("Optimize plant losses")
-    if st.button("Open Loss Correction", use_container_width=True):
-        st.session_state.page = "Loss"
+    loss = st.button("⚡ Loss Correction", use_container_width=True)
 
 with col2:
-    st.subheader("📈 RT Correction")
-    st.write("Real Time Correction")
-    if st.button("Open RT Correction", use_container_width=True):
-        st.session_state.page = "RT"
+    rt = st.button("📈 RT Correction", use_container_width=True)
 
-page = st.session_state.get("page", "")
+if loss:
+    st.title("⚡ Loss Correction")
+
+if rt:
+    st.title("📈 RT Correction")
 if page == "⚡ Loss Correction":
     st.title("Pasima Pakam Ravi, 3-4 Loss Correction kar chuke hai!!😎")
 
