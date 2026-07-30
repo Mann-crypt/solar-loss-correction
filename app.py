@@ -1750,6 +1750,64 @@ elif page == "RT Correction":
     ]
     
     df["Blocks"] = np.arange(1,97)
+    # ---------------- Objective ----------------
+
+    def objective(x):
+    
+        w, n1, n2, b = x
+    
+        n1 = int(round(n1))
+        n2 = int(round(n2))
+        b = int(round(b))
+    
+        if not (n1 < b < n2):
+            return 1e9
+    
+        p = df.loc[
+            df["Blocks"].isin([b-1, b, b+1]),
+            "Actual"
+        ].mean()
+    
+        projection = p * (
+            ((n1 - df["Blocks"]) * (n2 - df["Blocks"])) /
+            ((n1 - b) * (n2 - b))
+        )
+    
+        projection = np.where(projection < 0, 0, projection)
+    
+        prediction = np.where(
+            df["Blocks"] > b,
+            w * projection + (1 - w) * df["Trend"],
+            df["Trend"]
+        )
+    
+        actual = df["Actual"].to_numpy(dtype=float)
+    
+        mask = actual > 0
+    
+        if mask.sum() == 0:
+            return 1e9
+    
+        act = actual[mask]
+        pred = prediction[mask]
+    
+        if act.max() == 0 or act.sum() == 0:
+            return 1e9
+    
+        block = np.mean(np.abs(act - pred)) / act.max()
+        peak = abs(act.max() - pred.max()) / act.max()
+        energy = abs(act.sum() - pred.sum()) / act.sum()
+    
+        score = (
+            0.80 * block +
+            0.10 * peak +
+            0.10 * energy
+        )
+    
+        if np.isnan(score) or np.isinf(score):
+            return 1e9
+    
+        return score
     # ---------------- Optimize ----------------
     
     if st.button("🚀 Optimize RT Parameters"):
@@ -1759,10 +1817,10 @@ elif page == "RT Correction":
             result = differential_evolution(
                 objective,
                 bounds=[
-                    (0.3,0.3),
-                    (5,40),
-                    (55,95),
-                    (35,40)
+                    (0.3, 0.3),
+                    (5, 40),
+                    (55, 95),
+                    (35, 40)
                 ],
                 popsize=20,
                 maxiter=100,
@@ -1770,7 +1828,7 @@ elif page == "RT Correction":
                 seed=42
             )
     
-        w,n1,n2,b = result.x
+        w, n1, n2, b = result.x
     
         st.session_state.rt_params = {
             "w": float(w),
@@ -1778,60 +1836,6 @@ elif page == "RT Correction":
             "n2": int(round(n2)),
             "b": int(round(b))
         }
-    
-        def objective(x):
-    
-            w,n1,n2,b = x
-    
-            n1=int(round(n1))
-            n2=int(round(n2))
-            b=int(round(b))
-    
-            if not (n1 < b < n2):
-                return 1e6
-    
-            p = df.loc[
-                df["Blocks"].isin([b-1,b,b+1]),
-                "Actual"
-            ].mean()
-    
-            projection = p * (
-                ((n1-df["Blocks"])*(n2-df["Blocks"]))
-                /
-                ((n1-b)*(n2-b))
-            )
-    
-            projection=np.where(projection<0,0,projection)
-    
-            prediction=np.where(
-                df["Blocks"]>b,
-                w*projection+(1-w)*df["Trend"],
-                df["Trend"]
-            )
-            
-            actual = df["Actual"]
-            mask = actual > 0
-            if mask.sum() == 0:
-                return 1e9
-            pred=prediction[mask]
-            act=actual[mask]
-            if act.max() == 0:
-                return 1e9
-            
-            if act.sum() == 0:
-                return 1e9
-    
-            block=np.mean(np.abs(act-pred))/act.max()
-            peak=abs(act.max()-pred.max())/act.max()
-            energy=abs(act.sum()-pred.sum())/act.sum()
-            if np.isnan(pred).any() or np.isinf(pred).any():
-                return 1e9
-    
-            return (
-                0.80*block+
-                0.10*peak+
-                0.10*energy
-            )
     
     # ---------------- User Inputs ----------------
     
