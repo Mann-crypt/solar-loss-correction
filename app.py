@@ -71,7 +71,7 @@ unsafe_allow_html=True
 )
 
 page = st.session_state.page
-if page == "⚡ Loss Correction":
+if page == "Loss Correction":
     st.title("Pasima Pakam Ravi, 3-4 Loss Correction kar chuke hai!!😎")
 
     uploaded_file = st.file_uploader(
@@ -1714,6 +1714,6 @@ if page == "⚡ Loss Correction":
         
                     st.plotly_chart(fig, use_container_width=True)
 
-elif page == "📈 RT Correction":
+elif page == "RT Correction":
 
     st.title("📈 RT Correction")
