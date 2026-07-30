@@ -1754,11 +1754,17 @@ elif page == "RT Correction":
 
     if "rt_params" not in st.session_state:
         st.session_state.rt_params = {
-            "w": 0.30,
-            "n1": 20,
-            "n2": 75,
-            "b": 38
+            "w": 0.3,
+            "n1": 29,
+            "n2": 72,
+            "b": 39
         }
+    
+    actual = df["Actual"].to_numpy(dtype=float)
+    trend = df["Trend"].to_numpy(dtype=float)
+    blocks = df["Blocks"].to_numpy(dtype=float)
+    
+    mask = actual > 0
     
     # ---------------- Objective ----------------
     
@@ -1771,54 +1777,41 @@ elif page == "RT Correction":
         b = int(round(b))
     
         if not (n1 < b < n2):
-            return 1e9
+            return 1e6
     
         p = df.loc[
             df["Blocks"].isin([b-1, b, b+1]),
             "Actual"
         ].mean()
     
-        projection = p * (
-            ((n1 - df["Blocks"]) * (n2 - df["Blocks"]))
+        calc = p * (
+            ((n1 - blocks) * (n2 - blocks))
             /
             ((n1 - b) * (n2 - b))
         )
     
-        projection = np.maximum(projection, 0)
+        projection = np.where(calc < 0, 0, calc)
     
         prediction = np.where(
-            df["Blocks"] > b,
-            w * projection + (1 - w) * df["Trend"],
-            df["Trend"]
+            blocks > b,
+            w * projection + (1 - w) * trend,
+            trend
         )
     
-        actual = df["Actual"].to_numpy(float)
-    
-        mask = actual > 0
-    
-        if mask.sum() == 0:
-            return 1e9
-    
-        act = actual[mask]
         pred = prediction[mask]
+        act = actual[mask]
     
-        if act.max() <= 0 or act.sum() <= 0:
-            return 1e9
+        block_error = np.mean(np.abs(act - pred)) / act.max()
     
-        block = np.mean(np.abs(act - pred)) / act.max()
-        peak = abs(act.max() - pred.max()) / act.max()
-        energy = abs(act.sum() - pred.sum()) / act.sum()
+        peak_error = abs(act.max() - pred.max()) / act.max()
     
-        score = (
-            0.80 * block +
-            0.10 * peak +
-            0.10 * energy
+        energy_error = abs(act.sum() - pred.sum()) / act.sum()
+    
+        return (
+            0.80 * block_error +
+            0.10 * peak_error +
+            0.10 * energy_error
         )
-    
-        if not np.isfinite(score):
-            return 1e9
-    
-        return score
     
     
     # ---------------- Optimize ----------------
@@ -1830,10 +1823,10 @@ elif page == "RT Correction":
             result = differential_evolution(
                 objective,
                 bounds=[
-                    (0.30, 1.00),   # Weight
-                    (5, 40),        # N1
-                    (55, 95),       # N2
-                    (35, 40)        # Peak Block
+                    (0.3, 0.3),      # same as notebook
+                    (5, 40),
+                    (55, 95),
+                    (35, 40)
                 ],
                 popsize=20,
                 maxiter=100,
@@ -1855,67 +1848,62 @@ elif page == "RT Correction":
     
     # ---------------- User Inputs ----------------
     
-    st.subheader("Optimized Parameters")
-    
     col1, col2 = st.columns(2)
     
     with col1:
     
         w = st.number_input(
             "Weight",
-            min_value=0.0,
-            max_value=1.0,
-            step=0.01,
-            key="rt_w",
-            value=float(st.session_state.rt_params["w"])
+            0.0,
+            1.0,
+            value=float(st.session_state.rt_params["w"]),
+            step=0.01
         )
     
         n1 = st.number_input(
             "N1",
-            step=1,
-            key="rt_n1",
-            value=int(st.session_state.rt_params["n1"])
+            value=int(st.session_state.rt_params["n1"]),
+            step=1
         )
     
     with col2:
     
         n2 = st.number_input(
             "N2",
-            step=1,
-            key="rt_n2",
-            value=int(st.session_state.rt_params["n2"])
+            value=int(st.session_state.rt_params["n2"]),
+            step=1
         )
     
         b = st.number_input(
             "Peak Block",
-            step=1,
-            key="rt_b",
-            value=int(st.session_state.rt_params["b"])
+            value=int(st.session_state.rt_params["b"]),
+            step=1
         )
+    
     
     # ---------------- Final Calculation ----------------
     
-    p=df.loc[
-        df["Blocks"].isin([b-1,b,b+1]),
+    p = df.loc[
+        df["Blocks"].isin([b-1, b, b+1]),
         "Actual"
     ].mean()
     
-    projection=p*(
-        ((n1-df["Blocks"])*(n2-df["Blocks"]))
+    calc = p * (
+        ((n1 - blocks) * (n2 - blocks))
         /
-        ((n1-b)*(n2-b))
+        ((n1 - b) * (n2 - b))
     )
     
-    projection=np.where(projection<0,0,projection)
+    projection = np.where(calc < 0, 0, calc)
     
-    prediction=np.where(
-        df["Blocks"]>b,
-        w*projection+(1-w)*df["Trend"],
-        df["Trend"]
+    prediction = np.where(
+        blocks > b,
+        w * projection + (1 - w) * trend,
+        trend
     )
     
-    df["Projection"]=projection
-    df["RT Forecast"]=prediction
+    df["Projection"] = projection
+    df["RT Forecast"] = prediction
     
     # ---------------- Graph ----------------
     
