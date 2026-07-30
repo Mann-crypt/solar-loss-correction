@@ -78,16 +78,14 @@ with st.sidebar:
 
     st.markdown("# ☀ Solar Suite")
 
-    if st.button("📉 Loss Correction", use_container_width=True):
-        page="Loss"
+    st.markdown('<div class="card">📉 Loss Correction</div>',unsafe_allow_html=True)
 
-    if st.button("📈 RT Correction", use_container_width=True):
-        page="RT"
+    st.markdown('<div class="card">📈 RT Correction</div>',unsafe_allow_html=True)
 
-    st.divider()
+    st.markdown("---")
 
     st.caption("Developed by")
-    st.write("### Manjot Singh")
+    st.write("**Manjot Singh**")
 
 if page == "⚡ Loss Correction":
     st.title("Pasima Pakam Ravi, 3-4 Loss Correction kar chuke hai!!😎")
