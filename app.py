@@ -31,40 +31,19 @@ resetTimer();
 st.set_page_config(page_title="Solar Loss Correction", layout="wide")
 
 import streamlit as st
-st.markdown("""
-<style>
-
-[data-testid="stSidebar"]{
-    background: linear-gradient(180deg,#0f172a,#1e293b);
-}
-
-[data-testid="stSidebar"] button{
-    border-radius:12px;
-    height:55px;
-    font-size:18px;
-    font-weight:600;
-}
-
-[data-testid="stSidebar"] button:hover{
-    transform:scale(1.02);
-    transition:0.2s;
-}
-
-</style>
-""", unsafe_allow_html=True)
 
 st.sidebar.markdown("""
-<h1 style="
-text-align:center;
-font-size:42px;
-font-weight:900;
-color:#00D4FF;
-">
+<h1 style='text-align:center;
+background: linear-gradient(90deg,#00c6ff,#0072ff);
+-webkit-background-clip:text;
+-webkit-text-fill-color:transparent;
+font-size:40px;
+font-weight:800;'>
 ⚡ Solar Suite
 </h1>
 
-<p style="text-align:center;color:#9AA0A6">
-Renewable Energy Analytics
+<p style='text-align:center;color:gray;font-size:14px'>
+Loss Correction Platform
 </p>
 """, unsafe_allow_html=True)
 
