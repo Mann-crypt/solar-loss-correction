@@ -1715,5 +1715,240 @@ if page == "Loss Correction":
                     st.plotly_chart(fig, use_container_width=True)
 
 elif page == "RT Correction":
-
     st.title("📈 RT Correction")
+
+    uploaded_file = st.file_uploader(
+        "Upload RT Reference File",
+        type="xlsx",
+        key="rt_file"
+    )
+    
+    if uploaded_file is None:
+        st.stop()
+    
+    df = pd.read_excel(uploaded_file)
+    df = df.iloc[:, :7].copy()
+    
+    # ---------------- Time Blocks ----------------
+    
+    start = datetime.strptime("00:00", "%H:%M")
+    
+    df["Time-Blocks"] = [
+        f"{(start+timedelta(minutes=15*i)).strftime('%H:%M')} - {(start+timedelta(minutes=15*(i+1))).strftime('%H:%M')}"
+        for i in range(96)
+    ]
+    
+    df["Blocks"] = np.arange(1,97)
+    
+    # ---------------- Editable Data ----------------
+    
+    edited = st.data_editor(
+        df[["Trend","Actual"]],
+        hide_index=True,
+        use_container_width=True,
+        num_rows="fixed"
+    )
+    
+    df["Trend"] = pd.to_numeric(
+        edited["Trend"],
+        errors="coerce"
+    ).fillna(0)
+    
+    df["Actual"] = pd.to_numeric(
+        edited["Actual"],
+        errors="coerce"
+    ).fillna(0)
+    
+    actual = df["Actual"].values
+    
+    mask = actual > 0
+    
+    # ---------------- Optimize ----------------
+    
+    if "rt_params" not in st.session_state:
+    
+        def objective(x):
+    
+            w,n1,n2,b = x
+    
+            n1=int(round(n1))
+            n2=int(round(n2))
+            b=int(round(b))
+    
+            if not (n1 < b < n2):
+                return 1e6
+    
+            p = df.loc[
+                df["Blocks"].isin([b-1,b,b+1]),
+                "Actual"
+            ].mean()
+    
+            projection = p * (
+                ((n1-df["Blocks"])*(n2-df["Blocks"]))
+                /
+                ((n1-b)*(n2-b))
+            )
+    
+            projection=np.where(projection<0,0,projection)
+    
+            prediction=np.where(
+                df["Blocks"]>b,
+                w*projection+(1-w)*df["Trend"],
+                df["Trend"]
+            )
+    
+            pred=prediction[mask]
+            act=actual[mask]
+    
+            block=np.mean(np.abs(act-pred))/act.max()
+            peak=abs(act.max()-pred.max())/act.max()
+            energy=abs(act.sum()-pred.sum())/act.sum()
+    
+            return (
+                0.80*block+
+                0.10*peak+
+                0.10*energy
+            )
+    
+        with st.spinner("Optimizing..."):
+    
+            result=differential_evolution(
+                objective,
+                bounds=[
+                    (0.3,0.3),
+                    (5,40),
+                    (55,95),
+                    (35,40)
+                ],
+                popsize=20,
+                maxiter=100,
+                polish=True,
+                seed=42
+            )
+    
+        w,n1,n2,b=result.x
+    
+        st.session_state.rt_params={
+            "w":float(w),
+            "n1":int(round(n1)),
+            "n2":int(round(n2)),
+            "b":int(round(b))
+        }
+    
+    # ---------------- User Inputs ----------------
+    
+    st.subheader("Optimized Parameters")
+    
+    col1,col2=st.columns(2)
+    
+    with col1:
+        w=st.number_input(
+            "Weight",
+            0.0,
+            1.0,
+            step=0.01,
+            key="rt_w",
+            value=st.session_state.rt_params["w"]
+        )
+    
+        n1=st.number_input(
+            "N1",
+            step=1,
+            key="rt_n1",
+            value=st.session_state.rt_params["n1"]
+        )
+    
+    with col2:
+    
+        n2=st.number_input(
+            "N2",
+            step=1,
+            key="rt_n2",
+            value=st.session_state.rt_params["n2"]
+        )
+    
+        b=st.number_input(
+            "Peak Block",
+            step=1,
+            key="rt_b",
+            value=st.session_state.rt_params["b"]
+        )
+    
+    # ---------------- Final Calculation ----------------
+    
+    p=df.loc[
+        df["Blocks"].isin([b-1,b,b+1]),
+        "Actual"
+    ].mean()
+    
+    projection=p*(
+        ((n1-df["Blocks"])*(n2-df["Blocks"]))
+        /
+        ((n1-b)*(n2-b))
+    )
+    
+    projection=np.where(projection<0,0,projection)
+    
+    prediction=np.where(
+        df["Blocks"]>b,
+        w*projection+(1-w)*df["Trend"],
+        df["Trend"]
+    )
+    
+    df["Projection"]=projection
+    df["RT Forecast"]=prediction
+    
+    # ---------------- Metrics ----------------
+    
+    pred=prediction[mask]
+    act=actual[mask]
+    
+    block_error=np.mean(np.abs(act-pred))/act.max()
+    peak_error=abs(act.max()-pred.max())/act.max()
+    energy_error=abs(act.sum()-pred.sum())/act.sum()
+    
+    score=(
+        0.80*block_error+
+        0.10*peak_error+
+        0.10*energy_error
+    )
+    
+    st.metric("Score",round(score,5))
+    
+    # ---------------- Graph ----------------
+    
+    fig=go.Figure()
+    
+    fig.add_trace(
+        go.Scatter(
+            x=df["Blocks"],
+            y=df["Projection"],
+            name="Projection"
+        )
+    )
+    
+    fig.add_trace(
+        go.Scatter(
+            x=df["Blocks"],
+            y=df["RT Forecast"],
+            name="RT Forecast"
+        )
+    )
+    
+    fig.add_trace(
+        go.Scatter(
+            x=df["Blocks"],
+            y=df["Actual"],
+            name="Actual"
+        )
+    )
+    
+    fig.update_layout(
+        height=550,
+        hovermode="x unified"
+    )
+    
+    st.plotly_chart(
+        fig,
+        use_container_width=True
+    )
