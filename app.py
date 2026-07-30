@@ -32,8 +32,8 @@ st.set_page_config(page_title="Solar Loss Correction", layout="wide")
 
 import streamlit as st
 
-page = st.pills(
-    "Module",
+page = st.segmented_control(
+    "Choose Module",
     ["⚡ Loss Correction", "📈 RT Correction"]
 )
 if page == "⚡ Loss Correction":
