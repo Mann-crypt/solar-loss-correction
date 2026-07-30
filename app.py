@@ -63,9 +63,9 @@ with st.sidebar:
 
     st.title("Solar Suite")
 
-    loss=st.button("📉 Loss Correction",use_container_width=True)
+    st.markdown('<div class="card">📉 Loss Correction</div>',unsafe_allow_html=True)
 
-    rt=st.button("📈 RT Correction",use_container_width=True)
+    st.markdown('<div class="card">📈 RT Correction</div>',unsafe_allow_html=True)
 
     st.write("")
     st.write("")
