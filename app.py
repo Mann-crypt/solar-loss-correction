@@ -1750,8 +1750,18 @@ elif page == "RT Correction":
     ]
     
     df["Blocks"] = np.arange(1,97)
-    # ---------------- Objective ----------------
+    # ---------------- Default Parameters ----------------
 
+    if "rt_params" not in st.session_state:
+        st.session_state.rt_params = {
+            "w": 0.30,
+            "n1": 20,
+            "n2": 75,
+            "b": 38
+        }
+    
+    # ---------------- Objective ----------------
+    
     def objective(x):
     
         w, n1, n2, b = x
@@ -1769,11 +1779,12 @@ elif page == "RT Correction":
         ].mean()
     
         projection = p * (
-            ((n1 - df["Blocks"]) * (n2 - df["Blocks"])) /
+            ((n1 - df["Blocks"]) * (n2 - df["Blocks"]))
+            /
             ((n1 - b) * (n2 - b))
         )
     
-        projection = np.where(projection < 0, 0, projection)
+        projection = np.maximum(projection, 0)
     
         prediction = np.where(
             df["Blocks"] > b,
@@ -1781,7 +1792,7 @@ elif page == "RT Correction":
             df["Trend"]
         )
     
-        actual = df["Actual"].to_numpy(dtype=float)
+        actual = df["Actual"].to_numpy(float)
     
         mask = actual > 0
     
@@ -1791,7 +1802,7 @@ elif page == "RT Correction":
         act = actual[mask]
         pred = prediction[mask]
     
-        if act.max() == 0 or act.sum() == 0:
+        if act.max() <= 0 or act.sum() <= 0:
             return 1e9
     
         block = np.mean(np.abs(act - pred)) / act.max()
@@ -1804,23 +1815,25 @@ elif page == "RT Correction":
             0.10 * energy
         )
     
-        if np.isnan(score) or np.isinf(score):
+        if not np.isfinite(score):
             return 1e9
     
         return score
+    
+    
     # ---------------- Optimize ----------------
     
-    if st.button("🚀 Optimize RT Parameters"):
-
+    if st.button("🚀 Optimize RT Parameters", use_container_width=True):
+    
         with st.spinner("Optimizing..."):
     
             result = differential_evolution(
                 objective,
                 bounds=[
-                    (0.3, 0.3),
-                    (5, 40),
-                    (55, 95),
-                    (35, 40)
+                    (0.30, 1.00),   # Weight
+                    (5, 40),        # N1
+                    (55, 95),       # N2
+                    (35, 40)        # Peak Block
                 ],
                 popsize=20,
                 maxiter=100,
@@ -1837,43 +1850,47 @@ elif page == "RT Correction":
             "b": int(round(b))
         }
     
+        st.rerun()
+    
+    
     # ---------------- User Inputs ----------------
     
     st.subheader("Optimized Parameters")
     
-    col1,col2=st.columns(2)
+    col1, col2 = st.columns(2)
     
     with col1:
-        w=st.number_input(
+    
+        w = st.number_input(
             "Weight",
-            0.0,
-            1.0,
+            min_value=0.0,
+            max_value=1.0,
             step=0.01,
             key="rt_w",
-            value=st.session_state.rt_params["w"]
+            value=float(st.session_state.rt_params["w"])
         )
     
-        n1=st.number_input(
+        n1 = st.number_input(
             "N1",
             step=1,
             key="rt_n1",
-            value=st.session_state.rt_params["n1"]
+            value=int(st.session_state.rt_params["n1"])
         )
     
     with col2:
     
-        n2=st.number_input(
+        n2 = st.number_input(
             "N2",
             step=1,
             key="rt_n2",
-            value=st.session_state.rt_params["n2"]
+            value=int(st.session_state.rt_params["n2"])
         )
     
-        b=st.number_input(
+        b = st.number_input(
             "Peak Block",
             step=1,
             key="rt_b",
-            value=st.session_state.rt_params["b"]
+            value=int(st.session_state.rt_params["b"])
         )
     
     # ---------------- Final Calculation ----------------
