@@ -40,43 +40,33 @@ st.set_page_config(
 
 st.sidebar.markdown("""
 <h1 style='text-align:center;
-background: linear-gradient(90deg,#00c6ff,#0072ff);
--webkit-background-clip:text;
--webkit-text-fill-color:transparent;
-font-size:40px;
-font-weight:800;'>
+font-size:38px;
+font-weight:900;
+color:#4FC3F7'>
 ⚡ Solar Suite
 </h1>
-
-<p style='text-align:center;color:gray;font-size:14px'>
-Loss Correction Platform
-</p>
 """, unsafe_allow_html=True)
 
+st.sidebar.markdown("### Modules")
+
+col1,col2=st.sidebar.columns(2)
+
+with col1:
+    loss=st.button("☀️\nLoss",use_container_width=True)
+
+with col2:
+    rt=st.button("📊\nRT",use_container_width=True)
+
+if loss:
+    st.session_state.page="Loss"
+
+if rt:
+    st.session_state.page="RT"
+
 st.sidebar.divider()
 
-if "page" not in st.session_state:
-    st.session_state.page = "Loss Correction"
-
-if st.sidebar.button("☀️ Loss Correction", use_container_width=True):
-    st.session_state.page = "Loss Correction"
-
-if st.sidebar.button("📈 RT Correction", use_container_width=True):
-    st.session_state.page = "RT Correction"
-
-st.sidebar.divider()
-
-st.sidebar.markdown(
-"""
-<div style='text-align:center;color:gray;font-size:13px'>
-Developed by<br>
-<b>Manjot Singh</b>
-</div>
-""",
-unsafe_allow_html=True
-)
-
-page = st.session_state.page
+st.sidebar.caption("Developed by")
+st.sidebar.markdown("### Manjot Singh")
 if page == "⚡ Loss Correction":
     st.title("Pasima Pakam Ravi, 3-4 Loss Correction kar chuke hai!!😎")
 
