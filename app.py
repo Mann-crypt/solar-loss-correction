@@ -44,8 +44,8 @@ with st.sidebar:
 
     st.divider()
 
-    page = st.radio(
-        "Navigation",
+    page = st.selectbox(
+        "Choose Module",
         [
             "⚡ Loss Correction",
             "📈 RT Correction",
