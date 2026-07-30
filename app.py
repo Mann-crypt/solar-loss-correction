@@ -33,24 +33,15 @@ st.set_page_config(page_title="Solar Loss Correction", layout="wide")
 import streamlit as st
 
 st.sidebar.markdown("""
-# ⚡ Solar Suite
-""")
+<h1 style='text-align:center'>
+⚡ Solar Suite
+</h1>
+""",unsafe_allow_html=True)
 
-loss = st.sidebar.button(
-"""
-☀️
+st.sidebar.markdown("#### Select Module")
 
-LOSS CORRECTION
-""",
-use_container_width=True)
-
-rt = st.sidebar.button(
-"""
-📈
-
-RT CORRECTION
-""",
-use_container_width=True)
+loss=st.sidebar.button("☀️ Loss Correction",use_container_width=True,type="primary")
+rt=st.sidebar.button("📊 RT Correction",use_container_width=True)
 
 if loss:
     st.session_state.page="Loss"
@@ -59,9 +50,8 @@ if rt:
     st.session_state.page="RT"
 
 st.sidebar.markdown("---")
-
 st.sidebar.markdown(
-"<center><small>Developed by</small><br><b>Manjot Singh</b></center>",
+"<center>👨‍💻 Developed by<br><b>Manjot Singh</b></center>",
 unsafe_allow_html=True
 )
 if page == "⚡ Loss Correction":
