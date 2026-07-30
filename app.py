@@ -1884,9 +1884,6 @@ elif page == "RT Correction":
     
     # ---------------- Metrics ----------------
     
-    pred=prediction[mask]
-    act=actual[mask]
-    
     block_error=np.mean(np.abs(act-pred))/act.max()
     peak_error=abs(act.max()-pred.max())/act.max()
     energy_error=abs(act.sum()-pred.sum())/act.sum()
