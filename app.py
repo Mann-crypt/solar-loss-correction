@@ -216,8 +216,8 @@ if page == "Loss Correction":
     
     plant_type = st.segmented_control(
         "Plant Type",
-        options=["☀️ Fixed", "🔄 Tracking"],
-        default="☀️ Fixed",
+        options=["Fixed", "Tracking"],
+        default="Fixed",
         selection_mode="single",
         width="stretch"
     )
