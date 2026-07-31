@@ -2090,9 +2090,7 @@ elif page == "Aeromal":
 
     if curtailment:
         if "cam_input" not in st.session_state:
-            st.session_state.cam_input = pd.DataFrame({
-                "Power": np.zeros(96)
-            })
+            st.session_state.cam_input = pd.DataFrame(columns=["Power"])
         
         edited_df = st.data_editor(
             st.session_state.cam_input,
@@ -2106,16 +2104,25 @@ elif page == "Aeromal":
         
         # ---------------- Validation ----------------
         
-        power = pd.to_numeric(
-            edited_df.iloc[:,0],
-            errors="coerce"
-        ).fillna(0).to_numpy()
+        if edited_df.empty:
+            st.info("👆 Enter or paste Power data to begin.")
+            st.stop()
+        
+        power = (
+            pd.to_numeric(
+                edited_df["Power"],
+                errors="coerce"
+            )
+            .dropna()
+            .to_numpy()
+        )
         
         if len(power) == 0:
+            st.info("👆 Enter valid numeric Power values.")
             st.stop()
         
         if len(power) % 96 != 0:
-            st.error("Number of rows must be divisible by 96.")
+            st.error(f"Rows must be divisible by 96. Current rows: {len(power)}")
             st.stop()
         
         days = len(power) // 96
@@ -2659,6 +2666,3 @@ elif page == "Aeromal":
             use_container_width=True,
             hide_index=True
         )
-else:
-        st.success("⚡ Curtailment Mode Selected")
-        # No Curtailment code here
