@@ -1922,7 +1922,7 @@ elif page == "RT Correction":
     lookup = pd.DataFrame({
         "Parameter": ["N1", "Peak Block", "N2"],
         "Block": [n1, b, n2],
-        "Time Block": [n1_time, b_time, n2_time]
+        #"Time Block": [n1_time, b_time, n2_time]
     })
     
     st.dataframe(
