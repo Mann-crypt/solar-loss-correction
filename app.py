@@ -214,11 +214,13 @@ if page == "Loss Correction":
     df_fix.loc[:, ghi_cols] = edited_df[ghi_cols].values
     df_fix.loc[:, "Actual"] = edited_df["Actual"].values
     
-    plant_type = st.segmented_control(
-        "Plant Type",
-        options=["Fixed", "Tracking"],
-        default="Fixed",
-        selection_mode="single",
+    plant_type = st.pills(
+        "Select Plant Type",
+        [
+            "🏗️ Fixed",
+            "🔄 Tracking"
+        ],
+        default="🏗️ Fixed"
     )
     
     if "run_model" not in st.session_state:
@@ -230,7 +232,7 @@ if page == "Loss Correction":
     
     if st.session_state.run_model:
         if is_cluster:
-            if plant_type == "Fixed":
+            if plant_type == "🏗️ Fixed":
                 df = pd.read_excel(uploaded_file, sheet_name="Area & Efficiency", header=[1], usecols=range(8))
                 null_indices = df[df['Module Type'].isna()].index
                 first_null_pos = df.index.get_loc(null_indices[0])
@@ -455,7 +457,7 @@ if page == "Loss Correction":
                 )
         
                 st.plotly_chart(fig, use_container_width=True)
-            elif plant_type == "Tracking":
+            elif plant_type == "🔄 Tracking":
                 df = pd.read_excel(uploaded_file, sheet_name="Area & Efficiency", header=[1], usecols=range(8))
                 null_indices = df[df['Module Type'].isna()].index
                 first_null_pos = df.index.get_loc(null_indices[0])
@@ -1043,7 +1045,7 @@ if page == "Loss Correction":
                     st.plotly_chart(fig, use_container_width=True)
     
         else: 
-            if plant_type == "Fixed":
+            if plant_type == "🏗️ Fixed":
                 df = pd.read_excel(uploaded_file, sheet_name="Area & Efficiency", header=[1])
                 df.columns = df.columns.str.strip()
                 null_indices = df[df['Module Type'].isna()].index
@@ -1222,7 +1224,7 @@ if page == "Loss Correction":
                 )
         
                 st.plotly_chart(fig, use_container_width=True)
-            elif plant_type == "Tracking":
+            elif plant_type == "🔄 Tracking":
                 df = pd.read_excel(uploaded_file, sheet_name="Area & Efficiency", header=[1])
                 df.columns = df.columns.str.strip()
                 null_indices = df[df['Module Type'].isna()].index
