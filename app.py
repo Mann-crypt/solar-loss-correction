@@ -215,7 +215,7 @@ if page == "Loss Correction":
     plant_type = st.pills(
         "Plant Type",
         ["Fixed", "Tracking"],
-        horizontal=True
+        default="Fixed"
     )
     
     if "run_model" not in st.session_state:
