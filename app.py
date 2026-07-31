@@ -2065,14 +2065,33 @@ elif page == "Aeromal":
     if "aeromal_mode" not in st.session_state:
         st.session_state.aeromal_mode = "No Curtailment"
     
-    curtailment = st.toggle("Curtailment")
-
-    if curtailment:
-        st.header("⚡ Curtailment")
-    else:
-        st.header("☀️ No Curtailment")
+    st.markdown("""
+    <style>
+    div[data-testid="stToggle"]{
+        background:#1f2937;
+        border:2px solid #3b82f6;
+        border-radius:14px;
+        padding:14px 18px;
+        width:100%;
+        margin-bottom:15px;
+    }
     
-    st.subheader(mode)
+    div[data-testid="stToggle"] label{
+        font-size:22px !important;
+        font-weight:700 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    curtailment = st.toggle(
+        "⚡ Curtailment Mode",
+        value=True
+    )
+    
+    if curtailment:
+        st.success("Curtailment")
+    else:
+        st.success("No Curtailment")
     
     if mode == "No Curtailment":
         st.success("☀️ No Curtailment Mode Selected")
