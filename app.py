@@ -2192,7 +2192,7 @@ elif page == "Aeromal":
         height=550,
         hovermode="x unified",
         xaxis_title="Block",
-        yaxis_title="Power"
+        yaxis_title="Power",
         legend=dict(
             orientation="h",
             y=1.08,
