@@ -2186,11 +2186,8 @@ elif page == "Aeromal":
             s = savgol_filter(
                 ap,
                 window_length=window_length,
-                polyorder=2
+                polyorder=3
             )
-            sh = np.roll(s, -shift)
-    
-            sym = (s + sh[::-1]) / 2
     
             def solar_cap_curve(
                 y,
