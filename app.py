@@ -1924,7 +1924,7 @@ elif page == "RT Correction":
 
     lookup = pd.DataFrame({
         "Parameter": ["Parabolic Power Generation Starting Block", "Parabolic Power Generation Ending Block"],
-        "Time Block": [n1_time, b_time, n2_time]
+        "Time Block": [n1_time, n2_time]
     })
     
     st.dataframe(
