@@ -2066,20 +2066,27 @@ elif page == "Aeromal":
         st.session_state.aeromal_mode = "No Curtailment"
     
     st.markdown("""
-    <h2 style="
-    text-align:center;
-    padding:12px;
-    border-radius:10px;
-    background:linear-gradient(90deg,#00C6FF,#0072FF);
-    color:white;">
-    Aeromal Mode
-    </h2>
+    <style>
+    
+    div[data-testid="stToggle"]{
+        padding:15px;
+        border-radius:12px;
+        background:#111827;
+    }
+    
+    div[data-testid="stToggle"] label{
+        font-size:24px !important;
+        font-weight:700 !important;
+    }
+    
+    div[data-testid="stToggle"] input{
+        transform:scale(1.7);
+    }
+    
+    </style>
     """, unsafe_allow_html=True)
     
-    curtailment = st.toggle(
-        "⚡ Curtailment",
-        value=True
-    )    
+    curtailment = st.toggle("Aeromal")
     if mode == "No Curtailment":
         st.success("☀️ No Curtailment Mode Selected")
         # Curtailment code here
