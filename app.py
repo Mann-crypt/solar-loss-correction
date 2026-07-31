@@ -2136,336 +2136,339 @@ elif page == "Aeromal":
         if len(power) % 96 != 0:
             st.error(f"Rows must be divisible by 96. Current rows: {len(power)}")
             st.stop()
-        
-        days = len(power) // 96
-        # ---------------- Reshape ----------------
-
-        a = power.reshape(days, 96)
-        
-        ap = np.percentile(a, 95, axis=0) * 1.03
-
-        st.subheader("Parameters")
-
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            Power_Availability = st.number_input(
-                "Power Availability (%)",
-                value=100,
-                step=1
-            )
-        
-            peak_cap = st.number_input(
-                "Peak Cap",
-                value=200,
-                step=1
-            )
-        
-            target_width = st.number_input(
-                "Target Width",
-                value=25,
-                step=1
-            )
-        
-        with col2:
-            shift = st.number_input(
-                "Shift",
-                value=10,
-                step=1
-            )
-        
-            window_length = st.slider(
-                "Window Length",
-                5,
-                31,
-                7,
-                step=2
-            )
-        # ---------------- Smooth Profile ----------------
-
-        s = savgol_filter(
-            ap,
-            window_length=window_length,
-            polyorder=2
-        )
-        sh = np.roll(s, -shift)
-
-        sym = (s + sh[::-1]) / 2
-
-        def solar_cap_curve(
-            y,
-            peak_cap,
-            target_width,
-            window_length,
-            Power_Availability
-        ):
-        
-            y = np.array(y, dtype=float)
-        
-            n = len(y)
-        
-            para = np.zeros(n)
-            # =========================================
-            # SMOOTH INPUT
-            # =========================================
-            ys = savgol_filter(y, 7, 2)
-            # =========================================
-            # GRADIENT
-            # =========================================
-            grad = np.gradient(ys)
-            # =========================================
-            # LEFT ACTIVE REGION
-            # =========================================
-            left_peak = np.argmax(ys[:n//2])
-        
-            # strongest rising slope
-            left_start = np.argmax(grad[:left_peak])
-        
-            x_left = np.arange(left_start, left_peak)
-            y_left = ys[left_start:left_peak]
-        
-            # linear fit
-            m1, c1 = np.polyfit(x_left, y_left, 1)
-        
-            # =========================================
-            # RIGHT ACTIVE REGION
-            # =========================================
-        
-            right_peak = np.argmax(ys[n//2:]) + n//2
-        
-            # =========================================
-            # RIGHT FALLING REGION
-            # =========================================
-        
-            threshold = 0.02 * np.max(ys)
-        
-            active_idx = np.where(ys > threshold)[0]
-        
-            right_end = active_idx[-1]
-        
-            x_right = np.arange(right_peak, right_end)
-            y_right = ys[right_peak:right_end]
-        
-            # linear fit
-            m2, c2 = np.polyfit(x_right, y_right, 1)
-            # =========================================
-            # AUTO TRIP LEVEL FROM PEAK WIDTH
-            # =========================================
-        
-            A = (1/m2) - (1/m1)
-            B = (c1/m1) - (c2/m2)
-        
-            trip = (target_width - B) / A
-        
-            peak_left_idx = int(round((trip - c1) / m1))
-            peak_right_idx = int(round((trip - c2) / m2))
-            trip = max(0, trip)  # safety
-            print("Pre =", peak_right_idx - peak_left_idx)
-            print("Next =", target_width)
-            if peak_cap >= trip:
-                # =========================================
-                # LEFT EXTRAPOLATION
-                # =========================================
-                for i in range(n):
-                    val = m1*i + c1
-                    para[i] = min(val, trip)
-                    if val >= trip:
-                        peak_left_idx = i
-                        break
-        
-                # =========================================
-                # RIGHT EXTRAPOLATION
-                # =========================================
-        
-                right_curve = np.zeros(n)
-                for i in range(n-1, -1, -1):
-                    val = m2*i + c2
-                    right_curve[i] = min(val, trip)
-                    if val >= trip:
-                        peak_right_idx = i
-                        break
-                            
-                # =========================================
-                # MERGE
-                # =========================================
-        
-                para = np.maximum(para, right_curve)
-        
-                print("trip =", trip)
-                print("left edge =", para[peak_left_idx])
-                print("right edge =", para[peak_right_idx])
-                print("Width =", peak_right_idx - peak_left_idx)
-        
-                # =========================================
-                # SMOOTH SEMI-CIRCLE CAP
-                # =========================================
-        
-                x = np.arange(peak_left_idx, peak_right_idx+1)
-                print(len(x))
-                center = (peak_left_idx + peak_right_idx) / 2
-                radius = (peak_right_idx - peak_left_idx) / 2
-         
-                # edge height from existing profile
-                left_edge = trip
-                right_edge = trip
-        
-                base = max(left_edge, right_edge)
-        
-                width = peak_right_idx - peak_left_idx
-        
-                dome_height = max(20, 0.12 * trip)
-        
-                x = np.linspace(-1, 1, width)
-        
-                shape = np.sqrt(np.maximum(0, 1 - x**2))
-        
-                dome = trip + dome_height * shape
-                dome[0] = trip
-                dome[-1] = trip
-        
-                para[peak_left_idx:peak_right_idx] = dome
-                       
-                # =========================================
-                # SEMI-FINAL SMOOTHING
-                # =========================================
-                para = savgol_filter(para, window_length, 3)
-                para = np.clip(para, 0, None)
-        
-                # =========================================
-                # FOLLOW GENERATION ENDS
-                # =========================================
-        
-                para[:left_start] = ys[:left_start]
-        
-                para[right_end:] = ys[right_end:]
-        
-                # =========================================
-                # FINAL SMOOTHING
-                # =========================================
-                para = savgol_filter(para,7, 3) * Power_Availability/100
-                para = np.clip(para, 0, None)
-                para = np.where(para<0.2, 0, para)
-                return para
+        if np.any(power > 0):
+            days = len(power) // 96
+            # ---------------- Reshape ----------------
     
-            else:
-                # =========================================
-                # LEFT EXTRAPOLATION
-                # =========================================
-        
-                for i in range(n):
-        
-                    val = m1*i + c1
-        
-                    para[i] = val
-        
-                    if val >= peak_cap:
-                        peak_left_idx = i
-                        break
-        
-                # =========================================
-                # RIGHT EXTRAPOLATION
-                # =========================================
-        
-                right_curve = np.zeros(n)
-        
-                for i in range(n-1, -1, -1):
-        
-                    val = m2*i + c2
-        
-                    right_curve[i] = val
-        
-                    if val >= peak_cap:
-                        peak_right_idx = i
-                        break
-        
-                # =========================================
-                # MERGE
-                # =========================================
-        
-                para = np.maximum(para, right_curve)
-         
-                # =========================================
-                # FLAT PEAK
-                # =========================================
-        
-                para[peak_left_idx:peak_right_idx] = peak_cap
-        
-                # =========================================
-                # FINAL SMOOTHING
-                # =========================================
-                para = np.clip(para, 0, peak_cap)
-                para = savgol_filter(para, window_length, 3)
-                # =========================================
-                # FOLLOW GENERATION ENDS
-                # =========================================
-        
-                para[:left_start] = ys[:left_start]
-                para[right_end:] = ys[right_end:]
-                para = savgol_filter(para, 7, 3) * Power_Availability/100
-                para = np.clip(para, 0, peak_cap)
-                para = np.where(para<1, 0, para)
-                return para
-
-        Final_Smooth = solar_cap_curve(
-            ap,
-            peak_cap=peak_cap,
-            target_width=target_width,
-            window_length=window_length,
-            Power_Availability=Power_Availability
-        )
-        least_error = np.inf
-
-        for i in range(96):
-            sh = np.roll(Final_Smooth, -i)
-            Final_Smooth_Sym = (Final_Smooth + sh[::-1]) / 2
-        
-            error = np.sqrt(
-                np.mean(
-                    (Final_Smooth - Final_Smooth_Sym) ** 2
+            a = power.reshape(days, 96)
+            
+            ap = np.percentile(a, 95, axis=0) * 1.03
+    
+            st.subheader("Parameters")
+    
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                Power_Availability = st.number_input(
+                    "Power Availability (%)",
+                    value=100,
+                    step=1
                 )
+            
+                peak_cap = st.number_input(
+                    "Peak Cap",
+                    value=200,
+                    step=1
+                )
+            
+                target_width = st.number_input(
+                    "Target Width",
+                    value=25,
+                    step=1
+                )
+            
+            with col2:
+                shift = st.number_input(
+                    "Shift",
+                    value=10,
+                    step=1
+                )
+            
+                window_length = st.slider(
+                    "Window Length",
+                    5,
+                    31,
+                    7,
+                    step=2
+                )
+            # ---------------- Smooth Profile ----------------
+    
+            s = savgol_filter(
+                ap,
+                window_length=window_length,
+                polyorder=2
             )
+            sh = np.roll(s, -shift)
+    
+            sym = (s + sh[::-1]) / 2
+    
+            def solar_cap_curve(
+                y,
+                peak_cap,
+                target_width,
+                window_length,
+                Power_Availability
+            ):
+            
+                y = np.array(y, dtype=float)
+            
+                n = len(y)
+            
+                para = np.zeros(n)
+                # =========================================
+                # SMOOTH INPUT
+                # =========================================
+                ys = savgol_filter(y, 7, 2)
+                # =========================================
+                # GRADIENT
+                # =========================================
+                grad = np.gradient(ys)
+                # =========================================
+                # LEFT ACTIVE REGION
+                # =========================================
+                left_peak = np.argmax(ys[:n//2])
+            
+                # strongest rising slope
+                left_start = np.argmax(grad[:left_peak])
+            
+                x_left = np.arange(left_start, left_peak)
+                y_left = ys[left_start:left_peak]
+            
+                # linear fit
+                m1, c1 = np.polyfit(x_left, y_left, 1)
+            
+                # =========================================
+                # RIGHT ACTIVE REGION
+                # =========================================
+            
+                right_peak = np.argmax(ys[n//2:]) + n//2
+            
+                # =========================================
+                # RIGHT FALLING REGION
+                # =========================================
+            
+                threshold = 0.02 * np.max(ys)
+            
+                active_idx = np.where(ys > threshold)[0]
+            
+                right_end = active_idx[-1]
+            
+                x_right = np.arange(right_peak, right_end)
+                y_right = ys[right_peak:right_end]
+            
+                # linear fit
+                m2, c2 = np.polyfit(x_right, y_right, 1)
+                # =========================================
+                # AUTO TRIP LEVEL FROM PEAK WIDTH
+                # =========================================
+            
+                A = (1/m2) - (1/m1)
+                B = (c1/m1) - (c2/m2)
+            
+                trip = (target_width - B) / A
+            
+                peak_left_idx = int(round((trip - c1) / m1))
+                peak_right_idx = int(round((trip - c2) / m2))
+                trip = max(0, trip)  # safety
+                print("Pre =", peak_right_idx - peak_left_idx)
+                print("Next =", target_width)
+                if peak_cap >= trip:
+                    # =========================================
+                    # LEFT EXTRAPOLATION
+                    # =========================================
+                    for i in range(n):
+                        val = m1*i + c1
+                        para[i] = min(val, trip)
+                        if val >= trip:
+                            peak_left_idx = i
+                            break
+            
+                    # =========================================
+                    # RIGHT EXTRAPOLATION
+                    # =========================================
+            
+                    right_curve = np.zeros(n)
+                    for i in range(n-1, -1, -1):
+                        val = m2*i + c2
+                        right_curve[i] = min(val, trip)
+                        if val >= trip:
+                            peak_right_idx = i
+                            break
+                                
+                    # =========================================
+                    # MERGE
+                    # =========================================
+            
+                    para = np.maximum(para, right_curve)
+            
+                    print("trip =", trip)
+                    print("left edge =", para[peak_left_idx])
+                    print("right edge =", para[peak_right_idx])
+                    print("Width =", peak_right_idx - peak_left_idx)
+            
+                    # =========================================
+                    # SMOOTH SEMI-CIRCLE CAP
+                    # =========================================
+            
+                    x = np.arange(peak_left_idx, peak_right_idx+1)
+                    print(len(x))
+                    center = (peak_left_idx + peak_right_idx) / 2
+                    radius = (peak_right_idx - peak_left_idx) / 2
+             
+                    # edge height from existing profile
+                    left_edge = trip
+                    right_edge = trip
+            
+                    base = max(left_edge, right_edge)
+            
+                    width = peak_right_idx - peak_left_idx
+            
+                    dome_height = max(20, 0.12 * trip)
+            
+                    x = np.linspace(-1, 1, width)
+            
+                    shape = np.sqrt(np.maximum(0, 1 - x**2))
+            
+                    dome = trip + dome_height * shape
+                    dome[0] = trip
+                    dome[-1] = trip
+            
+                    para[peak_left_idx:peak_right_idx] = dome
+                           
+                    # =========================================
+                    # SEMI-FINAL SMOOTHING
+                    # =========================================
+                    para = savgol_filter(para, window_length, 3)
+                    para = np.clip(para, 0, None)
+            
+                    # =========================================
+                    # FOLLOW GENERATION ENDS
+                    # =========================================
+            
+                    para[:left_start] = ys[:left_start]
+            
+                    para[right_end:] = ys[right_end:]
+            
+                    # =========================================
+                    # FINAL SMOOTHING
+                    # =========================================
+                    para = savgol_filter(para,7, 3) * Power_Availability/100
+                    para = np.clip(para, 0, None)
+                    para = np.where(para<0.2, 0, para)
+                    return para
         
-            if error < least_error:
-                least_error = error
-                best_shift = i
-        
-        sh = np.roll(Final_Smooth, -best_shift)
-        
-        Final_Smooth_Sym = (
-            Final_Smooth + sh[::-1]
-        ) / 2
-        fig = go.Figure()
+                else:
+                    # =========================================
+                    # LEFT EXTRAPOLATION
+                    # =========================================
+            
+                    for i in range(n):
+            
+                        val = m1*i + c1
+            
+                        para[i] = val
+            
+                        if val >= peak_cap:
+                            peak_left_idx = i
+                            break
+            
+                    # =========================================
+                    # RIGHT EXTRAPOLATION
+                    # =========================================
+            
+                    right_curve = np.zeros(n)
+            
+                    for i in range(n-1, -1, -1):
+            
+                        val = m2*i + c2
+            
+                        right_curve[i] = val
+            
+                        if val >= peak_cap:
+                            peak_right_idx = i
+                            break
+            
+                    # =========================================
+                    # MERGE
+                    # =========================================
+            
+                    para = np.maximum(para, right_curve)
+             
+                    # =========================================
+                    # FLAT PEAK
+                    # =========================================
+            
+                    para[peak_left_idx:peak_right_idx] = peak_cap
+            
+                    # =========================================
+                    # FINAL SMOOTHING
+                    # =========================================
+                    para = np.clip(para, 0, peak_cap)
+                    para = savgol_filter(para, window_length, 3)
+                    # =========================================
+                    # FOLLOW GENERATION ENDS
+                    # =========================================
+            
+                    para[:left_start] = ys[:left_start]
+                    para[right_end:] = ys[right_end:]
+                    para = savgol_filter(para, 7, 3) * Power_Availability/100
+                    para = np.clip(para, 0, peak_cap)
+                    para = np.where(para<1, 0, para)
+                    return para
+    
+            Final_Smooth = solar_cap_curve(
+                ap,
+                peak_cap=peak_cap,
+                target_width=target_width,
+                window_length=window_length,
+                Power_Availability=Power_Availability
+            )
+            least_error = np.inf
+    
+            for i in range(96):
+                sh = np.roll(Final_Smooth, -i)
+                Final_Smooth_Sym = (Final_Smooth + sh[::-1]) / 2
+            
+                error = np.sqrt(
+                    np.mean(
+                        (Final_Smooth - Final_Smooth_Sym) ** 2
+                    )
+                )
+            
+                if error < least_error:
+                    least_error = error
+                    best_shift = i
+            
+            sh = np.roll(Final_Smooth, -best_shift)
+            
+            Final_Smooth_Sym = (
+                Final_Smooth + sh[::-1]
+            ) / 2
+            fig = go.Figure()
+    
+            fig.add_trace(go.Scatter(
+                x=np.arange(96),
+                y=ap,
+                name="Generation",
+                line=dict(width=2)
+            ))
+            
+            fig.add_trace(go.Scatter(
+                x=np.arange(96),
+                y=Final_Smooth,
+                name="Profile",
+                line=dict(width=4)
+            ))
+            
+            fig.add_trace(go.Scatter(
+                x=np.arange(96),
+                y=Final_Smooth_Sym,
+                name="Sym Profile",
+                line=dict(width=4)
+            ))
+            
+            st.plotly_chart(fig, use_container_width=True)
+    
+            output = pd.DataFrame({
+                "Power": ap,
+                "Profile": Final_Smooth,
+                "Sym Profile": Final_Smooth_Sym
+            })
+            
+            st.dataframe(output, use_container_width=True)
 
-        fig.add_trace(go.Scatter(
-            x=np.arange(96),
-            y=ap,
-            name="Generation",
-            line=dict(width=2)
-        ))
-        
-        fig.add_trace(go.Scatter(
-            x=np.arange(96),
-            y=Final_Smooth,
-            name="Profile",
-            line=dict(width=4)
-        ))
-        
-        fig.add_trace(go.Scatter(
-            x=np.arange(96),
-            y=Final_Smooth_Sym,
-            name="Sym Profile",
-            line=dict(width=4)
-        ))
-        
-        st.plotly_chart(fig, use_container_width=True)
-
-        output = pd.DataFrame({
-            "Power": ap,
-            "Profile": Final_Smooth,
-            "Sym Profile": Final_Smooth_Sym
-        })
-        
-        st.dataframe(output, use_container_width=True)
+        else:
+            st.warning("Please enter Power values to continue.")
 
     else:
         if "cam_input" not in st.session_state:
