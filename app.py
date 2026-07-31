@@ -1921,26 +1921,16 @@ elif page == "RT Correction":
 
     lookup_blocks = [
         n1,
-        n1 + 1,
-        n1 + 2,
+        n2,
         n1 + 3,
-        b,
         n2 - 3,
-        n2 - 2,
-        n2 - 1,
-        n2
     ]
     
     lookup_names = [
-        "N1",
-        "N1 + 1",
-        "N1 + 2",
-        "N1 + 3",
-        "Peak",
-        "N2 - 3",
-        "N2 - 2",
-        "N2 - 1",
-        "N2"
+        "Parabolic Power Generation Starting Block",
+        "Parabolic Power Generation Ending Block",
+        "Actual Generation Available Block (Lower Limit)",
+        "Actual Generation Effective Block (Upper Limit)"
     ]
     
     lookup_df = pd.DataFrame({
@@ -1953,12 +1943,13 @@ elif page == "RT Correction":
     )
     
     st.subheader("📅 Important Time Blocks")
+    with st.expander("🔍 View Efficiency Calculations"):
+        st.dataframe(
+            lookup_df,
+            use_container_width=True,
+            hide_index=True
+        )
     
-    st.dataframe(
-        lookup_df,
-        use_container_width=True,
-        hide_index=True
-    )
     
     # ---------------- Graph ----------------
     
