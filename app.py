@@ -2017,7 +2017,7 @@ elif page == "Aeromal":
             type="password"
         )
 
-        if st.button("Login"):
+        if st.button("Login", type='primary'):
 
             if password == "maakabhosda":
                 st.session_state.aeromal_auth = True
@@ -2028,8 +2028,6 @@ elif page == "Aeromal":
         st.stop()
 
     # ---------------- Aeromal Code ----------------
-    st.success("Access Granted")
-    st.title("✈️ Aeromal")
     from scipy.signal import savgol_filter
     
     st.title("Aeromal mai dekhleta hu!! Aap Dream11 pr team banao 🛫")
