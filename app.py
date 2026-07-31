@@ -54,10 +54,10 @@ st.sidebar.divider()
 if "page" not in st.session_state:
     st.session_state.page = "Loss Correction"
 
-if st.sidebar.button("☀️ Loss Correction", use_container_width=True):
+if st.sidebar.button("⛅ Loss Correction", use_container_width=True):
     st.session_state.page = "Loss Correction"
 
-if st.sidebar.button("📈 RT Correction", use_container_width=True):
+if st.sidebar.button("⏰ RT Correction", use_container_width=True):
     st.session_state.page = "RT Correction"
 
 st.sidebar.divider()
