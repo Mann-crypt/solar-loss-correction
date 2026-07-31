@@ -2167,6 +2167,7 @@ elif page == "Aeromal":
             y=sym,
             name="Sym Profile",
             line=dict(color="blue")
+            line=dict(width=2)
         )
     )
     
@@ -2176,6 +2177,7 @@ elif page == "Aeromal":
             y=s,
             name="Profile",
             line=dict(color="green")
+            line=dict(width=2)
         )
     )
     
@@ -2185,6 +2187,7 @@ elif page == "Aeromal":
             y=ap,
             name="95th Percentile",
             line=dict(color="red")
+            line=dict(width=2)
         )
     )
     
