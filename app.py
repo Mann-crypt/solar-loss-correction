@@ -2005,6 +2005,31 @@ elif page == "RT Correction":
     )
 
 elif page == "Aeromal":
+    if "aeromal_auth" not in st.session_state:
+        st.session_state.aeromal_auth = False
+
+    if not st.session_state.aeromal_auth:
+
+        st.title("🔒 Aeromal Access")
+
+        password = st.text_input(
+            "Enter Password",
+            type="password"
+        )
+
+        if st.button("Login"):
+
+            if password == "YourPassword123":
+                st.session_state.aeromal_auth = True
+                st.rerun()
+            else:
+                st.error("Incorrect Password")
+
+        st.stop()
+
+    # ---------------- Aeromal Code ----------------
+    st.success("Access Granted")
+    st.title("✈️ Aeromal")
     from scipy.signal import savgol_filter
     
     st.title("Aeromal mai dekhleta hu!! Aap Dream11 pr team banao 🛫")
