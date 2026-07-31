@@ -2072,7 +2072,7 @@ elif page == "Aeromal":
         border:2px solid #3b82f6;
         border-radius:14px;
         padding:14px 18px;
-        width:100%;
+        width:300%;
         margin-bottom:15px;
     }
     
@@ -2085,7 +2085,7 @@ elif page == "Aeromal":
     
     curtailment = st.toggle(
         "⚡ Curtailment Mode",
-        value=True
+        value=False
     )
 
     if curtailment:
