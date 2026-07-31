@@ -212,7 +212,7 @@ if page == "Loss Correction":
     df_fix.loc[:, ghi_cols] = edited_df[ghi_cols].values
     df_fix.loc[:, "Actual"] = edited_df["Actual"].values
     
-    plant_type = st.radio(
+    plant_type = st.pills(
         "Plant Type",
         ["Fixed", "Tracking"],
         horizontal=True
