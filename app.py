@@ -60,6 +60,9 @@ if st.sidebar.button("⛅ Loss Correction", use_container_width=True):
 if st.sidebar.button("⏰ RT Correction", use_container_width=True):
     st.session_state.page = "RT Correction"
 
+if st.sidebar.button("📊 Aeromal", use_container_width=True):
+    st.session_state.page = "Aeromal"
+
 st.sidebar.divider()
 
 st.sidebar.markdown(
@@ -1994,6 +1997,218 @@ elif page == "RT Correction":
     fig.update_layout(
         height=550,
         hovermode="x unified"
+    )
+    
+    st.plotly_chart(
+        fig,
+        use_container_width=True
+    )
+
+elif page == "Aeromal":
+    from scipy.signal import savgol_filter
+    
+    st.title("CAM Curve Generator")
+    
+    # ---------------- Input ----------------
+    
+    if "cam_input" not in st.session_state:
+        st.session_state.cam_input = pd.DataFrame({
+            "Power": np.zeros(96)
+        })
+    
+    edited_df = st.data_editor(
+        st.session_state.cam_input,
+        key="cam_editor",
+        use_container_width=True,
+        hide_index=True,
+        num_rows="dynamic"
+    )
+    
+    st.session_state.cam_input = edited_df.copy()
+    
+    # ---------------- Validation ----------------
+    
+    power = pd.to_numeric(
+        edited_df.iloc[:,0],
+        errors="coerce"
+    ).fillna(0).to_numpy()
+    
+    if len(power) == 0:
+        st.stop()
+    
+    if len(power) % 96 != 0:
+        st.error("Number of rows must be divisible by 96.")
+        st.stop()
+    
+    days = len(power) // 96
+    
+    # ---------------- Controls ----------------
+    
+    col1,col2,col3 = st.columns(3)
+    
+    with col1:
+        window = st.number_input(
+            "Window Length",
+            min_value=5,
+            max_value=31,
+            step=2,
+            value=11
+        )
+    
+    with col2:
+        power_availability = st.number_input(
+            "Power Availability (%)",
+            min_value=0,
+            max_value=100,
+            value=100
+        )
+    
+    # ---------------- Calculate ----------------
+    
+    a = power.reshape(days,96)
+    
+    ap = np.percentile(a,95,axis=0)
+    
+    s = savgol_filter(
+        ap,
+        window_length=window,
+        polyorder=3
+    )
+    
+    least_error = np.inf
+    best_shift = 0
+    
+    for i in range(96):
+    
+        sh = np.roll(s,-i)
+    
+        sym = (s + sh[::-1]) / 2
+    
+        error = np.sqrt(
+            np.mean((ap-sym)**2)
+        )
+    
+        if error < least_error:
+            least_error = error
+            best_shift = i
+    
+    with col3:
+    
+        shift = st.number_input(
+            "Shift",
+            min_value=0,
+            max_value=95,
+            value=int(best_shift)
+        )
+    
+    # ---------------- Final Curve ----------------
+    
+    alpha = 0.50
+    
+    sh = np.roll(s,-shift)
+    
+    sym = alpha*s + (1-alpha)*sh[::-1]
+    
+    thr = 0.1
+    
+    idx = np.where(ap>thr)[0]
+    
+    if len(idx)>0:
+    
+        start = idx[0]
+        end = idx[-1]
+    
+        blend = 8
+    
+        w = np.linspace(1,0,blend)
+    
+        sym[start+1:start+1+blend] = (
+            w*ap[start+1:start+1+blend]
+            +
+            (1-w)*sym[start+1:start+1+blend]
+        )
+    
+        w = np.linspace(0,1,blend)
+    
+        sym[end-blend:end] = (
+            w*ap[end-blend:end]
+            +
+            (1-w)*sym[end-blend:end]
+        )
+    
+    s = savgol_filter(
+        ap,
+        window_length=7,
+        polyorder=2
+    )
+    
+    sym = savgol_filter(
+        sym,
+        window_length=window,
+        polyorder=3
+    )
+    
+    s = np.clip(s,0,None)
+    sym = np.clip(sym,0,None)
+    
+    s = np.where(s<0.1,0,s)
+    sym = np.where(sym<0.1,0,sym)
+    
+    s *= power_availability/100
+    sym *= power_availability/100
+    
+    # ---------------- Results ----------------
+    
+    result = pd.DataFrame({
+        "Percentile":ap,
+        "Profile":s,
+        "Sym Profile":sym
+    })
+    
+    st.subheader("Generated Curve")
+    
+    st.dataframe(
+        result,
+        use_container_width=True,
+        hide_index=True
+    )
+    
+    # ---------------- Plot ----------------
+    
+    fig = go.Figure()
+    
+    fig.add_trace(
+        go.Scatter(
+            x=np.arange(96),
+            y=sym,
+            name="Sym Profile",
+            line=dict(color="blue")
+        )
+    )
+    
+    fig.add_trace(
+        go.Scatter(
+            x=np.arange(96),
+            y=s,
+            name="Profile",
+            line=dict(color="green")
+        )
+    )
+    
+    fig.add_trace(
+        go.Scatter(
+            x=np.arange(96),
+            y=ap,
+            name="95th Percentile",
+            line=dict(color="red")
+        )
+    )
+    
+    fig.update_layout(
+        height=550,
+        hovermode="x unified",
+        xaxis_title="Block",
+        yaxis_title="Power"
     )
     
     st.plotly_chart(
