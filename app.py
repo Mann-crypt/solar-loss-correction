@@ -2410,30 +2410,29 @@ elif page == "Aeromal":
                 window_length=window_length,
                 Power_Availability=Power_Availability
             )
-            if "best_shift" not in st.session_state:
-
-                least_error = np.inf
+            least_error = np.inf
+            best_shift = 0
             
-                for i in range(96):
-                    sh = np.roll(Final_Smooth, -i)
-                    sym = (Final_Smooth + sh[::-1]) / 2
+            for i in range(96):
+                sh = np.roll(Final_Smooth, -i)
+                sym = (Final_Smooth + sh[::-1]) / 2
             
-                    error = np.sqrt(np.mean((Final_Smooth - sym)**2))
+                error = np.sqrt(np.mean((Final_Smooth - sym)**2))
             
-                    if error < least_error:
-                        least_error = error
-                        st.session_state.best_shift = i
+                if error < least_error:
+                    least_error = error
+                    best_shift = i
             
             shift = st.number_input(
                 "Shift",
                 min_value=0,
                 max_value=95,
-                value=st.session_state.best_shift,
-                step=1
+                value=best_shift,
+                step=1,
             )
             
-            sh = np.roll(Final_Smooth, -shift)
-            Final_Smooth_Sym = (Final_Smooth + sh[::-1]) / 2            
+            sh = np.roll(Final_Smooth, -int(shift))
+            Final_Smooth_Sym = (Final_Smooth + sh[::-1]) / 2         
             
             fig = go.Figure()
     
