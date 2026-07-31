@@ -219,7 +219,6 @@ if page == "Loss Correction":
         options=["Fixed", "Tracking"],
         default="Fixed",
         selection_mode="single",
-        width="stretch"
     )
     
     if "run_model" not in st.session_state:
