@@ -2007,7 +2007,7 @@ elif page == "RT Correction":
 elif page == "Aeromal":
     from scipy.signal import savgol_filter
     
-    st.title("CAM Curve Generator")
+    st.title("Aeromal mai dekhleta hu!! Aap Dream11 pr team banao 🛫")
     
     # ---------------- Input ----------------
     
