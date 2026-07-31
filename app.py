@@ -2017,7 +2017,7 @@ elif page == "Aeromal":
             type="password"
         )
 
-        if st.button("Login", type='primary'):
+        if st.button("Login", type='primary', use_container_width=True):
 
             if password == "asdfghjkl;'":
                 st.session_state.aeromal_auth = True
