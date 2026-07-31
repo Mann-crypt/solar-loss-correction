@@ -2157,22 +2157,6 @@ elif page == "Aeromal":
     s *= power_availability/100
     sym *= power_availability/100
     
-    # ---------------- Results ----------------
-    
-    result = pd.DataFrame({
-        "Percentile":ap,
-        "Profile":s,
-        "Sym Profile":sym
-    })
-    
-    st.subheader("Generated Curve")
-    
-    st.dataframe(
-        result,
-        use_container_width=True,
-        hide_index=True
-    )
-    
     # ---------------- Plot ----------------
     
     fig = go.Figure()
@@ -2209,9 +2193,31 @@ elif page == "Aeromal":
         hovermode="x unified",
         xaxis_title="Block",
         yaxis_title="Power"
+        legend=dict(
+            orientation="h",
+            y=1.08,
+            x=0
+        ),
+        margin=dict(l=20, r=20, t=60, b=20)
     )
     
     st.plotly_chart(
         fig,
         use_container_width=True
+    )
+    
+    # ---------------- Results ----------------
+    
+    result = pd.DataFrame({
+        "Percentile":ap,
+        "Profile":s,
+        "Sym Profile":sym
+    })
+    
+    st.subheader("Generated Curve")
+    
+    st.dataframe(
+        result,
+        use_container_width=True,
+        hide_index=True
     )
