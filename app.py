@@ -125,6 +125,7 @@ if st.session_state.get("aeromal_auth", False):
         st.rerun()
 
 st.sidebar.markdown("</div>", unsafe_allow_html=True)
+page = st.session_state.page
 if page == "Loss Correction":
     st.title("Pakima Pakam Ravi, 3-4 Loss Correction kar chuke hai!!😎")
 
