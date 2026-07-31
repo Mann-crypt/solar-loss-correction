@@ -1942,8 +1942,7 @@ elif page == "RT Correction":
         df.set_index("Blocks")["Time-Blocks"]
     )
     
-    st.subheader("📅 Important Time Blocks")
-    with st.expander("🔍 View Efficiency Calculations"):
+    with st.expander("📅 Important Time Blocks"):
         st.dataframe(
             lookup_df,
             use_container_width=True,
