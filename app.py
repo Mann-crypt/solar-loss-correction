@@ -2065,19 +2065,34 @@ elif page == "Aeromal":
     if "aeromal_mode" not in st.session_state:
         st.session_state.aeromal_mode = "No Curtailment"
     
-    import streamlit_shadcn_ui as ui
-
-    mode = ui.tabs(
-        options=["⚡ Curtailment", "☀️ No Curtailment"],
-        default_value="⚡ Curtailment",
-        key="mode",
+    st.markdown("""
+    <style>
+    div[data-testid="stToggle"]{
+        background:#1f2937;
+        border:2px solid #3b82f6;
+        border-radius:14px;
+        padding:14px 18px;
+        width:100%;
+        margin-bottom:15px;
+    }
+    
+    div[data-testid="stToggle"] label{
+        font-size:22px !important;
+        font-weight:700 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    curtailment = st.toggle(
+        "⚡ Curtailment Mode",
+        value=True
     )
-    if mode == "No Curtailment":
-        st.success("☀️ No Curtailment Mode Selected")
+
+    if curtailment:
+        st.success("⚡ Curtailment Mode Selected")
         # Curtailment code here
-    
-    # ---------------- Input ----------------
-    
+
+    else:
         if "cam_input" not in st.session_state:
             st.session_state.cam_input = pd.DataFrame({
                 "Power": np.zeros(96)
