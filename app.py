@@ -34,6 +34,24 @@ st.set_page_config(page_title="Solar Suite", layout="wide")
 
 import streamlit as st
 
+# Sidebar CSS
+st.markdown("""
+<style>
+[data-testid="stSidebar"] > div:first-child{
+    display:flex;
+    flex-direction:column;
+    height:100vh;
+}
+
+.sidebar-bottom{
+    margin-top:auto;
+    padding-top:20px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+# ---------------- Logo ----------------
 st.sidebar.markdown("""
 <h1 style='text-align:center;
 background: linear-gradient(90deg,#00c6ff,#0072ff);
@@ -51,6 +69,8 @@ Loss Correction Platform
 
 st.sidebar.divider()
 
+
+# ---------------- Navigation ----------------
 if "page" not in st.session_state:
     st.session_state.page = "Loss Correction"
 
@@ -63,48 +83,48 @@ if st.sidebar.button("⏰ RT Correction", use_container_width=True):
 if st.sidebar.button("🐱‍🏍 Aeromal", use_container_width=True):
     st.session_state.page = "Aeromal"
 
+
 st.sidebar.divider()
 
-st.sidebar.markdown(
-"""
+
+# ---------------- Credits ----------------
+st.sidebar.markdown("""
 <div style='text-align:center;color:gray;font-size:13px'>
 Developed and Maintained by:<br>
-<b>Manjot Singh</b>
-</div>
-<div style='text-align:center;color:gray;font-size:13px'>
+<b>Manjot Singh</b><br><br>
+
 Scripter Writer:<br>
-<b>Tushar Sharma</b>
-</div>
-<div style='text-align:center;color:gray;font-size:13px'>
+<b>Tushar Sharma</b><br><br>
+
 Challenger:<br>
-<b>Aarav Sharma</b>
-</div>
-<div style='text-align:center;color:gray;font-size:13px'>
+<b>Aarav Sharma</b><br><br>
+
 Tester:<br>
-<b>Jatin Chaturvedi</b>
-<div style='text-align:center;color:gray;font-size:13px'>
+<b>Jatin Chaturvedi</b><br><br>
+
 Improviser:<br>
-<b>Ujala Agrahari</b>
-</div>
-<div style='text-align:center;color:gray;font-size:13px'>
+<b>Ujala Agrahari</b><br><br>
+
 Suggested by:<br>
 <b>Garima Bajetha</b>
 </div>
-""",
-unsafe_allow_html=True
-)
-st.markdown("<br>" * 12, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
+
+
+# ---------------- Bottom Section ----------------
+st.sidebar.markdown("<div class='sidebar-bottom'>", unsafe_allow_html=True)
 
 if st.session_state.get("aeromal_auth", False):
-    if st.button(
+    if st.sidebar.button(
         "🚪 Logout",
         use_container_width=True,
         key="logout"
     ):
         st.session_state.aeromal_auth = False
+        st.session_state.page = "Loss Correction"
         st.rerun()
 
-page = st.session_state.page
+st.sidebar.markdown("</div>", unsafe_allow_html=True)
 if page == "Loss Correction":
     st.title("Pakima Pakam Ravi, 3-4 Loss Correction kar chuke hai!!😎")
 
