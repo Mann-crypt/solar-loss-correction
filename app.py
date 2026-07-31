@@ -1919,16 +1919,43 @@ elif page == "RT Correction":
     
     df["Projection"] = projection
 
-    n1_time = df.loc[df["Blocks"] == n1, "Time-Blocks"].iloc[0]
-    n2_time = df.loc[df["Blocks"] == n2, "Time-Blocks"].iloc[0]
-
-    lookup = pd.DataFrame({
-        "Parameter": ["Parabolic Power Generation Starting Block", "Parabolic Power Generation Ending Block"],
-        "Time Block": [n1_time, n2_time]
+    lookup_blocks = [
+        n1,
+        n1 + 1,
+        n1 + 2,
+        n1 + 3,
+        b,
+        n2 - 3,
+        n2 - 2,
+        n2 - 1,
+        n2
+    ]
+    
+    lookup_names = [
+        "N1",
+        "N1 + 1",
+        "N1 + 2",
+        "N1 + 3",
+        "Peak",
+        "N2 - 3",
+        "N2 - 2",
+        "N2 - 1",
+        "N2"
+    ]
+    
+    lookup_df = pd.DataFrame({
+        "Parameter": lookup_names,
+        "Block": lookup_blocks
     })
     
+    lookup_df["Time Block"] = lookup_df["Block"].map(
+        df.set_index("Blocks")["Time-Blocks"]
+    )
+    
+    st.subheader("📅 Important Time Blocks")
+    
     st.dataframe(
-        lookup,
+        lookup_df,
         use_container_width=True,
         hide_index=True
     )
