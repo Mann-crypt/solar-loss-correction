@@ -30,7 +30,7 @@ resetTimer();
 </script>
 """, height=0)
 
-st.set_page_config(page_title="Solar Loss Correction", layout="wide")
+st.set_page_config(page_title="Solar Suite", layout="wide")
 
 import streamlit as st
 
