@@ -2064,30 +2064,15 @@ elif page == "Aeromal":
     
     # Initialize
     if "aeromal_mode" not in st.session_state:
-        st.session_state.aeromal_mode = "Curtailment"
+        st.session_state.aeromal_mode = "No Curtailment"
     
-    c1, c2 = st.columns(2)
+    mode = st.selectbox(
+        "Select Mode",
+        ["⚡ Curtailment", "☀️ No Curtailment"],
+        label_visibility="collapsed"
+    )
     
-    with c1:
-        if st.button(
-            "⚡ Curtailment",
-            use_container_width=True,
-            type="primary" if st.session_state.aeromal_mode == "Curtailment" else "secondary"
-        ):
-            st.session_state.aeromal_mode = "Curtailment"
-    
-    with c2:
-        if st.button(
-            "☀️ No Curtailment",
-            use_container_width=True,
-            type="primary" if st.session_state.aeromal_mode == "No Curtailment" else "secondary"
-        ):
-            st.session_state.aeromal_mode = "No Curtailment"
-    
-    st.divider()
-    
-    # Selected mode
-    mode = st.session_state.aeromal_mode
+    st.subheader(mode)
     
     if mode == "No Curtailment":
         st.success("☀️ No Curtailment Mode Selected")
