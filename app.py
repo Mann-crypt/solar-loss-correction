@@ -2090,7 +2090,9 @@ elif page == "Aeromal":
 
     if curtailment:
         if "cam_input" not in st.session_state:
-            st.session_state.cam_input = pd.DataFrame(columns=["Power"])
+            st.session_state.cam_input = pd.DataFrame({
+                "Power": [None] * 96
+            })
         
         edited_df = st.data_editor(
             st.session_state.cam_input,
@@ -2099,6 +2101,16 @@ elif page == "Aeromal":
             hide_index=True,
             num_rows="dynamic"
         )
+        power = pd.to_numeric(
+            edited_df["Power"],
+            errors="coerce"
+        )
+        
+        if power.isna().all():
+            st.info("👆 Enter or paste Power data to begin.")
+            st.stop()
+        
+        power = power.fillna(0).to_numpy()
         
         st.session_state.cam_input = edited_df.copy()
         
@@ -2139,14 +2151,14 @@ elif page == "Aeromal":
         with col1:
             Power_Availability = st.number_input(
                 "Power Availability (%)",
-                value=130,
+                value=100,
                 step=1
             )
         
             peak_cap = st.number_input(
                 "Peak Cap",
-                value=1200.0,
-                step=10.0
+                value=200,
+                step=1
             )
         
             target_width = st.number_input(
