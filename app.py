@@ -2029,9 +2029,9 @@ elif page == "Aeromal":
 
     # ---------------- Aeromal Code ----------------
     from scipy.signal import savgol_filter
-    if st.sidebar.button("🚪 Logout Aeromal"):
-        st.session_state.aeromal_auth = False
-        st.rerun()
+if st.sidebar.button("🚪 Logout Aeromal"):
+    st.session_state.aeromal_auth = False
+    st.rerun()
     st.title("Aeromal mai dekhleta hu!! Aap Dream11 pr team banao 🛫")
     
     # ---------------- Input ----------------
