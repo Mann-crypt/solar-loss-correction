@@ -95,14 +95,14 @@ unsafe_allow_html=True
 )
 st.markdown("<br>" * 12, unsafe_allow_html=True)
 
-    if st.session_state.get("aeromal_auth", False):
-        if st.button(
-            "🚪 Logout",
-            use_container_width=True,
-            key="logout"
-        ):
-            st.session_state.aeromal_auth = False
-            st.rerun()
+if st.session_state.get("aeromal_auth", False):
+    if st.button(
+        "🚪 Logout",
+        use_container_width=True,
+        key="logout"
+    ):
+        st.session_state.aeromal_auth = False
+        st.rerun()
 
 page = st.session_state.page
 if page == "Loss Correction":
