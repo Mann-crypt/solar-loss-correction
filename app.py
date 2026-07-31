@@ -2065,76 +2065,12 @@ elif page == "Aeromal":
     if "aeromal_mode" not in st.session_state:
         st.session_state.aeromal_mode = "No Curtailment"
     
-    import streamlit.components.v1 as components
+    import streamlit_shadcn_ui as ui
 
-    mode = components.html(
-    """
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <style>
-    .container{
-        width:100%;
-        display:flex;
-        border-radius:16px;
-        overflow:hidden;
-        border:2px solid #2196F3;
-        font-family:sans-serif;
-    }
-    
-    .option{
-        flex:1;
-        padding:18px;
-        text-align:center;
-        font-size:22px;
-        font-weight:bold;
-        cursor:pointer;
-        transition:.3s;
-    }
-    
-    .left{
-        background:#2196F3;
-        color:white;
-    }
-    
-    .right{
-        background:#f5f5f5;
-        color:#444;
-    }
-    
-    input{display:none;}
-    
-    input:checked + .container .left{
-        background:#2196F3;
-        color:white;
-    }
-    
-    input:checked + .container .right{
-        background:#f5f5f5;
-        color:#444;
-    }
-    </style>
-    </head>
-    
-    <body>
-    
-    <input type="checkbox" id="toggle" checked>
-    
-    <label for="toggle">
-    <div class="container">
-        <div class="option left">
-            ⚡ Curtailment
-        </div>
-        <div class="option right">
-            ☀️ No Curtailment
-        </div>
-    </div>
-    </label>
-    
-    </body>
-    </html>
-    """,
-    height=80,
+    mode = ui.tabs(
+        options=["⚡ Curtailment", "☀️ No Curtailment"],
+        default_value="⚡ Curtailment",
+        key="mode",
     )
     if mode == "No Curtailment":
         st.success("☀️ No Curtailment Mode Selected")
