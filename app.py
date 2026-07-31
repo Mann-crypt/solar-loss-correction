@@ -2161,16 +2161,10 @@ elif page == "Aeromal":
                     step=1
                 )
             
+            with col2:
                 target_width = st.number_input(
                     "Target Width",
                     value=25,
-                    step=1
-                )
-            
-            with col2:
-                shift = st.number_input(
-                    "Shift",
-                    value=10,
                     step=1
                 )
             
