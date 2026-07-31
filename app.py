@@ -65,7 +65,7 @@ st.sidebar.divider()
 st.sidebar.markdown(
 """
 <div style='text-align:center;color:gray;font-size:13px'>
-Developer:<br>
+Developed and Maintained by:<br>
 <b>Manjot Singh</b>
 </div>
 <div style='text-align:center;color:gray;font-size:13px'>
@@ -1875,17 +1875,17 @@ elif page == "RT Correction":
             step=0.01
         )
     
-        n1 = st.number_input(
-            "N1",
-            value=int(st.session_state.rt_params["n1"]),
+        n2 = st.number_input(
+            "n2",
+            value=int(st.session_state.rt_params["n2"]),
             step=1
         )
     
     with col2:
     
-        n2 = st.number_input(
-            "N2",
-            value=int(st.session_state.rt_params["n2"]),
+        n1 = st.number_input(
+            "n1",
+            value=int(st.session_state.rt_params["n1"]),
             step=1
         )
     
@@ -1919,10 +1919,12 @@ elif page == "RT Correction":
     
     df["Projection"] = projection
 
+    n1_time = df.loc[df["Blocks"] == n1, "Time-Blocks"].iloc[0]
+    n2_time = df.loc[df["Blocks"] == n2, "Time-Blocks"].iloc[0]
+
     lookup = pd.DataFrame({
-        "Parameter": ["N1", "Peak Block", "N2"],
-        "Block": [n1, b, n2],
-        #"Time Block": [n1_time, b_time, n2_time]
+        "Parameter": ["Parabolic Power Generation Starting Block", "Parabolic Power Generation Ending Block"],
+        "Time Block": [n1_time, b_time, n2_time]
     })
     
     st.dataframe(
