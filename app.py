@@ -2166,7 +2166,7 @@ elif page == "Aeromal":
             x=np.arange(96),
             y=sym,
             name="Sym Profile",
-            line=dict(color="blue", width=3)
+            line=dict(color="blue", width=4)
         )
     )
     
@@ -2175,7 +2175,7 @@ elif page == "Aeromal":
             x=np.arange(96),
             y=s,
             name="Profile",
-            line=dict(color="green", width=3)
+            line=dict(color="green", width=4)
         )
     )
     
@@ -2184,7 +2184,7 @@ elif page == "Aeromal":
             x=np.arange(96),
             y=ap,
             name="95th Percentile",
-            line=dict(color="red", width=3)
+            line=dict(color="red", width=4)
         )
     )
     
