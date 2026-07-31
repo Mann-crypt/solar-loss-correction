@@ -2010,7 +2010,7 @@ elif page == "Aeromal":
 
     if not st.session_state.aeromal_auth:
 
-        st.title("🔒 Access bas bade logo ke paas hai")
+        st.title("🔒  Access bas bade logo ke paas hai")
 
         password = st.text_input(
             "Enter Password",
