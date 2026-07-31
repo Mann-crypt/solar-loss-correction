@@ -2019,7 +2019,7 @@ elif page == "Aeromal":
 
         if st.button("Login"):
 
-            if password == "YourPassword123":
+            if password == "maakabhosda":
                 st.session_state.aeromal_auth = True
                 st.rerun()
             else:
