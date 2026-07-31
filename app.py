@@ -2060,7 +2060,7 @@ elif page == "Aeromal":
 
     # ---------------- Aeromal Code ----------------
     from scipy.signal import savgol_filter
-        st.title("🐱‍🏍 Aeromal")
+    st.title("🐱‍🏍 Aeromal")
     
     # Initialize
     if "aeromal_mode" not in st.session_state:
