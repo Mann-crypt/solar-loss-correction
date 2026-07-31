@@ -2059,7 +2059,7 @@ elif page == "Aeromal":
         power_availability = st.number_input(
             "Power Availability (%)",
             min_value=0,
-            max_value=100,
+            max_value=1000,
             value=100
         )
     
