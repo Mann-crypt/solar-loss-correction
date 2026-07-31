@@ -87,7 +87,6 @@ if st.sidebar.button("🐱‍🏍 Aeromal", use_container_width=True):
 st.sidebar.divider()
 
 # ---------------- Logout Aeromal ----------------
-st.sidebar.markdown("<div class='sidebar-bottom'>", unsafe_allow_html=True)
 
 if st.session_state.get("aeromal_auth", False):
     if st.sidebar.button(
