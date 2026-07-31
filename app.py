@@ -86,6 +86,22 @@ if st.sidebar.button("🐱‍🏍 Aeromal", use_container_width=True):
 
 st.sidebar.divider()
 
+# ---------------- Logout Aeromal ----------------
+st.sidebar.markdown("<div class='sidebar-bottom'>", unsafe_allow_html=True)
+
+if st.session_state.get("aeromal_auth", False):
+    if st.sidebar.button(
+        "🚪 Logout",
+        use_container_width=True,
+        key="logout"
+    ):
+        st.session_state.aeromal_auth = False
+        st.session_state.page = "Loss Correction"
+        st.rerun()
+
+st.sidebar.markdown("</div>", unsafe_allow_html=True)
+
+
 
 # ---------------- Credits ----------------
 st.sidebar.markdown("""
@@ -110,21 +126,6 @@ Suggested by:<br>
 </div>
 """, unsafe_allow_html=True)
 
-
-# ---------------- Bottom Section ----------------
-st.sidebar.markdown("<div class='sidebar-bottom'>", unsafe_allow_html=True)
-
-if st.session_state.get("aeromal_auth", False):
-    if st.sidebar.button(
-        "🚪 Logout",
-        use_container_width=True,
-        key="logout"
-    ):
-        st.session_state.aeromal_auth = False
-        st.session_state.page = "Loss Correction"
-        st.rerun()
-
-st.sidebar.markdown("</div>", unsafe_allow_html=True)
 page = st.session_state.page
 if page == "Loss Correction":
     st.title("Pakima Pakam Ravi, 3-4 Loss Correction kar chuke hai!!😎")
