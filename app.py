@@ -93,7 +93,7 @@ unsafe_allow_html=True
 
 page = st.session_state.page
 if page == "Loss Correction":
-    st.title("Pasima Pakam Ravi, 3-4 Loss Correction kar chuke hai!!😎")
+    st.title("Pakima Pakam Ravi, 3-4 Loss Correction kar chuke hai!!😎")
 
     uploaded_file = st.file_uploader(
         "Yaha Feko!!",
@@ -191,8 +191,10 @@ if page == "Loss Correction":
     ).any(axis=1)
     
     if changed_rows.any():
-        st.success(f"✅ {changed_rows.sum()} rows updated")
-        st.toast("✨ Input data updated!")
+        st.toast(
+            f"✨ {changed_rows.sum()} rows updated successfully!",
+            icon="✅"
+        )
     
     edited_df = edited_df.iloc[:96].reset_index(drop=True)
     
@@ -1760,7 +1762,6 @@ elif page == "RT Correction":
     changed_rows = (edited_df != st.session_state.rt_input).any(axis=1)
     
     if changed_rows.any():
-        st.success(f"✅ {changed_rows.sum()} rows updated")
     
         st.toast(
             f"✨ {changed_rows.sum()} rows updated successfully!",
