@@ -60,7 +60,7 @@ if st.sidebar.button("⛅ Loss Correction", use_container_width=True):
 if st.sidebar.button("⏰ RT Correction", use_container_width=True):
     st.session_state.page = "RT Correction"
 
-if st.sidebar.button("📊 Aeromal", use_container_width=True):
+if st.sidebar.button("🐱‍🏍 Aeromal", use_container_width=True):
     st.session_state.page = "Aeromal"
 
 st.sidebar.divider()
