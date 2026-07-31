@@ -212,10 +212,12 @@ if page == "Loss Correction":
     df_fix.loc[:, ghi_cols] = edited_df[ghi_cols].values
     df_fix.loc[:, "Actual"] = edited_df["Actual"].values
     
-    plant_type = st.pills(
+    plant_type = st.segmented_control(
         "Plant Type",
-        ["Fixed", "Tracking"],
-        default="Fixed"
+        options=["☀️ Fixed", "🔄 Tracking"],
+        default="☀️ Fixed",
+        selection_mode="single",
+        width="stretch"
     )
     
     if "run_model" not in st.session_state:
