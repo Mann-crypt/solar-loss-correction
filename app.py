@@ -1746,44 +1746,29 @@ elif page == "RT Correction":
             "Trend": np.zeros(96)
         })
     
-    input_df = st.data_editor(
+    edited_df = st.data_editor(
         st.session_state.rt_input,
         key="rt_editor",
         use_container_width=True,
         hide_index=True,
         num_rows="fixed"
     )
-    original_df = input_df.copy()
     
-    edited_df = st.data_editor(
-        input_df,
-        use_container_width=True,
-        hide_index=True,
-        num_rows="fixed",
-        key="editor"
-    )
+    edited_df = edited_df.iloc[:96].reset_index(drop=True)
     
-    edited_numeric = edited_df.copy()
-    
-    edited_numeric[ghi_cols] = edited_numeric[ghi_cols].apply(
-        pd.to_numeric,
-        errors="coerce"
-    ).fillna(0)
-    
-    edited_numeric["Actual"] = (
-        pd.to_numeric(edited_numeric["Actual"], errors="coerce")
-        .fillna(0)
-    )
-    
-    changed_rows = (
-        edited_numeric.ne(original_df.fillna(0))
-    ).any(axis=1)
+    # Detect changes
+    changed_rows = (edited_df != st.session_state.rt_input).any(axis=1)
     
     if changed_rows.any():
         st.success(f"✅ {changed_rows.sum()} rows updated")
-        st.toast("✨ Input data updated!")
     
-    edited_df = edited_df.iloc[:96].reset_index(drop=True)
+        st.toast(
+            f"✨ {changed_rows.sum()} rows updated successfully!",
+            icon="✅"
+        )
+    
+    # Update session state
+    st.session_state.rt_input = edited_df.copy()
     
     st.session_state.rt_input = edited_df.copy()
     df = edited_df.copy()
