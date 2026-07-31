@@ -2138,7 +2138,7 @@ elif page == "Aeromal":
     
     s = savgol_filter(
         ap,
-        window_length=7,
+        window_length=window,
         polyorder=2
     )
     
