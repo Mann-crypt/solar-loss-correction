@@ -93,6 +93,16 @@ Suggested by:<br>
 """,
 unsafe_allow_html=True
 )
+st.markdown("<br>" * 12, unsafe_allow_html=True)
+
+    if st.session_state.get("aeromal_auth", False):
+        if st.button(
+            "🚪 Logout",
+            use_container_width=True,
+            key="logout"
+        ):
+            st.session_state.aeromal_auth = False
+            st.rerun()
 
 page = st.session_state.page
 if page == "Loss Correction":
@@ -2029,10 +2039,6 @@ elif page == "Aeromal":
 
     # ---------------- Aeromal Code ----------------
     from scipy.signal import savgol_filter
-    if st.sidebar.button("🚪 Logout Aeromal"):
-        st.session_state.aeromal_auth = False
-        st.rerun()
-    st.title("Aeromal mai dekhleta hu!! Aap Dream11 pr team banao 🛫")
     
     # ---------------- Input ----------------
     
