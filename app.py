@@ -2172,16 +2172,10 @@ elif page == "Aeromal":
                     "Window Length",
                     5,
                     31,
-                    7,
+                    11,
                     step=2
                 )
             # ---------------- Smooth Profile ----------------
-    
-            s = savgol_filter(
-                ap,
-                window_length=window_length,
-                polyorder=3
-            )
     
             def solar_cap_curve(
                 y,
@@ -2434,21 +2428,21 @@ elif page == "Aeromal":
                 x=np.arange(96),
                 y=ap,
                 name="Generation",
-                line=dict(width=2)
+                line=dict(width=3)
             ))
             
             fig.add_trace(go.Scatter(
                 x=np.arange(96),
                 y=Final_Smooth,
                 name="Profile",
-                line=dict(width=4)
+                line=dict(width=3)
             ))
             
             fig.add_trace(go.Scatter(
                 x=np.arange(96),
                 y=Final_Smooth_Sym,
                 name="Sym Profile",
-                line=dict(width=4)
+                line=dict(width=3)
             ))
             
             st.plotly_chart(fig, use_container_width=True)
