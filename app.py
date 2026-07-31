@@ -2065,28 +2065,77 @@ elif page == "Aeromal":
     if "aeromal_mode" not in st.session_state:
         st.session_state.aeromal_mode = "No Curtailment"
     
-    st.markdown("""
+    import streamlit.components.v1 as components
+
+    mode = components.html(
+    """
+    <!DOCTYPE html>
+    <html>
+    <head>
     <style>
-    
-    div[data-testid="stToggle"]{
-        padding:15px;
-        border-radius:12px;
-        background:#111827;
+    .container{
+        width:100%;
+        display:flex;
+        border-radius:16px;
+        overflow:hidden;
+        border:2px solid #2196F3;
+        font-family:sans-serif;
     }
     
-    div[data-testid="stToggle"] label{
-        font-size:24px !important;
-        font-weight:700 !important;
+    .option{
+        flex:1;
+        padding:18px;
+        text-align:center;
+        font-size:22px;
+        font-weight:bold;
+        cursor:pointer;
+        transition:.3s;
     }
     
-    div[data-testid="stToggle"] input{
-        transform:scale(1.7);
+    .left{
+        background:#2196F3;
+        color:white;
     }
     
+    .right{
+        background:#f5f5f5;
+        color:#444;
+    }
+    
+    input{display:none;}
+    
+    input:checked + .container .left{
+        background:#2196F3;
+        color:white;
+    }
+    
+    input:checked + .container .right{
+        background:#f5f5f5;
+        color:#444;
+    }
     </style>
-    """, unsafe_allow_html=True)
+    </head>
     
-    curtailment = st.toggle("Aeromal")
+    <body>
+    
+    <input type="checkbox" id="toggle" checked>
+    
+    <label for="toggle">
+    <div class="container">
+        <div class="option left">
+            ⚡ Curtailment
+        </div>
+        <div class="option right">
+            ☀️ No Curtailment
+        </div>
+    </div>
+    </label>
+    
+    </body>
+    </html>
+    """,
+    height=80,
+    )
     if mode == "No Curtailment":
         st.success("☀️ No Curtailment Mode Selected")
         # Curtailment code here
