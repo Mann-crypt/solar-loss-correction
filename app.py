@@ -2564,13 +2564,13 @@ elif page == "Aeromal":
         
         s = savgol_filter(
             ap,
-            window_length=7,
-            polyorder=2
+            window_length=11,
+            polyorder=3
         )
         
         sym = savgol_filter(
             sym,
-            window_length=7,
+            window_length=11,
             polyorder=3
         )
         
