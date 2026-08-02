@@ -2165,7 +2165,7 @@ elif page == "Aeromal":
             
                 peak_cap = st.number_input(
                     "Peak Cap",
-                    value=200,
+                    value=np.max(power),
                     step=1
                 )
             
