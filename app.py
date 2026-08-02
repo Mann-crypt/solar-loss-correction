@@ -2036,6 +2036,7 @@ elif page == "RT Correction":
     )
 
 elif page == "Aeromal":
+    st.title("Kaha hai Aeromal ka khauf?!!")
     if "aeromal_auth" not in st.session_state:
         st.session_state.aeromal_auth = False
 
