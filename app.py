@@ -2120,13 +2120,6 @@ elif page == "Aeromal":
     )
 
     if curtailment:
-        if power.isna().all():
-            st.info("👆 Enter or paste Power data to begin.")
-            st.stop()
-        
-        power = power.fillna(0).to_numpy()
-        
-        st.session_state.cam_input = edited_df.copy()
         
         # ---------------- Validation ----------------
         
