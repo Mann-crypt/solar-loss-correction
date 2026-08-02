@@ -2036,7 +2036,6 @@ elif page == "RT Correction":
     )
 
 elif page == "Aeromal":
-    st.title("Kaha hai Aeromal ka khauf?!!")
     if "aeromal_auth" not in st.session_state:
         st.session_state.aeromal_auth = False
 
@@ -2061,6 +2060,7 @@ elif page == "Aeromal":
 
     # ---------------- Aeromal Code ----------------
     from scipy.signal import savgol_filter
+    st.title("Kaha hai Aeromal ka khauf?!!")
     
     # Initialize
     if "aeromal_mode" not in st.session_state:
