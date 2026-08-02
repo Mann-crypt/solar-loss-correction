@@ -2064,6 +2064,37 @@ elif page == "Aeromal":
     # Initialize
     if "aeromal_mode" not in st.session_state:
         st.session_state.aeromal_mode = "No Curtailment"
+
+    if "cam_input" not in st.session_state:
+        st.session_state.cam_input = pd.DataFrame({
+            "Power": np.zeros(96)
+        })
+    
+    edited_df = st.data_editor(
+        st.session_state.cam_input,
+        key="cam_editor",
+        use_container_width=True,
+        hide_index=True,
+        num_rows="dynamic"
+    )
+    
+    st.session_state.cam_input = edited_df.copy()
+    
+    # ---------------- Validation ----------------
+    
+    power = pd.to_numeric(
+        edited_df.iloc[:,0],
+        errors="coerce"
+    ).fillna(0).to_numpy()
+    
+    if len(power) == 0:
+        st.stop()
+    
+    if len(power) % 96 != 0:
+        st.error("Number of rows must be divisible by 96.")
+        st.stop()
+    
+    days = len(power) // 96
     
     st.markdown("""
     <style>
@@ -2089,23 +2120,6 @@ elif page == "Aeromal":
     )
 
     if curtailment:
-        if "cam_input" not in st.session_state:
-            st.session_state.cam_input = pd.DataFrame({
-                "Power": [None] * 96
-            })
-        
-        edited_df = st.data_editor(
-            st.session_state.cam_input,
-            key="cam_editor",
-            use_container_width=True,
-            hide_index=True,
-            num_rows="dynamic"
-        )
-        power = pd.to_numeric(
-            edited_df["Power"],
-            errors="coerce"
-        )
-        
         if power.isna().all():
             st.info("👆 Enter or paste Power data to begin.")
             st.stop()
@@ -2459,36 +2473,6 @@ elif page == "Aeromal":
             st.warning("Please enter Power values to continue.")
 
     else:
-        if "cam_input" not in st.session_state:
-            st.session_state.cam_input = pd.DataFrame({
-                "Power": np.zeros(96)
-            })
-        
-        edited_df = st.data_editor(
-            st.session_state.cam_input,
-            key="cam_editor",
-            use_container_width=True,
-            hide_index=True,
-            num_rows="dynamic"
-        )
-        
-        st.session_state.cam_input = edited_df.copy()
-        
-        # ---------------- Validation ----------------
-        
-        power = pd.to_numeric(
-            edited_df.iloc[:,0],
-            errors="coerce"
-        ).fillna(0).to_numpy()
-        
-        if len(power) == 0:
-            st.stop()
-        
-        if len(power) % 96 != 0:
-            st.error("Number of rows must be divisible by 96.")
-            st.stop()
-        
-        days = len(power) // 96
         
         # ---------------- Controls ----------------
         
