@@ -30,7 +30,7 @@ resetTimer();
 </script>
 """, height=0)
 
-st.set_page_config(page_title="Solar Suite", layout="wide", page_icon="https://github.com/Mann-crypt/solar-loss-correction/blob/main/initial-monogram-letter-m-logo-260nw-2149169739.webp?raw=true")
+st.set_page_config(page_title="Solar Suite", layout="wide")
 
 import streamlit as st
 
