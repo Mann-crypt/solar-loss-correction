@@ -18,7 +18,7 @@ function resetTimer(){
     clearTimeout(timer);
     timer = setTimeout(()=>{
         window.location.reload();
-    },120000); // 2 minutes
+    },600000); // 10 minutes
 }
 
 ["mousemove","mousedown","keydown","scroll","touchstart"].forEach(e=>{
