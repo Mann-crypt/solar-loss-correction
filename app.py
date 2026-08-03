@@ -475,10 +475,10 @@ if page == "Loss Correction":
                     template="plotly_white",
                     height=500,
                     hovermode="x unified",
-                    #xaxis=dict(
-                        #title="15 Minute Block",
-                        #dtick=4
-                    #),
+                    xaxis=dict(
+                        title="15 Minute Block",
+                        dtick=4
+                    ),
                     yaxis=dict(
                         title="Power (MW)"
                     ),
@@ -1061,10 +1061,10 @@ if page == "Loss Correction":
                         template="plotly_white",
                         height=500,
                         hovermode="x unified",
-                        #xaxis=dict(
-                            #title="15 Minute Block",
-                            #dtick=4
-                        #),
+                        xaxis=dict(
+                            title="15 Minute Block",
+                            dtick=4
+                        ),
                         yaxis=dict(
                             title="Power (MW)"
                         ),
@@ -1242,10 +1242,10 @@ if page == "Loss Correction":
                     template="plotly_white",
                     height=500,
                     hovermode="x unified",
-                    #xaxis=dict(
-                        #title="15 Minute Block",
-                        #dtick=4
-                    #),
+                    xaxis=dict(
+                        title="15 Minute Block",
+                        dtick=4
+                    ),
                     yaxis=dict(
                         title="Power (MW)"
                     ),
@@ -1757,10 +1757,10 @@ if page == "Loss Correction":
                         template="plotly_white",
                         height=500,
                         hovermode="x unified",
-                        #xaxis=dict(
-                            #title="15 Minute Block",
-                            #dtick=4
-                        #),
+                        xaxis=dict(
+                            title="15 Minute Block",
+                            dtick=4
+                        ),
                         yaxis=dict(
                             title="Power (MW)"
                         ),
