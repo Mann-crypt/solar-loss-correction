@@ -771,7 +771,7 @@ if page == "Loss Correction":
                     (0, 10),      # DHI (%)
                     (0, 30),     # GHI Starting Block
                     (65, 80),     # GHI Ending Block
-                    (47, 53),     # GHI Max Block
+                    (44, 60),     # GHI Max Block
                     (0, 70),     # Tracking East Limit
                     (0, 70)      # Tracking West Limit
                 ]
@@ -1474,7 +1474,7 @@ if page == "Loss Correction":
                     (0, 10),      # DHI (%)
                     (0, 30),     # GHI Starting Block
                     (65, 80),     # GHI Ending Block
-                    (47, 53),     # GHI Max Block
+                    (44, 60),     # GHI Max Block
                     (0, 70),     # Tracking East Limit
                     (0, 70)      # Tracking West Limit
                 ]
