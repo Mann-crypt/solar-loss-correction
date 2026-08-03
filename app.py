@@ -769,11 +769,11 @@ if page == "Loss Correction":
                 
                 bounds = [
                     (0, 10),      # DHI (%)
-                    (10, 30),     # GHI Starting Block
+                    (0, 30),     # GHI Starting Block
                     (65, 80),     # GHI Ending Block
                     (47, 53),     # GHI Max Block
-                    (10, 70),     # Tracking East Limit
-                    (10, 70)      # Tracking West Limit
+                    (0, 70),     # Tracking East Limit
+                    (0, 70)      # Tracking West Limit
                 ]
                 
                 # ------------------ Optimization ------------------
@@ -1472,11 +1472,11 @@ if page == "Loss Correction":
         
                 bounds = [
                     (0, 10),      # DHI (%)
-                    (10, 30),     # GHI Starting Block
+                    (0, 30),     # GHI Starting Block
                     (65, 80),     # GHI Ending Block
                     (47, 53),     # GHI Max Block
-                    (10, 70),     # Tracking East Limit
-                    (10, 70)      # Tracking West Limit
+                    (0, 70),     # Tracking East Limit
+                    (0, 70)      # Tracking West Limit
                 ]
         
                 # ------------------ Optimization ------------------
