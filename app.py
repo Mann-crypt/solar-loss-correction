@@ -18,7 +18,7 @@ function resetTimer(){
     clearTimeout(timer);
     timer = setTimeout(()=>{
         window.location.reload();
-    },120000); // 5 minutes
+    },120000); // 2 minutes
 }
 
 ["mousemove","mousedown","keydown","scroll","touchstart"].forEach(e=>{
@@ -30,7 +30,7 @@ resetTimer();
 </script>
 """, height=0)
 
-st.set_page_config(page_title="Solar Suite", layout="wide")
+st.set_page_config(page_title="Solar Suite", layout="wide", page_icon="https://github.com/Mann-crypt/solar-loss-correction/blob/main/initial-monogram-letter-m-logo-260nw-2149169739.webp?raw=true")
 
 import streamlit as st
 
