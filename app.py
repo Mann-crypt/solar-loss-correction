@@ -63,7 +63,7 @@ font-weight:800;'>
 </h1>
 
 <p style='text-align:center;color:gray;font-size:14px'>
-Loss Correction Platform
+Forecast Correction Platform
 </p>
 """, unsafe_allow_html=True)
 
