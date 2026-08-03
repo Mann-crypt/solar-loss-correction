@@ -2,6 +2,18 @@
 
 import numpy as np
 
+def apply_daylight_mask(actual, predicted, threshold=0):
+    """
+    Returns actual and predicted values where actual > threshold.
+    """
+
+    actual = np.asarray(actual, dtype=float)
+    predicted = np.asarray(predicted, dtype=float)
+
+    mask = actual > threshold
+
+    return actual[mask], predicted[mask]
+
 
 def mae(actual, predicted):
     """
