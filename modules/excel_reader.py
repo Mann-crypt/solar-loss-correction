@@ -1,3 +1,6 @@
+import pandas as pd
+import numpy as np
+
 def excel_reader(uploaded_file):
     """
     Read and clean all required sheets.
