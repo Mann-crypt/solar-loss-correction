@@ -3,8 +3,8 @@ import numpy as np
 
 def excel_reader(uploaded_file):
     """
-    Read and clean all required sheets.
-    Returns a dictionary of cleaned dataframes.
+    #Read and clean all required sheets.
+    #Returns a dictionary of cleaned dataframes.
     """
 
     xls = pd.ExcelFile(uploaded_file)
