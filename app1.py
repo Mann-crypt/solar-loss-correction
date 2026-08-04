@@ -1,10 +1,15 @@
 import streamlit as st
 
-from pages.loss_correction import show_loss_correction
-from pages.rt_correction import show_rt_correction
-from pages.aeromal import show_aeromal
+from screens.loss_correction import show_loss_correction
+from screens.rt_correction import show_rt_correction
+from screens.aeromal import show_aeromal
 
-st.set_page_config(page_title="Solar Suite", layout="wide")
+st.set_page_config(
+    page_title="Solar Suite",
+    layout="wide"
+)
+
+# ---------- Sidebar Header ----------
 
 st.sidebar.markdown("""
 <h1 style='text-align:center;
@@ -23,26 +28,33 @@ Forecast Correction Platform
 
 st.sidebar.divider()
 
+# ---------- Session State ----------
+
 if "page" not in st.session_state:
     st.session_state.page = "Loss Correction"
 
 if "aeromal_auth" not in st.session_state:
     st.session_state.aeromal_auth = False
 
-pages = {
+# ---------- Navigation ----------
+
+navigation = {
     "⛅ Loss Correction": "Loss Correction",
     "⏰ RT Correction": "RT Correction",
     "🐱‍🏍 Aeromal": "Aeromal"
 }
 
-for label, page in pages.items():
+for label, page_name in navigation.items():
+
     if st.sidebar.button(
         label,
         use_container_width=True
     ):
-        st.session_state.page = page
+        st.session_state.page = page_name
 
 st.sidebar.divider()
+
+# ---------- Credits ----------
 
 st.sidebar.markdown("""
 <div style='text-align:center;color:gray;font-size:13px'>
@@ -66,9 +78,11 @@ Suggested by<br>
 </div>
 """, unsafe_allow_html=True)
 
+# ---------- Logout ----------
+
 if st.session_state.aeromal_auth:
 
-    st.sidebar.markdown("---")
+    st.sidebar.divider()
 
     if st.sidebar.button(
         "🚪 Logout",
@@ -76,6 +90,8 @@ if st.session_state.aeromal_auth:
     ):
         st.session_state.aeromal_auth = False
         st.rerun()
+
+# ---------- Routing ----------
 
 page = st.session_state.page
 
