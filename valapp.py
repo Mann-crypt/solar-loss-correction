@@ -129,7 +129,8 @@ def find_date_column(df):
 
 def find_pairs(df):
 
-    pairs = {}
+    p_columns = []
+    x_columns = []
 
     for col in df.columns:
 
@@ -139,20 +140,84 @@ def find_pairs(df):
         if col.upper().startswith("DEV"):
             continue
 
-        # Find PN12 / XN12 / PE10 / XE10
-        match = re.search(
-            r'([PX])([A-Z]\d{2})',
-            col
+        # -------------------------------------------------
+        # Find P followed by letters/numbers
+        # Examples:
+        # PN12
+        # PE10
+        # PSD00
+        # -------------------------------------------------
+
+        p_match = re.search(
+            r'P([A-Z]+\d+)',
+            col,
+            re.IGNORECASE
         )
 
-        if match:
+        # -------------------------------------------------
+        # Find X followed by letters/numbers
+        # Examples:
+        # XN12
+        # XE10
+        # XSD0
+        # -------------------------------------------------
 
-            side = match.group(1)
-            key = match.group(2)
+        x_match = re.search(
+            r'X([A-Z]+\d+)',
+            col,
+            re.IGNORECASE
+        )
 
-            pairs.setdefault(key, {})
-            pairs[key].setdefault(side, [])
-            pairs[key][side].append(col)
+        if p_match:
+            p_identifier = p_match.group(1).upper()
+
+            p_columns.append(
+                (col, p_identifier)
+            )
+
+        if x_match:
+            x_identifier = x_match.group(1).upper()
+
+            x_columns.append(
+                (col, x_identifier)
+            )
+
+
+    # -----------------------------------------------------
+    # Match P and X based on common identifier
+    # -----------------------------------------------------
+
+    pairs = []
+
+    for p_col, p_id in p_columns:
+
+        for x_col, x_id in x_columns:
+
+            # Exact match
+            if p_id == x_id:
+
+                pairs.append(
+                    (p_id, p_col, x_col)
+                )
+
+            # Handle cases such as:
+            # PSD00 ↔ XSD0
+            #
+            # Common identifier = SD0
+            elif (
+                p_id.startswith(x_id)
+                or x_id.startswith(p_id)
+            ):
+
+                common_id = (
+                    x_id
+                    if len(x_id) <= len(p_id)
+                    else p_id
+                )
+
+                pairs.append(
+                    (common_id, p_col, x_col)
+                )
 
     return pairs
 
