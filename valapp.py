@@ -16,44 +16,23 @@ st.set_page_config(
 
 
 # =========================================================
-# CUSTOM CSS
+# CSS
 # =========================================================
 
 st.markdown("""
 <style>
 
-    .main-title {
-        font-size: 32px;
-        font-weight: 700;
-        margin-bottom: 5px;
-    }
+.main-title {
+    font-size: 32px;
+    font-weight: 700;
+    margin-bottom: 5px;
+}
 
-    .sub-title {
-        color: #666;
-        font-size: 16px;
-        margin-bottom: 25px;
-    }
-
-    .metric-card {
-        padding: 15px;
-        border-radius: 10px;
-        background-color: #f7f7f7;
-        border: 1px solid #e5e5e5;
-    }
-
-    .success-box {
-        padding: 12px;
-        border-radius: 8px;
-        background-color: #eaf7ed;
-        border: 1px solid #b7dfc0;
-    }
-
-    .error-box {
-        padding: 12px;
-        border-radius: 8px;
-        background-color: #fdecec;
-        border: 1px solid #efb5b5;
-    }
+.sub-title {
+    color: #666;
+    font-size: 16px;
+    margin-bottom: 25px;
+}
 
 </style>
 """, unsafe_allow_html=True)
@@ -70,7 +49,7 @@ st.markdown(
 
 st.markdown(
     '<div class="sub-title">'
-    'Upload your CSV or Excel file to automatically compare P and X columns.'
+    'Upload a CSV or Excel file to automatically compare P and X columns.'
     '</div>',
     unsafe_allow_html=True
 )
@@ -90,6 +69,39 @@ uploaded_file = st.file_uploader(
 # FUNCTIONS
 # =========================================================
 
+def make_columns_unique(df):
+
+    """
+    Makes duplicate column names unique.
+
+    Example:
+    A, A, B
+    becomes:
+    A, A_1, B
+    """
+
+    counts = {}
+    new_columns = []
+
+    for col in df.columns:
+
+        col = str(col)
+
+        if col not in counts:
+            counts[col] = 0
+            new_columns.append(col)
+
+        else:
+            counts[col] += 1
+            new_columns.append(
+                f"{col}_{counts[col]}"
+            )
+
+    df.columns = new_columns
+
+    return df
+
+
 def load_file(uploaded_file):
 
     if uploaded_file.name.lower().endswith(".csv"):
@@ -100,13 +112,15 @@ def load_file(uploaded_file):
 
 def find_date_column(df):
 
-    # First try exact Date
+    # Exact Date
     for col in df.columns:
+
         if str(col).strip().lower() == "date":
             return col
 
-    # Then look for columns containing date
+    # Date somewhere in column name
     for col in df.columns:
+
         if "date" in str(col).lower():
             return col
 
@@ -119,19 +133,17 @@ def find_pairs(df):
 
     for col in df.columns:
 
-        col_str = str(col)
+        col = str(col)
 
         # Ignore DEV columns
-        if col_str.upper().startswith("DEV"):
+        if col.upper().startswith("DEV"):
             continue
 
-        # Find P/X + identifier
-        # Examples:
-        # PN12
-        # XN12
-        # PE10
-        # XE10
-        match = re.search(r'([PX])([A-Z]\d{2})', col_str)
+        # Find PN12 / XN12 / PE10 / XE10
+        match = re.search(
+            r'([PX])([A-Z]\d{2})',
+            col
+        )
 
         if match:
 
@@ -149,8 +161,8 @@ def compare_data(df):
 
     pairs = find_pairs(df)
 
+    report = []
     result_columns = []
-    pair_report = []
 
     for key, sides in pairs.items():
 
@@ -166,78 +178,106 @@ def compare_data(df):
 
                 result_col = f"{key}_Result"
 
-                comparison = df[p_col].eq(df[x_col])
+                comparison = df[p_col].eq(
+                    df[x_col]
+                )
 
-                # Add result to dataframe
+                # If multiple P/X columns have same key,
+                # don't overwrite previous result.
+                if result_col in df.columns:
+
+                    result_col = (
+                        f"{key}_"
+                        f"{len(result_columns) + 1}_Result"
+                    )
+
                 df[result_col] = comparison
 
-                # Statistics
+                result_columns.append(
+                    result_col
+                )
+
                 total_blocks = len(comparison)
-                different_blocks = (~comparison).sum()
-                identical_blocks = comparison.sum()
+                identical_blocks = int(
+                    comparison.sum()
+                )
+                different_blocks = int(
+                    (~comparison).sum()
+                )
 
-                is_identical = different_blocks == 0
-
-                pair_report.append({
+                report.append({
                     "Identifier": key,
                     "P Column": p_col,
                     "X Column": x_col,
                     "Total Blocks": total_blocks,
                     "Identical Blocks": identical_blocks,
                     "Different Blocks": different_blocks,
-                    "100% Identical": "Yes" if is_identical else "No"
+                    "100% Identical":
+                        "Yes"
+                        if different_blocks == 0
+                        else "No"
                 })
 
-                result_columns.append(result_col)
+    return (
+        df,
+        pd.DataFrame(report),
+        result_columns
+    )
 
-    report_df = pd.DataFrame(pair_report)
 
-    return df, report_df
+def highlight_mismatch(
+    row,
+    result_columns,
+    pair_lookup
+):
 
-
-def highlight_mismatch(row, result_columns):
-
-    styles = pd.Series("", index=row.index)
+    styles = pd.Series(
+        "",
+        index=row.index
+    )
 
     for result_col in result_columns:
 
         if result_col not in row.index:
             continue
 
-        key = result_col.replace("_Result", "")
+        is_different = (
+            row[result_col] == False
+        )
 
-        # Find corresponding P/X columns from the row
-        for col in row.index:
-
-            if col == result_col:
-                continue
-
-            col_str = str(col)
-
-            # If this column contains the corresponding P/X identifier
-            if re.search(
-                rf'[PX]{re.escape(key)}',
-                col_str
-            ):
-
-                if row[result_col] is False or row[result_col] == False:
-                    styles[col] = (
-                        "background-color: #ffcccc; "
-                        "color: #9c0006;"
-                    )
-
-        # Highlight result itself
-        if row[result_col] is False or row[result_col] == False:
+        if not is_different:
             styles[result_col] = (
-                "background-color: #ff9999; "
-                "color: #7f0000; "
+                "background-color: #d9f2d9;"
+                "color: #176b17;"
                 "font-weight: bold;"
             )
-        else:
-            styles[result_col] = (
-                "background-color: #d9f2d9; "
-                "color: #176b17;"
-            )
+
+            continue
+
+        styles[result_col] = (
+            "background-color: #ff9999;"
+            "color: #7f0000;"
+            "font-weight: bold;"
+        )
+
+        # Highlight corresponding P/X columns
+        if result_col in pair_lookup:
+
+            p_col, x_col = pair_lookup[
+                result_col
+            ]
+
+            if p_col in styles.index:
+                styles[p_col] = (
+                    "background-color: #ffcccc;"
+                    "color: #9c0006;"
+                )
+
+            if x_col in styles.index:
+                styles[x_col] = (
+                    "background-color: #ffcccc;"
+                    "color: #9c0006;"
+                )
 
     return styles
 
@@ -253,8 +293,7 @@ def convert_to_excel(df):
 
         df.to_excel(
             writer,
-            sheet_name="Comparison Result",
-            index=True
+            sheet_name="Comparison Result"
         )
 
     output.seek(0)
@@ -263,7 +302,7 @@ def convert_to_excel(df):
 
 
 # =========================================================
-# MAIN APPLICATION
+# MAIN
 # =========================================================
 
 if uploaded_file:
@@ -271,20 +310,46 @@ if uploaded_file:
     try:
 
         # -------------------------------------------------
-        # Load file
+        # LOAD
         # -------------------------------------------------
 
         with st.spinner("Reading file..."):
 
-            df = load_file(uploaded_file)
+            df = load_file(
+                uploaded_file
+            )
+
+        # -------------------------------------------------
+        # FIX DUPLICATE COLUMN NAMES
+        # -------------------------------------------------
+
+        original_columns = len(
+            df.columns
+        )
+
+        duplicate_columns = (
+            df.columns.duplicated().sum()
+        )
+
+        if duplicate_columns > 0:
+
+            st.warning(
+                f"{duplicate_columns} duplicate "
+                "column name(s) detected. "
+                "They were automatically renamed "
+                "to keep the comparison reliable."
+            )
+
+            df = make_columns_unique(df)
+
 
         st.success(
-            f"File loaded successfully: {uploaded_file.name}"
+            f"File loaded: {uploaded_file.name}"
         )
 
 
         # -------------------------------------------------
-        # Basic information
+        # DATE
         # -------------------------------------------------
 
         date_col = find_date_column(df)
@@ -292,130 +357,160 @@ if uploaded_file:
         if date_col is None:
 
             st.error(
-                "No Date column was found in the uploaded file."
+                "No Date column was found."
             )
 
             st.stop()
 
 
-        # Convert Date
         df[date_col] = pd.to_datetime(
             df[date_col],
             errors="coerce"
         )
 
-        # Set Date as index
-        df = df.set_index(date_col)
+        # IMPORTANT:
+        # Do NOT use Date as index for styling.
+        # Keep it as a normal unique column.
+
+        # -------------------------------------------------
+        # COMPARISON
+        # -------------------------------------------------
+
+        with st.spinner(
+            "Detecting P-X pairs..."
+        ):
+
+            result_df, report_df, result_columns = (
+                compare_data(df)
+            )
 
 
         # -------------------------------------------------
-        # Run comparison
+        # PAIR LOOKUP
         # -------------------------------------------------
 
-        with st.spinner("Detecting P-X pairs and comparing data..."):
+        pair_lookup = {}
 
-            result_df, report_df = compare_data(df)
+        for _, row in report_df.iterrows():
+
+            result_col = f"{row['Identifier']}_Result"
+
+            # Handle duplicate result names
+            matching_results = [
+                c for c in result_columns
+                if c.startswith(
+                    f"{row['Identifier']}_"
+                )
+                and c.endswith("_Result")
+            ]
+
+            for result_name in matching_results:
+
+                if result_name not in pair_lookup:
+
+                    pair_lookup[result_name] = (
+                        row["P Column"],
+                        row["X Column"]
+                    )
+
+                    break
 
 
         # -------------------------------------------------
-        # Result columns
+        # SUMMARY
         # -------------------------------------------------
 
-        result_columns = [
-            col for col in result_df.columns
-            if str(col).endswith("_Result")
-        ]
+        st.markdown(
+            "## Comparison Summary"
+        )
 
+        total_pairs = len(
+            report_df
+        )
 
-        # -------------------------------------------------
-        # Summary
-        # -------------------------------------------------
+        total_blocks = len(
+            result_df
+        )
 
-        st.markdown("## Comparison Summary")
+        if total_pairs:
 
-        total_columns = len(result_df.columns)
-        total_pairs = len(report_df)
+            total_different = int(
+                report_df[
+                    "Different Blocks"
+                ].sum()
+            )
 
-        if total_pairs > 0:
-
-            total_different = report_df[
-                "Different Blocks"
-            ].sum()
-
-            total_identical_pairs = (
-                report_df["100% Identical"] == "Yes"
-            ).sum()
+            identical_pairs = int(
+                (
+                    report_df[
+                        "100% Identical"
+                    ] == "Yes"
+                ).sum()
+            )
 
         else:
 
             total_different = 0
-            total_identical_pairs = 0
+            identical_pairs = 0
 
 
-        col1, col2, col3, col4 = st.columns(4)
+        c1, c2, c3, c4 = st.columns(4)
 
-        with col1:
-            st.metric(
-                "Rows / Blocks",
-                len(result_df)
-            )
+        c1.metric(
+            "Rows / Blocks",
+            total_blocks
+        )
 
-        with col2:
-            st.metric(
-                "P-X Pairs",
-                total_pairs
-            )
+        c2.metric(
+            "P-X Pairs",
+            total_pairs
+        )
 
-        with col3:
-            st.metric(
-                "100% Identical",
-                total_identical_pairs
-            )
+        c3.metric(
+            "100% Identical",
+            identical_pairs
+        )
 
-        with col4:
-            st.metric(
-                "Different Blocks",
-                int(total_different)
-            )
+        c4.metric(
+            "Different Blocks",
+            total_different
+        )
 
 
         # -------------------------------------------------
-        # Overall status
+        # STATUS
         # -------------------------------------------------
 
         if total_pairs == 0:
 
             st.warning(
-                "No matching P-X column pairs were detected."
+                "No matching P-X pairs found."
             )
 
         elif total_different == 0:
 
-            st.markdown(
-                '<div class="success-box">'
-                '<b>✓ All matched P-X columns are 100% identical.</b>'
-                '</div>',
-                unsafe_allow_html=True
+            st.success(
+                "✓ All matched P-X columns are "
+                "100% identical."
             )
 
         else:
 
-            st.markdown(
-                '<div class="error-box">'
-                '<b>⚠ Differences detected.</b> '
-                'See the report and highlighted blocks below.'
-                '</div>',
-                unsafe_allow_html=True
+            st.error(
+                f"⚠ Differences detected in "
+                f"{total_different} blocks."
             )
 
 
         # -------------------------------------------------
-        # Pair report
+        # REPORT
         # -------------------------------------------------
 
         if not report_df.empty:
 
-            st.markdown("## P-X Comparison Report")
+            st.markdown(
+                "## P-X Comparison Report"
+            )
 
             st.dataframe(
                 report_df,
@@ -425,24 +520,32 @@ if uploaded_file:
 
 
         # -------------------------------------------------
-        # Detailed Data
+        # HIGHLIGHTED DATA
         # -------------------------------------------------
 
-        st.markdown("## Detailed Comparison")
+        st.markdown(
+            "## Detailed Comparison"
+        )
 
         if result_columns:
 
             st.caption(
-                "🔴 Red cells indicate P-X mismatches. "
-                "🟢 Green result cells indicate matching values."
+                "🔴 P/X values are highlighted when "
+                "they are different. "
+                "🟢 Result cells indicate matching values."
             )
 
-            styled_df = result_df.style.apply(
-                lambda row: highlight_mismatch(
-                    row,
-                    result_columns
-                ),
-                axis=1
+            styled_df = (
+                result_df.style
+                .apply(
+                    lambda row:
+                    highlight_mismatch(
+                        row,
+                        result_columns,
+                        pair_lookup
+                    ),
+                    axis=1
+                )
             )
 
             st.dataframe(
@@ -454,17 +557,19 @@ if uploaded_file:
         else:
 
             st.info(
-                "No comparison result columns were generated."
+                "No P-X comparison columns generated."
             )
 
 
         # -------------------------------------------------
-        # Show only mismatched blocks
+        # ONLY MISMATCHED BLOCKS
         # -------------------------------------------------
 
         if total_different > 0:
 
-            st.markdown("## Mismatched Blocks")
+            st.markdown(
+                "## Mismatched Blocks"
+            )
 
             mismatch_mask = pd.Series(
                 False,
@@ -482,8 +587,8 @@ if uploaded_file:
             ]
 
             st.write(
-                f"Found **{len(mismatch_df)} blocks** "
-                "with at least one mismatch."
+                f"**{len(mismatch_df)}** "
+                "blocks contain at least one mismatch."
             )
 
             st.dataframe(
@@ -494,15 +599,19 @@ if uploaded_file:
 
 
         # -------------------------------------------------
-        # Download
+        # DOWNLOAD
         # -------------------------------------------------
 
-        st.markdown("## Download")
+        st.markdown(
+            "## Download"
+        )
 
-        excel_file = convert_to_excel(result_df)
+        excel_file = convert_to_excel(
+            result_df
+        )
 
         st.download_button(
-            label="⬇ Download Comparison Result",
+            "⬇ Download Comparison Result",
             data=excel_file,
             file_name="comparison_result.xlsx",
             mime=(
@@ -515,29 +624,29 @@ if uploaded_file:
     except Exception as e:
 
         st.error(
-            f"Something went wrong: {str(e)}"
+            f"Something went wrong: {e}"
         )
+
+        st.exception(e)
+
 
 else:
 
-    # -----------------------------------------------------
-    # Empty state
-    # -----------------------------------------------------
-
     st.info(
-        "Upload a CSV or Excel file above to start the comparison."
+        "Upload a CSV or Excel file above "
+        "to start the comparison."
     )
 
     st.markdown("""
-    ### How it works
+### How it works
 
-    1. Upload your CSV or Excel file.
-    2. The app automatically detects the **Date** column.
-    3. Columns starting with **DEV** are ignored.
-    4. P/X pairs such as `PN12` ↔ `XN12` are detected.
-    5. Each P column is compared with its X column.
-    6. Result columns such as `N12_Result` are added.
-    7. Mismatched blocks are highlighted.
-    8. A detailed comparison report is generated.
-    9. Download the complete result as Excel.
-    """)
+1. Upload a **CSV or Excel** file.
+2. The app detects the **Date** column automatically.
+3. Columns starting with **DEV** are ignored.
+4. P/X patterns such as `PN12 ↔ XN12` are detected.
+5. Matching columns are compared block-by-block.
+6. Result columns such as `N12_Result` are added.
+7. Mismatched P/X values are highlighted.
+8. A detailed mismatch report is generated.
+9. The complete result can be downloaded as Excel.
+""")
