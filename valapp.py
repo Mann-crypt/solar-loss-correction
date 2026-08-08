@@ -469,7 +469,7 @@ if uploaded_file:
             "Detecting P-X pairs..."
         ):
 
-            result_df, report_df, result_columns = (
+            result_df, report_df, result_columns, pair_lookup = (
                 compare_data(df)
             )
 
