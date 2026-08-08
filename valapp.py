@@ -636,17 +636,3 @@ else:
         "Upload a CSV or Excel file above "
         "to start the comparison."
     )
-
-    st.markdown("""
-### How it works
-
-1. Upload a **CSV or Excel** file.
-2. The app detects the **Date** column automatically.
-3. Columns starting with **DEV** are ignored.
-4. P/X patterns such as `PN12 ↔ XN12` are detected.
-5. Matching columns are compared block-by-block.
-6. Result columns such as `N12_Result` are added.
-7. Mismatched P/X values are highlighted.
-8. A detailed mismatch report is generated.
-9. The complete result can be downloaded as Excel.
-""")
