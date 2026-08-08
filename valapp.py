@@ -141,13 +141,9 @@ def find_pairs(df):
             continue
 
         # -------------------------------------------------
-        # Find P followed by letters/numbers
-        # Examples:
-        # PN12
-        # PE10
-        # PSD00
+        # P pattern
+        # PN12, PE10, PSD00, etc.
         # -------------------------------------------------
-
         p_match = re.search(
             r'P([A-Z]+\d+)',
             col,
@@ -155,13 +151,9 @@ def find_pairs(df):
         )
 
         # -------------------------------------------------
-        # Find X followed by letters/numbers
-        # Examples:
-        # XN12
-        # XE10
-        # XSD0
+        # X pattern
+        # XN12, XE10, XSD0, etc.
         # -------------------------------------------------
-
         x_match = re.search(
             r'X([A-Z]+\d+)',
             col,
@@ -169,22 +161,24 @@ def find_pairs(df):
         )
 
         if p_match:
-            p_identifier = p_match.group(1).upper()
+
+            identifier = p_match.group(1).upper()
 
             p_columns.append(
-                (col, p_identifier)
+                (col, identifier)
             )
 
         if x_match:
-            x_identifier = x_match.group(1).upper()
+
+            identifier = x_match.group(1).upper()
 
             x_columns.append(
-                (col, x_identifier)
+                (col, identifier)
             )
 
 
     # -----------------------------------------------------
-    # Match P and X based on common identifier
+    # Match P and X
     # -----------------------------------------------------
 
     pairs = []
@@ -193,25 +187,33 @@ def find_pairs(df):
 
         for x_col, x_id in x_columns:
 
-            # Exact match
+            # Exact identifier
             if p_id == x_id:
 
                 pairs.append(
                     (p_id, p_col, x_col)
                 )
 
-            # Handle cases such as:
+                continue
+
+
+            # Handle:
             # PSD00 ↔ XSD0
             #
-            # Common identifier = SD0
-            elif (
+            # PSD00
+            #  └── SD0
+            #
+            # XSD0
+            #  └── SD0
+            #
+            if (
                 p_id.startswith(x_id)
                 or x_id.startswith(p_id)
             ):
 
                 common_id = (
                     x_id
-                    if len(x_id) <= len(p_id)
+                    if len(x_id) < len(p_id)
                     else p_id
                 )
 
@@ -228,67 +230,89 @@ def compare_data(df):
 
     report = []
     result_columns = []
+    pair_lookup = {}
 
-    for key, sides in pairs.items():
+    for key, p_col, x_col in pairs:
 
-        if "P" not in sides or "X" not in sides:
-            continue
+        # -------------------------------------------------
+        # Unique result column
+        # -------------------------------------------------
 
-        p_cols = sides["P"]
-        x_cols = sides["X"]
+        result_col = f"{key}_Result"
 
-        for p_col in p_cols:
+        if result_col in df.columns:
 
-            for x_col in x_cols:
+            counter = 2
 
-                result_col = f"{key}_Result"
+            while f"{key}_{counter}_Result" in df.columns:
+                counter += 1
 
-                comparison = df[p_col].eq(
-                    df[x_col]
-                )
+            result_col = f"{key}_{counter}_Result"
 
-                # If multiple P/X columns have same key,
-                # don't overwrite previous result.
-                if result_col in df.columns:
 
-                    result_col = (
-                        f"{key}_"
-                        f"{len(result_columns) + 1}_Result"
-                    )
+        # -------------------------------------------------
+        # Row-by-row comparison
+        # -------------------------------------------------
 
-                df[result_col] = comparison
+        comparison = df[p_col].eq(
+            df[x_col]
+        )
 
-                result_columns.append(
-                    result_col
-                )
+        # Add result directly to existing dataframe
+        df[result_col] = comparison
 
-                total_blocks = len(comparison)
-                identical_blocks = int(
-                    comparison.sum()
-                )
-                different_blocks = int(
-                    (~comparison).sum()
-                )
+        result_columns.append(
+            result_col
+        )
 
-                report.append({
-                    "Identifier": key,
-                    "P Column": p_col,
-                    "X Column": x_col,
-                    "Total Blocks": total_blocks,
-                    "Identical Blocks": identical_blocks,
-                    "Different Blocks": different_blocks,
-                    "100% Identical":
-                        "Yes"
-                        if different_blocks == 0
-                        else "No"
-                })
+        pair_lookup[result_col] = (
+            p_col,
+            x_col
+        )
+
+
+        # -------------------------------------------------
+        # Statistics
+        # -------------------------------------------------
+
+        total_blocks = len(comparison)
+
+        identical_blocks = int(
+            comparison.sum()
+        )
+
+        different_blocks = int(
+            (~comparison).sum()
+        )
+
+
+        report.append({
+
+            "Identifier": key,
+
+            "P Column": p_col,
+
+            "X Column": x_col,
+
+            "Total Blocks": total_blocks,
+
+            "Identical Blocks": identical_blocks,
+
+            "Different Blocks": different_blocks,
+
+            "100% Identical":
+                "Yes"
+                if different_blocks == 0
+                else "No"
+        })
+
 
     return (
         df,
         pd.DataFrame(report),
-        result_columns
+        result_columns,
+        pair_lookup
     )
-
 
 def highlight_mismatch(
     row,
