@@ -27,7 +27,7 @@ def optimize_generic(
 
     return differential_evolution(
         objective,
-        bounds=bounds,
+        bounds,
         popsize=popsize,
         maxiter=maxiter,
         seed=seed,
@@ -36,7 +36,7 @@ def optimize_generic(
 
 
 # ==========================================================
-# TRACKING LOSS CORRECTION OPTIMIZATION
+# TRACKING LOSS CORRECTION
 # ==========================================================
 
 def optimize_tracking_parameters(
@@ -45,8 +45,7 @@ def optimize_tracking_parameters(
     blocks,
     area_df,
     weight_factors,
-    efficiency_loss=None,
-    bounds=None,
+    bounds,
     maxiter=100,
     popsize=15,
     seed=42,
@@ -57,45 +56,25 @@ def optimize_tracking_parameters(
 
     Optimized parameters:
 
-        DHI
-        GHI Starting Block
-        GHI Ending Block
-        GHI Max Block
-        East Tracking Limit
-        West Tracking Limit
-        Efficiency Loss
+        1. DHI
+        2. GHI Starting Block
+        3. GHI Ending Block
+        4. GHI Max Block
+        5. East Tracking Limit
+        6. West Tracking Limit
+        7. Efficiency Loss
 
-    Parameters
-    ----------
-    efficiency_loss : optional
-        Kept for compatibility with the screen.
-        When Efficiency Loss is included in bounds,
-        the optimizer uses x[6].
+    Works for:
 
-    bounds
-        Expected order:
+        Cluster plants:
+            CL1-GHI ... CL5-GHI
 
-        [
-            (DHI_min, DHI_max),
-            (start_min, start_max),
-            (end_min, end_max),
-            (max_min, max_max),
-            (east_min, east_max),
-            (west_min, west_max),
-            (loss_min, loss_max),
-        ]
-
-    Returns
-    -------
-    dict
-        parameters
-        score
-        weights
-        result
+        Non-cluster plants:
+            Normal GHI from Backend Cal
     """
 
     # ======================================================
-    # CLEAN INPUT
+    # CLEAN INPUTS
     # ======================================================
 
     actual = np.asarray(
@@ -108,105 +87,121 @@ def optimize_tracking_parameters(
         dtype=float,
     )
 
-    # ======================================================
-    # VALIDATION
-    # ======================================================
+    # ------------------------------------------------------
+    # Validate actual
+    # ------------------------------------------------------
 
     if len(actual) != len(blocks):
 
         raise ValueError(
-            "Actual and Blocks must have same length."
+            "Actual and Blocks must have the same length."
         )
 
-    if len(ghi_arrays) == 0:
+    # ------------------------------------------------------
+    # Validate GHI arrays
+    # ------------------------------------------------------
+
+    if not ghi_arrays:
 
         raise ValueError(
             "No GHI arrays supplied."
         )
 
-    for ghi in ghi_arrays:
+    cleaned_ghi_arrays = []
+
+    for i, ghi in enumerate(ghi_arrays):
+
+        ghi = np.asarray(
+            ghi,
+            dtype=float,
+        )
 
         if len(ghi) != len(blocks):
 
             raise ValueError(
-                "GHI array length does not "
-                "match Blocks."
+                f"GHI array {i + 1} length "
+                "does not match Blocks."
             )
 
-    if bounds is None:
-
-        raise ValueError(
-            "Optimization bounds are required."
+        ghi = np.nan_to_num(
+            ghi,
+            nan=0.0,
+            posinf=0.0,
+            neginf=0.0,
         )
+
+        ghi = np.maximum(
+            ghi,
+            0,
+        )
+
+        cleaned_ghi_arrays.append(
+            ghi
+        )
+
+    # ======================================================
+    # VALIDATE BOUNDS
+    # ======================================================
 
     if len(bounds) != 7:
 
         raise ValueError(
             "Tracking optimization requires "
-            "7 parameter bounds: "
-            "DHI, Starting Block, Ending Block, "
-            "Max Block, East Limit, West Limit "
-            "and Efficiency Loss."
+            "exactly 7 parameter bounds."
         )
 
     # ======================================================
-    # DETERMINE PLANT TYPE
-    # ======================================================
-
-    has_cluster = (
-        len(ghi_arrays) > 1
-    )
-
-    # ======================================================
-    # OBJECTIVE FUNCTION
+    # OBJECTIVE
     # ======================================================
 
     def objective(x):
 
         # --------------------------------------------------
-        # PARAMETERS
+        # Convert parameters
         # --------------------------------------------------
 
-        DHI = int(
+        dhi_percent = int(
             round(x[0])
         )
 
-        start = int(
+        ghi_start = int(
             round(x[1])
         )
 
-        end = int(
+        ghi_end = int(
             round(x[2])
         )
 
-        max_block = int(
+        ghi_max = int(
             round(x[3])
         )
 
-        east = int(
+        east_limit = int(
             round(x[4])
         )
 
-        west = int(
+        west_limit = int(
             round(x[5])
         )
 
-        loss = float(
+        efficiency_loss = float(
             x[6]
         )
 
         # --------------------------------------------------
-        # VALIDATE BLOCK CONFIGURATION
+        # Validate GHI configuration
         # --------------------------------------------------
 
         if not (
-            start < max_block < end
+            ghi_start
+            < ghi_max
+            < ghi_end
         ):
 
             return 1e9
 
         # --------------------------------------------------
-        # CALCULATE EFFECTIVE WEIGHTS
+        # Calculate effective weights
         # --------------------------------------------------
 
         try:
@@ -216,12 +211,13 @@ def optimize_tracking_parameters(
 
                     area_df=area_df,
 
-                    efficiency_loss=loss,
+                    efficiency_loss=efficiency_loss,
 
                     weight_factors=weight_factors,
 
-                    has_cluster=has_cluster,
-
+                    has_cluster=(
+                        len(cleaned_ghi_arrays) > 1
+                    ),
                 )
             )
 
@@ -230,17 +226,17 @@ def optimize_tracking_parameters(
             return 1e9
 
         # --------------------------------------------------
-        # VALIDATE WEIGHTS
+        # Validate weights
         # --------------------------------------------------
 
         if len(weights) != len(
-            ghi_arrays
+            cleaned_ghi_arrays
         ):
 
             return 1e9
 
         # --------------------------------------------------
-        # CALCULATE FORECAST
+        # Calculate forecast
         # --------------------------------------------------
 
         try:
@@ -248,24 +244,23 @@ def optimize_tracking_parameters(
             prediction = (
                 calculate_tracking_forecast(
 
-                    ghi_arrays=ghi_arrays,
+                    ghi_arrays=cleaned_ghi_arrays,
 
                     weights=weights,
 
                     blocks=blocks,
 
-                    dhi_percent=DHI,
+                    dhi_percent=dhi_percent,
 
-                    ghi_start=start,
+                    ghi_start=ghi_start,
 
-                    ghi_end=end,
+                    ghi_end=ghi_end,
 
-                    ghi_max=max_block,
+                    ghi_max=ghi_max,
 
-                    east_limit=east,
+                    east_limit=east_limit,
 
-                    west_limit=west,
-
+                    west_limit=west_limit,
                 )
             )
 
@@ -274,12 +269,37 @@ def optimize_tracking_parameters(
             return 1e9
 
         # --------------------------------------------------
-        # DAYLIGHT MASK
+        # Validate prediction
         # --------------------------------------------------
 
-        mask = (
-            actual > 0
+        prediction = np.asarray(
+            prediction,
+            dtype=float,
         )
+
+        if len(prediction) != len(actual):
+
+            return 1e9
+
+        if np.any(
+            ~np.isfinite(prediction)
+        ):
+
+            return 1e9
+
+        # ==================================================
+        # DAYLIGHT MASK
+        # ==================================================
+
+        mask = (
+            np.isfinite(actual)
+            & np.isfinite(prediction)
+            & (actual > 0)
+        )
+
+        if not np.any(mask):
+
+            return 1e9
 
         act = actual[mask]
 
@@ -289,63 +309,58 @@ def optimize_tracking_parameters(
 
             return 1e9
 
-        if act.max() <= 0:
+        actual_peak = act.max()
+
+        actual_energy = act.sum()
+
+        if actual_peak <= 0:
 
             return 1e9
 
-        # --------------------------------------------------
+        if actual_energy <= 0:
+
+            return 1e9
+
+        # ==================================================
         # BLOCK ERROR
-        # --------------------------------------------------
+        # ==================================================
 
         block_error_value = (
-
             np.mean(
                 np.abs(
                     act - pred
                 )
             )
-
-            / act.max()
-
+            / actual_peak
         )
 
-        # --------------------------------------------------
+        # ==================================================
         # PEAK ERROR
-        # --------------------------------------------------
+        # ==================================================
 
         peak_error_value = (
-
             abs(
-                act.max()
+                actual_peak
                 - pred.max()
             )
-
-            / act.max()
-
+            / actual_peak
         )
 
-        # --------------------------------------------------
+        # ==================================================
         # ENERGY ERROR
-        # --------------------------------------------------
-
-        if act.sum() == 0:
-
-            return 1e9
+        # ==================================================
 
         energy_error_value = (
-
             abs(
-                act.sum()
+                actual_energy
                 - pred.sum()
             )
-
-            / act.sum()
-
+            / actual_energy
         )
 
-        # --------------------------------------------------
+        # ==================================================
         # COMBINED SCORE
-        # --------------------------------------------------
+        # ==================================================
 
         score = (
 
@@ -361,21 +376,15 @@ def optimize_tracking_parameters(
 
             0.10
             * energy_error_value
-
         )
 
-        # --------------------------------------------------
-        # VALIDATE SCORE
-        # --------------------------------------------------
-
         if (
-            np.isnan(score)
-            or np.isinf(score)
+            not np.isfinite(score)
         ):
 
             return 1e9
 
-        return score
+        return float(score)
 
     # ======================================================
     # DIFFERENTIAL EVOLUTION
@@ -395,7 +404,7 @@ def optimize_tracking_parameters(
 
         tol=0.001,
 
-        mutation=(0.5, 1),
+        mutation=(0.5, 1.0),
 
         recombination=0.7,
 
@@ -406,7 +415,6 @@ def optimize_tracking_parameters(
         workers=1,
 
         callback=callback,
-
     )
 
     # ======================================================
@@ -415,36 +423,37 @@ def optimize_tracking_parameters(
 
     best = result.x
 
-    best_DHI = int(
+    dhi_percent = int(
         round(best[0])
     )
 
-    best_start = int(
+    ghi_start = int(
         round(best[1])
     )
 
-    best_end = int(
+    ghi_end = int(
         round(best[2])
     )
 
-    best_max = int(
+    ghi_max = int(
         round(best[3])
     )
 
-    best_east = int(
+    east_limit = int(
         round(best[4])
     )
 
-    best_west = int(
+    west_limit = int(
         round(best[5])
     )
 
-    best_loss = float(
+    best_efficiency_loss = float(
         best[6]
     )
 
     # ======================================================
-    # FINAL WEIGHTS
+    # CALCULATE FINAL WEIGHTS
+    # USING BEST EFFICIENCY LOSS
     # ======================================================
 
     final_weights = (
@@ -452,42 +461,44 @@ def optimize_tracking_parameters(
 
             area_df=area_df,
 
-            efficiency_loss=best_loss,
+            efficiency_loss=(
+                best_efficiency_loss
+            ),
 
             weight_factors=weight_factors,
 
-            has_cluster=has_cluster,
-
+            has_cluster=(
+                len(cleaned_ghi_arrays) > 1
+            ),
         )
     )
 
     # ======================================================
-    # FINAL PARAMETERS
+    # PARAMETERS
     # ======================================================
 
     parameters = {
 
         "DHI":
-            best_DHI,
+            dhi_percent,
 
         "Starting Block":
-            best_start,
+            ghi_start,
 
         "Ending Block":
-            best_end,
+            ghi_end,
 
         "Max Block":
-            best_max,
+            ghi_max,
 
         "East Limit":
-            best_east,
+            east_limit,
 
         "West Limit":
-            best_west,
+            west_limit,
 
         "Efficiency Loss":
-            best_loss,
-
+            best_efficiency_loss,
     }
 
     # ======================================================
@@ -507,5 +518,4 @@ def optimize_tracking_parameters(
 
         "result":
             result,
-
     }
