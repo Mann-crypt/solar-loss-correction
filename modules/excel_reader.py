@@ -242,7 +242,7 @@ def read_tracking_input(uploaded_file):
     """
     Read all inputs required for Tracking Loss Correction.
 
-    Supports two workbook structures:
+    Supports:
 
     1. Cluster plant
        - CL1-GHI
@@ -252,11 +252,12 @@ def read_tracking_input(uploaded_file):
        - CL5-GHI
 
     2. Non-cluster plant
-       - Normal GHI Forecast from Fixed sheet
+       - GHI_Forecast from Fixed sheet
 
-    Returns
-    -------
-    dict
+    Actual generation:
+       - Always read from Fixed sheet
+
+    Returns:
         area
         cluster_data
         has_cluster
@@ -264,6 +265,7 @@ def read_tracking_input(uploaded_file):
         backend
         tracking
         ghi_arrays
+        actual
         area_weights
     """
 
@@ -295,10 +297,12 @@ def read_tracking_input(uploaded_file):
 
         if len(null_indices) > 0:
 
+            first_null_position = area.index.get_loc(
+                null_indices[0]
+            )
+
             area = area.iloc[
-                :area.index.get_loc(
-                    null_indices[0]
-                )
+                :first_null_position
             ].copy()
 
     # ==========================================================
@@ -315,6 +319,11 @@ def read_tracking_input(uploaded_file):
         area_eff_full.columns
         .astype(str)
         .str.strip()
+        .str.replace(
+            "\n",
+            " ",
+            regex=False
+        )
     )
 
     # ==========================================================
@@ -335,15 +344,18 @@ def read_tracking_input(uploaded_file):
         if col in area_eff_full.columns
     ]
 
-    # ----------------------------------------------------------
-    # Cluster plant
-    # ----------------------------------------------------------
-
+    # A plant is considered cluster only when
+    # all 5 cluster GHI columns are available.
     has_cluster = (
         len(cluster_columns_found) == 5
     )
 
     cluster_data = None
+    ghi_arrays = []
+
+    # ==========================================================
+    # CLUSTER PLANT
+    # ==========================================================
 
     if has_cluster:
 
@@ -354,7 +366,6 @@ def read_tracking_input(uploaded_file):
             .copy()
         )
 
-        # Convert to numeric
         for col in expected_cluster_columns:
 
             cluster_data[col] = pd.to_numeric(
@@ -362,20 +373,17 @@ def read_tracking_input(uploaded_file):
                 errors="coerce"
             ).fillna(0)
 
-        # Make sure we only use 96 blocks
         cluster_data = (
             cluster_data
             .iloc[:96]
             .reset_index(drop=True)
         )
 
-        # ------------------------------------------------------
-        # GHI arrays for calculation
-        # ------------------------------------------------------
-
+        # Create five GHI arrays
         ghi_arrays = [
-            cluster_data[col]
-            .to_numpy(dtype=float)
+            cluster_data[col].to_numpy(
+                dtype=float
+            )
             for col in expected_cluster_columns
         ]
 
@@ -384,10 +392,6 @@ def read_tracking_input(uploaded_file):
     # ==========================================================
 
     else:
-
-        # ------------------------------------------------------
-        # Read Fixed sheet
-        # ------------------------------------------------------
 
         if "Fixed" not in xls.sheet_names:
 
@@ -413,10 +417,7 @@ def read_tracking_input(uploaded_file):
             )
         )
 
-        # ------------------------------------------------------
-        # Find GHI column
-        # ------------------------------------------------------
-
+        # Possible names for normal GHI
         possible_ghi_columns = [
             "GHI_Forecast",
             "GHI Forecast",
@@ -436,8 +437,8 @@ def read_tracking_input(uploaded_file):
         if ghi_column is None:
 
             raise ValueError(
-                "Non-cluster workbook does not contain "
-                "a GHI forecast column in the Fixed sheet."
+                "Could not find GHI forecast column "
+                "in Fixed sheet."
             )
 
         ghi = pd.to_numeric(
@@ -459,26 +460,100 @@ def read_tracking_input(uploaded_file):
 
         ghi = ghi[:96]
 
-        # ------------------------------------------------------
-        # Keep same structure as cluster case
-        # ------------------------------------------------------
-
-        cluster_data = None
-
         ghi_arrays = [
             ghi
         ]
 
     # ==========================================================
-    # CLUSTER WEIGHT DATA
+    # FIXED SHEET
+    # ==========================================================
+    # IMPORTANT:
+    # Actual generation comes from Fixed.
+    # Do NOT search Tracking or Backend Cal for Actual.
+
+    if "Fixed" not in xls.sheet_names:
+
+        raise ValueError(
+            "Workbook must contain a 'Fixed' sheet "
+            "to read Actual generation."
+        )
+
+    fixed = pd.read_excel(
+        xls,
+        sheet_name="Fixed",
+        header=1
+    )
+
+    fixed.columns = (
+        fixed.columns
+        .astype(str)
+        .str.strip()
+        .str.replace(
+            "\n",
+            " ",
+            regex=False
+        )
+    )
+
+    # ==========================================================
+    # ACTUAL GENERATION
+    # ==========================================================
+
+    possible_actual_columns = [
+        "Actual",
+        "Actual Generation",
+        "Actual Generation (MW)",
+        "Actual_Power",
+        "Power (MW)",
+    ]
+
+    actual_column = None
+
+    for col in possible_actual_columns:
+
+        if col in fixed.columns:
+
+            actual_column = col
+            break
+
+    if actual_column is None:
+
+        raise ValueError(
+            "Could not find Actual generation "
+            "column in Fixed sheet. "
+            f"Available columns: "
+            f"{list(fixed.columns)}"
+        )
+
+    actual = pd.to_numeric(
+        fixed[actual_column],
+        errors="coerce"
+    ).fillna(0)
+
+    actual = np.maximum(
+        actual.to_numpy(dtype=float),
+        0
+    )
+
+    if len(actual) < 96:
+
+        raise ValueError(
+            f"Expected at least 96 Actual blocks. "
+            f"Found {len(actual)}."
+        )
+
+    actual = actual[:96]
+
+    # ==========================================================
+    # CLUSTER WEIGHTS
     # ==========================================================
 
     area_weights = None
 
     if has_cluster:
 
-        # Only try usecols when the sheet actually has
-        # the required cluster columns.
+        # Only extract cluster-related columns
+        # when cluster actually exists.
 
         cluster_weight_columns = [
             col
@@ -486,16 +561,25 @@ def read_tracking_input(uploaded_file):
             if "CL" in col.upper()
         ]
 
-        area_weights = (
-            area_eff_full[
-                cluster_weight_columns
-            ]
-            .copy()
-        )
+        if len(cluster_weight_columns) > 0:
+
+            area_weights = (
+                area_eff_full[
+                    cluster_weight_columns
+                ]
+                .copy()
+            )
 
     # ==========================================================
     # FORECAST CONFIGURATION
     # ==========================================================
+
+    if "Forecast Config" not in xls.sheet_names:
+
+        raise ValueError(
+            "Workbook must contain "
+            "'Forecast Config' sheet."
+        )
 
     forecast_config = pd.read_excel(
         xls,
@@ -556,10 +640,30 @@ def read_tracking_input(uploaded_file):
     # ==========================================================
 
     return {
-    "area": area,
-    "cluster_data": cluster_data,
-    "has_cluster": has_cluster,
-    "latitude": latitude,
-    "backend": backend,
-    "tracking": tracking,
-}
+
+        "area": area,
+
+        "cluster_data":
+            cluster_data,
+
+        "has_cluster":
+            has_cluster,
+
+        "latitude":
+            latitude,
+
+        "backend":
+            backend,
+
+        "tracking":
+            tracking,
+
+        "ghi_arrays":
+            ghi_arrays,
+
+        "actual":
+            actual,
+
+        "area_weights":
+            area_weights,
+    }
