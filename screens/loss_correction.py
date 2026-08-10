@@ -734,19 +734,13 @@ def show_loss_correction():
     )
 
     bounds = [
-
         (0, 10),       # DHI
-
         (10, 30),      # Starting Block
-
         (65, 80),      # Ending Block
-
         (47, 53),      # Max Block
-
         (10, 70),      # East Limit
-
         (10, 70),      # West Limit
-
+        (0, 10),       # Efficiency Loss
     ]
 
     bounds_df = pd.DataFrame({
