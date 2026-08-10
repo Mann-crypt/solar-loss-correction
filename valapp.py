@@ -526,22 +526,19 @@ def highlight_mismatch(
 
 def create_excel_report(
     file_summary_df,
-    combined_report,
     all_results
 ):
 
     output = BytesIO()
-
-    sheets_written = 0
 
     with pd.ExcelWriter(
         output,
         engine="openpyxl"
     ) as writer:
 
-        # -------------------------------------------------
-        # SUMMARY
-        # -------------------------------------------------
+        # =================================================
+        # 1. OVERALL SUMMARY
+        # =================================================
 
         if file_summary_df is not None:
 
@@ -551,85 +548,53 @@ def create_excel_report(
                 index=False
             )
 
-            sheets_written += 1
 
-
-        # -------------------------------------------------
-        # P-X REPORT
-        # -------------------------------------------------
-
-        if (
-            combined_report is not None
-            and not combined_report.empty
-        ):
-
-            combined_report.to_excel(
-                writer,
-                sheet_name="P-X Report",
-                index=False
-            )
-
-            sheets_written += 1
-
-
-        # -------------------------------------------------
-        # MISMATCH SHEETS
-        # -------------------------------------------------
+        # =================================================
+        # 2. ONE SHEET PER FILE
+        # =================================================
 
         for filename, data in all_results.items():
 
-            result_df = data["data"]
-
-            result_columns = data[
-                "result_columns"
-            ]
+            report_df = data["report"].copy()
 
 
-            if not result_columns:
-                continue
+            # ---------------------------------------------
+            # Remove File column because sheet already
+            # represents that file
+            # ---------------------------------------------
 
-
-            mismatch_mask = pd.Series(
-                False,
-                index=result_df.index
+            report_df = report_df.drop(
+                columns=["File"],
+                errors="ignore"
             )
 
 
-            for result_col in result_columns:
+            # ---------------------------------------------
+            # Create safe Excel sheet name
+            # ---------------------------------------------
 
-                mismatch_mask |= (
-                    result_df[result_col] == False
-                )
-
-
-            mismatch_df = result_df[
-                mismatch_mask
-            ]
-
-
-            # Safe sheet name
-            safe_name = re.sub(
+            sheet_name = re.sub(
                 r'[\[\]\:\*\?\/\\]',
                 "_",
                 str(filename)
             )
 
-
-            sheet_name = (
-                safe_name[:25]
-                + "_Mismatch"
-            )
-
+            # Excel sheet name max = 31 characters
             sheet_name = sheet_name[:31]
 
 
+            # ---------------------------------------------
             # Handle duplicate sheet names
-            existing = writer.book.sheetnames
+            # ---------------------------------------------
+
+            existing_sheets = (
+                writer.book.sheetnames
+            )
 
             base_name = sheet_name
             counter = 1
 
-            while sheet_name in existing:
+            while sheet_name in existing_sheets:
 
                 suffix = f"_{counter}"
 
@@ -643,30 +608,29 @@ def create_excel_report(
                 counter += 1
 
 
-            mismatch_df.to_excel(
-                writer,
-                sheet_name=sheet_name,
-                index=True
-            )
+            # ---------------------------------------------
+            # Write file summary
+            # ---------------------------------------------
 
-            sheets_written += 1
+            if report_df.empty:
 
+                pd.DataFrame({
+                    "Message": [
+                        "No P-X pairs were found."
+                    ]
+                }).to_excel(
+                    writer,
+                    sheet_name=sheet_name,
+                    index=False
+                )
 
-        # -------------------------------------------------
-        # SAFETY SHEET
-        # -------------------------------------------------
+            else:
 
-        if sheets_written == 0:
-
-            pd.DataFrame({
-                "Message": [
-                    "No files were successfully processed."
-                ]
-            }).to_excel(
-                writer,
-                sheet_name="Result",
-                index=False
-            )
+                report_df.to_excel(
+                    writer,
+                    sheet_name=sheet_name,
+                    index=False
+                )
 
 
     output.seek(0)
@@ -1196,19 +1160,17 @@ if uploaded_files:
 
     excel_file = create_excel_report(
         file_summary_df,
-        combined_report,
         all_results
     )
 
 
     st.download_button(
-
-        label="⬇ Download Complete Report",
-
+        label="⬇ Download Final Report",
+    
         data=excel_file.getvalue(),
-
-        file_name="PX_Comparison_Report.xlsx",
-
+    
+        file_name="PX_Comparison_Final_Report.xlsx",
+    
         mime=(
             "application/vnd.openxmlformats-officedocument."
             "spreadsheetml.sheet"
