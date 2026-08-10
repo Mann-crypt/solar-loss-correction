@@ -240,8 +240,14 @@ def read_loss_correction_input(uploaded_file):
 
 def read_tracking_input(uploaded_file):
 
+    xls = pd.ExcelFile(uploaded_file)
+
+    # ==================================================
+    # AREA & EFFICIENCY
+    # ==================================================
+
     area = pd.read_excel(
-        uploaded_file,
+        xls,
         sheet_name="Area & Efficiency",
         header=1,
         usecols=range(8)
@@ -249,40 +255,74 @@ def read_tracking_input(uploaded_file):
 
     area.columns = (
         area.columns
+        .astype(str)
         .str.strip()
     )
 
-    null_indices = (
-        area[
-            area["Module Type"].isna()
-        ].index
-    )
+    null_indices = area[
+        area["Module Type"].isna()
+    ].index
 
     if len(null_indices) > 0:
-
         area = area.iloc[
-            :area.index.get_loc(
-                null_indices[0]
-            )
+            :area.index.get_loc(null_indices[0])
         ]
 
-    # ------------------------------------------
-    # Cluster weighting
-    # ------------------------------------------
+    # ==================================================
+    # CHECK FOR CLUSTER DATA
+    # ==================================================
 
-    area_weights = pd.read_excel(
-        uploaded_file,
+    cluster_data = None
+    has_cluster = False
+
+    # Read the second header row WITHOUT usecols first
+    area_eff_full = pd.read_excel(
+        xls,
         sheet_name="Area & Efficiency",
-        header=2,
-        usecols=[12, 13, 14, 15, 16]
+        header=2
     )
 
-    # ------------------------------------------
-    # Forecast configuration
-    # ------------------------------------------
+    area_eff_full.columns = (
+        area_eff_full.columns
+        .astype(str)
+        .str.strip()
+    )
+
+    # --------------------------------------------------
+    # Detect cluster columns
+    # --------------------------------------------------
+
+    cluster_columns = [
+        col for col in area_eff_full.columns
+        if "CL" in col.upper()
+    ]
+
+    # If the expected cluster GHI columns exist
+    expected_cluster_columns = [
+        "CL1-GHI",
+        "CL2-GHI",
+        "CL3-GHI",
+        "CL4-GHI",
+        "CL5-GHI",
+    ]
+
+    if all(
+        col in area_eff_full.columns
+        for col in expected_cluster_columns
+    ):
+
+        has_cluster = True
+
+        cluster_data = area_eff_full[
+            expected_cluster_columns
+        ].copy()
+
+    # ==================================================
+    # FORECAST CONFIGURATION
+    # ==================================================
 
     forecast_config = pd.read_excel(
-        uploaded_file,
+        xls,
         sheet_name="Forecast Config",
         header=8
     )
@@ -291,28 +331,33 @@ def read_tracking_input(uploaded_file):
         forecast_config.loc[0, "Lat"]
     )
 
-    # ------------------------------------------
-    # Backend calculation
-    # ------------------------------------------
+    # ==================================================
+    # BACKEND CALCULATION
+    # ==================================================
 
     backend = pd.read_excel(
-        uploaded_file,
+        xls,
         sheet_name="Backend Cal"
     )
 
-    # ------------------------------------------
-    # Tracking
-    # ------------------------------------------
+    # ==================================================
+    # TRACKING
+    # ==================================================
 
     tracking = pd.read_excel(
-        uploaded_file,
+        xls,
         sheet_name="Tracking",
         header=1
     )
 
+    # ==================================================
+    # RETURN
+    # ==================================================
+
     return {
         "area": area,
-        "area_weights": area_weights,
+        "cluster_data": cluster_data,
+        "has_cluster": has_cluster,
         "latitude": latitude,
         "backend": backend,
         "tracking": tracking,
