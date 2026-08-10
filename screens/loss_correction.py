@@ -400,3 +400,169 @@ def show_loss_correction():
             use_container_width=True,
             hide_index=True,
         )
+
+def read_loss_correction_input(uploaded_file):
+    """
+    Read Loss Correction input data.
+
+    Excel:
+        GHI_Forecast -> Fixed sheet
+        Actual       -> Actual column from workbook
+
+    CSV:
+        GHI_Forecast and Actual must exist in the CSV.
+
+    Returns:
+        DataFrame containing:
+        GHI_Forecast
+        Actual
+    """
+
+    # ==================================================
+    # CSV
+    # ==================================================
+
+    if uploaded_file.name.lower().endswith(".csv"):
+
+        df = pd.read_csv(uploaded_file)
+
+        df.columns = (
+            df.columns
+            .astype(str)
+            .str.strip()
+            .str.replace("\n", " ", regex=False)
+        )
+
+        required = [
+            "GHI_Forecast",
+            "Actual",
+        ]
+
+        missing = [
+            col for col in required
+            if col not in df.columns
+        ]
+
+        if missing:
+            raise ValueError(
+                f"Missing required column(s): "
+                f"{', '.join(missing)}"
+            )
+
+        return df[required].copy()
+
+    # ==================================================
+    # EXCEL
+    # ==================================================
+
+    xls = pd.ExcelFile(uploaded_file)
+
+    if "Fixed" not in xls.sheet_names:
+        raise ValueError(
+            "Excel file must contain a 'Fixed' sheet."
+        )
+
+    # --------------------------------------------------
+    # GHI Forecast
+    # --------------------------------------------------
+
+    fixed = pd.read_excel(
+        xls,
+        sheet_name="Fixed",
+    )
+
+    fixed.columns = (
+        fixed.columns
+        .astype(str)
+        .str.strip()
+        .str.replace("\n", " ", regex=False)
+    )
+
+    if "GHI_Forecast" not in fixed.columns:
+        raise ValueError(
+            "'GHI_Forecast' column not found "
+            "in 'Fixed' sheet."
+        )
+
+    ghi_forecast = fixed["GHI_Forecast"].copy()
+
+    # --------------------------------------------------
+    # Actual
+    # --------------------------------------------------
+
+    actual = None
+
+    for sheet_name in xls.sheet_names:
+
+        sheet = pd.read_excel(
+            xls,
+            sheet_name=sheet_name,
+        )
+
+        sheet.columns = (
+            sheet.columns
+            .astype(str)
+            .str.strip()
+            .str.replace(
+                "\n",
+                " ",
+                regex=False,
+            )
+        )
+
+        if "Actual" in sheet.columns:
+            actual = sheet["Actual"].copy()
+            break
+
+    if actual is None:
+        raise ValueError(
+            "'Actual' column not found "
+            "in Excel workbook."
+        )
+
+    # --------------------------------------------------
+    # Combine
+    # --------------------------------------------------
+
+    df = pd.DataFrame({
+        "GHI_Forecast": ghi_forecast,
+        "Actual": actual,
+    })
+
+    # --------------------------------------------------
+    # Clean
+    # --------------------------------------------------
+
+    df["GHI_Forecast"] = pd.to_numeric(
+        df["GHI_Forecast"],
+        errors="coerce",
+    )
+
+    df["Actual"] = pd.to_numeric(
+        df["Actual"],
+        errors="coerce",
+    )
+
+    df = df.fillna(0)
+
+    df["GHI_Forecast"] = np.maximum(
+        df["GHI_Forecast"],
+        0,
+    )
+
+    df["Actual"] = np.maximum(
+        df["Actual"],
+        0,
+    )
+
+    # --------------------------------------------------
+    # Validate
+    # --------------------------------------------------
+
+    if len(df) != 96:
+        raise ValueError(
+            f"Loss Correction requires exactly "
+            f"96 blocks. Found {len(df)}."
+        )
+
+    return df.reset_index(drop=True)
