@@ -125,3 +125,455 @@ def find_best_shift(profile):
             best_shift = i
 
     return best_shift
+
+# ==========================================================
+# TRACKING LOSS CORRECTION
+# ==========================================================
+
+def calculate_tracking_angles(
+    blocks,
+    ghi_start,
+    ghi_end,
+    ghi_max,
+    east_limit,
+    west_limit
+):
+    """
+    Calculate solar zenith/panel tracking angle
+    using the GHI block configuration.
+    """
+
+    blocks = np.asarray(blocks, dtype=float)
+
+    # Validate block configuration
+    if (
+        ghi_start >= ghi_max
+        or ghi_max >= ghi_end
+    ):
+        raise ValueError(
+            "Invalid block configuration: "
+            "Start < Max < End is required."
+        )
+
+    denominator_1 = (
+        ghi_start - 1 - ghi_max
+    )
+
+    denominator_2 = (
+        ghi_end + 1 - ghi_max
+    )
+
+    if denominator_1 == 0 or denominator_2 == 0:
+        raise ValueError(
+            "Invalid block configuration."
+        )
+
+    m1 = 90 / denominator_1
+    m2 = 90 / denominator_2
+
+    zenith = np.where(
+        blocks <= ghi_max,
+
+        np.minimum(
+            89,
+            m1 * (blocks - ghi_max)
+        ),
+
+        np.minimum(
+            89,
+            m2 * (blocks - ghi_max)
+        )
+    )
+
+    panel = np.where(
+
+        blocks < ghi_max,
+
+        np.minimum(
+            zenith,
+            abs(east_limit)
+        ),
+
+        np.where(
+            (blocks > ghi_max)
+            & (zenith > west_limit),
+
+            west_limit,
+
+            zenith
+        )
+    )
+
+    return zenith, panel
+
+
+def calculate_dhi(
+    ghi,
+    dhi_percent
+):
+    """
+    Calculate DHI from GHI.
+    """
+
+    return (
+        np.asarray(ghi, dtype=float)
+        * dhi_percent
+        / 100.0
+    )
+
+
+def calculate_dni(
+    ghi,
+    dhi,
+    panel_angle
+):
+    """
+    Calculate DNI from GHI, DHI and panel angle.
+    """
+
+    cos_alpha = np.cos(
+        np.radians(panel_angle)
+    )
+
+    # Prevent division by zero
+    cos_alpha = np.clip(
+        cos_alpha,
+        1e-6,
+        None
+    )
+
+    dni = (
+        np.asarray(ghi, dtype=float)
+        - np.asarray(dhi, dtype=float)
+    ) / cos_alpha
+
+    return dni
+
+
+def calculate_tracking_forecast(
+    ghi_arrays,
+    weights,
+    blocks,
+    dhi_percent,
+    ghi_start,
+    ghi_end,
+    ghi_max,
+    east_limit,
+    west_limit
+):
+    """
+    Calculate final tracking power forecast.
+
+    ghi_arrays:
+        List containing CL1-GHI ... CL5-GHI
+
+    weights:
+        Corresponding effective area/efficiency
+        for CL1 ... CL5
+    """
+
+    _, panel = calculate_tracking_angles(
+        blocks=blocks,
+        ghi_start=ghi_start,
+        ghi_end=ghi_end,
+        ghi_max=ghi_max,
+        east_limit=east_limit,
+        west_limit=west_limit
+    )
+
+    cos_alpha = np.cos(
+        np.radians(panel)
+    )
+
+    cos_alpha = np.clip(
+        cos_alpha,
+        1e-6,
+        None
+    )
+
+    forecast = np.zeros(
+        len(blocks),
+        dtype=float
+    )
+
+    for ghi, weight in zip(
+        ghi_arrays,
+        weights
+    ):
+
+        ghi = np.asarray(
+            ghi,
+            dtype=float
+        )
+
+        dhi = (
+            ghi
+            * dhi_percent
+            / 100.0
+        )
+
+        dni = (
+            ghi - dhi
+        ) / cos_alpha
+
+        forecast += (
+            dni * weight
+        ) / 1_000_000
+
+    return forecast
+
+from scipy.optimize import differential_evolution
+
+
+def calculate_loss_corrected_weights(
+    area_df,
+    efficiency_loss,
+    weight_factors
+):
+    """
+    Calculate effective area for each cluster.
+    """
+
+    df = area_df.copy()
+
+    df["Efficiency Losses(%)"] = (
+        efficiency_loss
+    )
+
+    df["Net Efficiency (%)"] = (
+        df["Standard PV Efficiency (%)"]
+        - df["Efficiency Losses(%)"]
+    )
+
+    effective_area = (
+        df["Total area(m2)"]
+        * df["Net Efficiency (%)"]
+        / 100
+    )
+
+    weights = []
+
+    for factor in weight_factors:
+
+        weights.append(
+            effective_area.sum()
+            * factor
+        )
+
+    return np.asarray(
+        weights,
+        dtype=float
+    )
+
+
+def optimize_tracking_parameters(
+    actual,
+    ghi_arrays,
+    blocks,
+    area_df,
+    weight_factors,
+    efficiency_loss,
+    bounds,
+    maxiter=100,
+    popsize=15,
+    seed=42,
+    callback=None
+):
+    """
+    Optimize:
+
+        DHI
+        GHI Starting Block
+        GHI Ending Block
+        GHI Max Block
+        East Tracking Limit
+        West Tracking Limit
+    """
+
+    actual = np.asarray(
+        actual,
+        dtype=float
+    )
+
+    blocks = np.asarray(
+        blocks,
+        dtype=float
+    )
+
+    # ---------------------------------------------
+    # Effective area / weights
+    # ---------------------------------------------
+
+    weights = calculate_loss_corrected_weights(
+        area_df=area_df,
+        efficiency_loss=efficiency_loss,
+        weight_factors=weight_factors
+    )
+
+    # ---------------------------------------------
+    # Objective
+    # ---------------------------------------------
+
+    def objective(x):
+
+        DHI = int(round(x[0]))
+        start = int(round(x[1]))
+        end = int(round(x[2]))
+        max_block = int(round(x[3]))
+        east = int(round(x[4]))
+        west = int(round(x[5]))
+
+        # Invalid configuration
+        if not (
+            start < max_block < end
+        ):
+            return 1e9
+
+        try:
+
+            prediction = calculate_tracking_forecast(
+
+                ghi_arrays=ghi_arrays,
+
+                weights=weights,
+
+                blocks=blocks,
+
+                dhi_percent=DHI,
+
+                ghi_start=start,
+
+                ghi_end=end,
+
+                ghi_max=max_block,
+
+                east_limit=east,
+
+                west_limit=west
+            )
+
+        except Exception:
+
+            return 1e9
+
+        # -----------------------------------------
+        # Daylight mask
+        # -----------------------------------------
+
+        mask = (
+            actual != 0
+        )
+
+        act = actual[mask]
+        pred = prediction[mask]
+
+        if len(act) == 0:
+            return 1e9
+
+        if act.max() <= 0:
+            return 1e9
+
+        # -----------------------------------------
+        # Error metrics
+        # -----------------------------------------
+
+        block_error = (
+            np.mean(
+                np.abs(act - pred)
+            )
+            / act.max()
+        )
+
+        peak_error = (
+            abs(
+                act.max()
+                - pred.max()
+            )
+            / act.max()
+        )
+
+        energy_error = (
+            abs(
+                act.sum()
+                - pred.sum()
+            )
+            / act.sum()
+            if act.sum() != 0
+            else 1e9
+        )
+
+        score = (
+            0.80 * block_error
+            + 0.10 * peak_error
+            + 0.10 * energy_error
+        )
+
+        if (
+            np.isnan(score)
+            or np.isinf(score)
+        ):
+            return 1e9
+
+        return score
+
+    # ---------------------------------------------
+    # Optimization
+    # ---------------------------------------------
+
+    result = differential_evolution(
+
+        objective,
+
+        bounds=bounds,
+
+        strategy="best1bin",
+
+        maxiter=maxiter,
+
+        popsize=popsize,
+
+        tol=0.001,
+
+        mutation=(0.5, 1),
+
+        recombination=0.7,
+
+        seed=seed,
+
+        polish=True,
+
+        workers=1,
+
+        callback=callback
+    )
+
+    best = np.round(
+        result.x
+    ).astype(int)
+
+    parameters = {
+
+        "DHI": int(best[0]),
+
+        "Starting Block":
+            int(best[1]),
+
+        "Ending Block":
+            int(best[2]),
+
+        "Max Block":
+            int(best[3]),
+
+        "East Limit":
+            int(best[4]),
+
+        "West Limit":
+            int(best[5]),
+    }
+
+    return {
+        "parameters": parameters,
+        "score": float(result.fun),
+        "weights": weights,
+        "result": result,
+    }
