@@ -274,19 +274,29 @@ def read_tracking_input(uploaded_file):
 
     cluster_data = None
     has_cluster = False
-
-    # Read the second header row WITHOUT usecols first
+    
     area_eff_full = pd.read_excel(
         xls,
         sheet_name="Area & Efficiency",
         header=2
     )
-
-    area_eff_full.columns = (
-        area_eff_full.columns
-        .astype(str)
-        .str.strip()
-    )
+    
+    if area_eff_full.shape[1] >= 17:
+    
+        cluster_data = pd.read_excel(
+            xls,
+            sheet_name="Area & Efficiency",
+            header=2,
+            usecols=[12, 13, 14, 15, 16]
+        )
+    
+        cluster_data.columns = (
+            cluster_data.columns
+            .astype(str)
+            .str.strip()
+        )
+    
+        has_cluster = True
 
     # --------------------------------------------------
     # Detect cluster columns
