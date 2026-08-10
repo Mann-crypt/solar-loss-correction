@@ -1,395 +1,44 @@
-# calculations.py
-
-import numpy as np
-import pandas as pd
-
-# ------Layer 1--------
-def calculate_declination_angle(date):
-    """
-    Solar declination angle (degrees).
-    """
-    day = pd.to_datetime(date).dayofyear
-
-    return 23.45 * np.sin(
-        np.radians(
-            360 * (284 + day) / 365
-        )
-    )
-
-
-def calculate_elevation_angle(latitude, declination):
-    """
-    Maximum solar elevation angle.
-    """
-    return 90 - latitude + declination
-
-
-def sin_deg(angle):
-    """
-    Sine of angle in degrees.
-    """
-    return np.sin(np.radians(angle))
-
-
-def clip_zero(values):
-    """
-    Replace negative values with zero.
-    """
-    return np.maximum(values, 0)
-# ------Layer 2--------
-def calculate_poa(
-    ghi,
-    elevation_angle,
-    tilt_angle
-):
-    """
-    Plane of Array Irradiance.
-    """
-
-    sin_a = sin_deg(elevation_angle)
-
-    sin_ab = sin_deg(elevation_angle + tilt_angle)
-
-    return (ghi * sin_ab) / sin_a
-
-# -------RT Correction--------
-def calculate_projection(
-    blocks,
-    peak,
-    n1,
-    n2,
-    b
-):
-    """
-    RT Projection curve.
-    """
-
-    projection = peak * (
-        ((n1 - blocks) * (n2 - blocks))
-        /
-        ((n1 - b) * (n2 - b))
-    )
-
-    return clip_zero(projection)
-
-def calculate_rt_forecast(
-    projection,
-    trend,
-    blocks,
-    b,
-    weight
-):
-    """
-    Final RT Forecast.
-    """
-
-    return np.where(
-        blocks > b,
-        weight * projection + (1 - weight) * trend,
-        trend
-    )
-
-# ---------AM Curve---------
-def calculate_symmetry(
-    profile,
-    shift
-):
-    """
-    Symmetry profile.
-    """
-
-    shifted = np.roll(profile, -shift)
-
-    return (profile + shifted[::-1]) / 2
-
-def find_best_shift(profile):
-    """
-    Find best symmetry shift.
-    """
-
-    least_error = np.inf
-    best_shift = 0
-
-    for i in range(96):
-
-        shifted = np.roll(profile, -i)
-
-        sym = (profile + shifted[::-1]) / 2
-
-        error = np.sqrt(
-            np.mean((profile - sym) ** 2)
-        )
-
-        if error < least_error:
-            least_error = error
-            best_shift = i
-
-    return best_shift
-
-# ==========================================================
-# TRACKING LOSS CORRECTION
-# ==========================================================
-
-def calculate_tracking_angles(
-    blocks,
-    ghi_start,
-    ghi_end,
-    ghi_max,
-    east_limit,
-    west_limit
-):
-    """
-    Calculate solar zenith/panel tracking angle
-    using the GHI block configuration.
-    """
-
-    blocks = np.asarray(blocks, dtype=float)
-
-    # Validate block configuration
-    if (
-        ghi_start >= ghi_max
-        or ghi_max >= ghi_end
-    ):
-        raise ValueError(
-            "Invalid block configuration: "
-            "Start < Max < End is required."
-        )
-
-    denominator_1 = (
-        ghi_start - 1 - ghi_max
-    )
-
-    denominator_2 = (
-        ghi_end + 1 - ghi_max
-    )
-
-    if denominator_1 == 0 or denominator_2 == 0:
-        raise ValueError(
-            "Invalid block configuration."
-        )
-
-    m1 = 90 / denominator_1
-    m2 = 90 / denominator_2
-
-    zenith = np.where(
-        blocks <= ghi_max,
-
-        np.minimum(
-            89,
-            m1 * (blocks - ghi_max)
-        ),
-
-        np.minimum(
-            89,
-            m2 * (blocks - ghi_max)
-        )
-    )
-
-    panel = np.where(
-
-        blocks < ghi_max,
-
-        np.minimum(
-            zenith,
-            abs(east_limit)
-        ),
-
-        np.where(
-            (blocks > ghi_max)
-            & (zenith > west_limit),
-
-            west_limit,
-
-            zenith
-        )
-    )
-
-    return zenith, panel
-
-
-def calculate_dhi(
-    ghi,
-    dhi_percent
-):
-    """
-    Calculate DHI from GHI.
-    """
-
-    return (
-        np.asarray(ghi, dtype=float)
-        * dhi_percent
-        / 100.0
-    )
-
-
-def calculate_dni(
-    ghi,
-    dhi,
-    panel_angle
-):
-    """
-    Calculate DNI from GHI, DHI and panel angle.
-    """
-
-    cos_alpha = np.cos(
-        np.radians(panel_angle)
-    )
-
-    # Prevent division by zero
-    cos_alpha = np.clip(
-        cos_alpha,
-        1e-6,
-        None
-    )
-
-    dni = (
-        np.asarray(ghi, dtype=float)
-        - np.asarray(dhi, dtype=float)
-    ) / cos_alpha
-
-    return dni
-
-
-def calculate_tracking_forecast(
-    ghi_arrays,
-    weights,
-    blocks,
-    dhi_percent,
-    ghi_start,
-    ghi_end,
-    ghi_max,
-    east_limit,
-    west_limit
-):
-    """
-    Calculate final tracking power forecast.
-    """
-
-    if len(ghi_arrays) != len(weights):
-
-        raise ValueError(
-            "Number of GHI arrays must match "
-            "number of weights."
-        )
-
-    blocks = np.asarray(
-        blocks,
-        dtype=float
-    )
-
-    # ==================================================
-    # TRACKING ANGLES
-    # ==================================================
-
-    _, panel = calculate_tracking_angles(
-
-        blocks=blocks,
-
-        ghi_start=ghi_start,
-
-        ghi_end=ghi_end,
-
-        ghi_max=ghi_max,
-
-        east_limit=east_limit,
-
-        west_limit=west_limit
-    )
-
-    # ==================================================
-    # COS PANEL ANGLE
-    # ==================================================
-
-    cos_alpha = np.cos(
-        np.radians(panel)
-    )
-
-    cos_alpha = np.clip(
-        cos_alpha,
-        1e-6,
-        None
-    )
-
-    # ==================================================
-    # FORECAST
-    # ==================================================
-
-    forecast = np.zeros(
-        len(blocks),
-        dtype=float
-    )
-
-    # ==================================================
-    # EACH CLUSTER / NORMAL GHI
-    # ==================================================
-
-    for ghi, weight in zip(
-        ghi_arrays,
-        weights
-    ):
-
-        ghi = np.asarray(
-            ghi,
-            dtype=float
-        )
-
-        if len(ghi) != len(blocks):
-
-            raise ValueError(
-                "GHI array length does not "
-                "match blocks."
-            )
-
-        # DHI
-        dhi = calculate_dhi(
-            ghi,
-            dhi_percent
-        )
-
-        # DNI
-        dni = (
-            ghi - dhi
-        ) / cos_alpha
-
-        # Power
-        forecast += (
-            dni * weight
-        ) / 1_000_000
-
-    return np.maximum(
-        forecast,
-        0
-    )
-from scipy.optimize import differential_evolution
-
-
 def calculate_loss_corrected_weights(
     area_df,
     efficiency_loss,
-    weight_factors=None,
-    has_cluster=True
+    weight_factors,
+    has_cluster=True,
 ):
     """
     Calculate effective area / weights.
 
     Cluster:
-        Returns one weight per cluster.
+        One weight per GHI cluster.
 
     Non-cluster:
-        Returns one total plant weight.
+        One total plant weight.
     """
 
     df = area_df.copy()
 
     # --------------------------------------------------
-    # Efficiency loss
+    # Efficiency
     # --------------------------------------------------
 
-    df["Efficiency Losses(%)"] = efficiency_loss
+    df["Efficiency Losses(%)"] = (
+        float(efficiency_loss)
+    )
 
     df["Net Efficiency (%)"] = (
-        df["Standard PV Efficiency (%)"]
+        pd.to_numeric(
+            df["Standard PV Efficiency (%)"],
+            errors="coerce",
+        ).fillna(0)
         - df["Efficiency Losses(%)"]
+    )
+
+    # --------------------------------------------------
+    # Prevent negative efficiency
+    # --------------------------------------------------
+
+    df["Net Efficiency (%)"] = np.maximum(
+        df["Net Efficiency (%)"],
+        0,
     )
 
     # --------------------------------------------------
@@ -397,8 +46,16 @@ def calculate_loss_corrected_weights(
     # --------------------------------------------------
 
     df["Effective Area"] = (
-        df["Total area(m2)"]
-        * df["Net Efficiency (%)"]
+
+        pd.to_numeric(
+            df["Total area(m2)"],
+            errors="coerce",
+        ).fillna(0)
+
+        *
+
+        df["Net Efficiency (%)"]
+
         / 100
     )
 
@@ -414,391 +71,39 @@ def calculate_loss_corrected_weights(
 
         return np.asarray(
             [total_effective_area],
-            dtype=float
+            dtype=float,
         )
 
     # ==================================================
     # CLUSTER
     # ==================================================
 
-    if weight_factors is None:
-
-        raise ValueError(
-            "weight_factors are required "
-            "when cluster data is present."
-        )
-
     weight_factors = np.asarray(
         weight_factors,
-        dtype=float
+        dtype=float,
     )
+
+    if len(weight_factors) == 0:
+
+        raise ValueError(
+            "No cluster weight factors supplied."
+        )
+
+    # Normalize if required
+
+    if np.sum(weight_factors) > 0:
+
+        weight_factors = (
+            weight_factors
+            / np.sum(weight_factors)
+        )
 
     weights = (
         total_effective_area
         * weight_factors
     )
 
-    return weights
-
-def optimize_tracking_parameters(
-    actual,
-    ghi_arrays,
-    blocks,
-    area_df,
-    weight_factors=None,
-    efficiency_loss=0,
-    bounds=None,
-    has_cluster=False,
-    maxiter=100,
-    popsize=15,
-    seed=42,
-    callback=None
-):
-    """
-    Optimize tracking parameters.
-
-    Parameters optimized:
-        DHI
-        GHI Starting Block
-        GHI Ending Block
-        GHI Max Block
-        East Tracking Limit
-        West Tracking Limit
-
-    Supports both:
-
-    Cluster:
-        ghi_arrays = [
-            CL1-GHI,
-            CL2-GHI,
-            CL3-GHI,
-            CL4-GHI,
-            CL5-GHI
-        ]
-        
-        weights = [
-            weight_1,
-            weight_2,
-            weight_3,
-            weight_4,
-            weight_5
-        ]
-
-    Non-cluster:
-        ghi_arrays = [
-            GHI_Forecast
-        ]
-        
-        weights = [
-            total_effective_area
-        ]
-    """
-
-    # ==================================================
-    # CLEAN INPUT
-    # ==================================================
-
-    actual = np.asarray(
-        actual,
-        dtype=float
+    return np.asarray(
+        weights,
+        dtype=float,
     )
-
-    blocks = np.asarray(
-        blocks,
-        dtype=float
-    )
-
-    # ==================================================
-    # VALIDATION
-    # ==================================================
-
-    if len(actual) != len(blocks):
-
-        raise ValueError(
-            "Actual and Blocks must have same length."
-        )
-
-    if len(ghi_arrays) == 0:
-
-        raise ValueError(
-            "At least one GHI array is required."
-        )
-
-    for ghi in ghi_arrays:
-
-        if len(ghi) != len(blocks):
-
-            raise ValueError(
-                "GHI array length must match blocks."
-            )
-
-    # ==================================================
-    # CALCULATE WEIGHTS
-    # ==================================================
-
-    weights = calculate_loss_corrected_weights(
-
-        area_df=area_df,
-
-        efficiency_loss=efficiency_loss,
-
-        weight_factors=weight_factors,
-
-        has_cluster=has_cluster
-    )
-
-    # ==================================================
-    # VALIDATE WEIGHTS
-    # ==================================================
-
-    if len(weights) != len(ghi_arrays):
-
-        raise ValueError(
-            f"GHI arrays ({len(ghi_arrays)}) "
-            f"and weights ({len(weights)}) "
-            f"must have same length."
-        )
-
-    # ==================================================
-    # OBJECTIVE FUNCTION
-    # ==================================================
-
-    def objective(x):
-
-        # ----------------------------------------------
-        # Parameters
-        # ----------------------------------------------
-
-        DHI = int(round(x[0]))
-
-        start = int(round(x[1]))
-
-        end = int(round(x[2]))
-
-        max_block = int(round(x[3]))
-
-        east = int(round(x[4]))
-
-        west = int(round(x[5]))
-
-        # ----------------------------------------------
-        # Validate block configuration
-        # ----------------------------------------------
-
-        if not (
-            start < max_block < end
-        ):
-
-            return 1e9
-
-        # ----------------------------------------------
-        # Calculate forecast
-        # ----------------------------------------------
-
-        try:
-
-            prediction = calculate_tracking_forecast(
-
-                ghi_arrays=ghi_arrays,
-
-                weights=weights,
-
-                blocks=blocks,
-
-                dhi_percent=DHI,
-
-                ghi_start=start,
-
-                ghi_end=end,
-
-                ghi_max=max_block,
-
-                east_limit=east,
-
-                west_limit=west
-            )
-
-        except Exception:
-
-            return 1e9
-
-        # ==================================================
-        # DAYLIGHT MASK
-        # ==================================================
-
-        mask = actual > 0
-
-        act = actual[mask]
-
-        pred = prediction[mask]
-
-        if len(act) == 0:
-
-            return 1e9
-
-        if act.max() <= 0:
-
-            return 1e9
-
-        # ==================================================
-        # BLOCK ERROR
-        # ==================================================
-
-        block_error_value = (
-            np.mean(
-                np.abs(
-                    act - pred
-                )
-            )
-            / act.max()
-        )
-
-        # ==================================================
-        # PEAK ERROR
-        # ==================================================
-
-        peak_error_value = (
-            abs(
-                act.max()
-                - pred.max()
-            )
-            / act.max()
-        )
-
-        # ==================================================
-        # ENERGY ERROR
-        # ==================================================
-
-        energy_error_value = (
-            abs(
-                act.sum()
-                - pred.sum()
-            )
-            / act.sum()
-        )
-
-        # ==================================================
-        # COMBINED SCORE
-        # ==================================================
-
-        score = (
-
-            0.80
-            * block_error_value
-
-            +
-
-            0.10
-            * peak_error_value
-
-            +
-
-            0.10
-            * energy_error_value
-        )
-
-        if (
-            np.isnan(score)
-            or np.isinf(score)
-        ):
-
-            return 1e9
-
-        return score
-
-    # ==================================================
-    # DEFAULT BOUNDS
-    # ==================================================
-
-    if bounds is None:
-
-        bounds = [
-            (0, 30),     # DHI %
-            (10, 30),    # Starting block
-            (70, 90),    # Ending block
-            (40, 70),    # Max block
-            (10, 70),    # East limit
-            (10, 70),    # West limit
-        ]
-
-    # ==================================================
-    # DIFFERENTIAL EVOLUTION
-    # ==================================================
-
-    result = differential_evolution(
-
-        objective,
-
-        bounds=bounds,
-
-        strategy="best1bin",
-
-        maxiter=maxiter,
-
-        popsize=popsize,
-
-        tol=0.001,
-
-        mutation=(0.5, 1),
-
-        recombination=0.7,
-
-        seed=seed,
-
-        polish=True,
-
-        workers=1,
-
-        callback=callback
-    )
-
-    # ==================================================
-    # BEST PARAMETERS
-    # ==================================================
-
-    best = np.round(
-        result.x
-    ).astype(int)
-
-    parameters = {
-
-        "DHI":
-            int(best[0]),
-
-        "Starting Block":
-            int(best[1]),
-
-        "Ending Block":
-            int(best[2]),
-
-        "Max Block":
-            int(best[3]),
-
-        "East Limit":
-            int(best[4]),
-
-        "West Limit":
-            int(best[5]),
-    }
-
-    # ==================================================
-    # RETURN
-    # ==================================================
-
-    return {
-
-        "parameters":
-            parameters,
-
-        "score":
-            float(result.fun),
-
-        "weights":
-            weights,
-
-        "result":
-            result,
-
-        "has_cluster":
-            has_cluster,
-    }
