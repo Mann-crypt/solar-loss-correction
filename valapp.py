@@ -494,108 +494,153 @@ if uploaded_files:
     # =====================================================
     # DOWNLOAD COMBINED REPORT
     # =====================================================
-
-    st.markdown(
-        "## Download Report"
-    )
-
-
+    
+    st.markdown("## Download Report")
+    
     output = BytesIO()
-
+    
+    # Track whether at least one sheet is written
+    sheets_written = 0
+    
     with pd.ExcelWriter(
         output,
         engine="openpyxl"
     ) as writer:
-
-        # ---------------------------------------------
+    
+        # -------------------------------------------------
         # Summary
-        # ---------------------------------------------
-
+        # -------------------------------------------------
+    
         if all_results:
-
+    
             file_summary_df.to_excel(
                 writer,
                 sheet_name="Summary",
                 index=False
             )
-
-
-        # ---------------------------------------------
-        # Complete report
-        # ---------------------------------------------
-
+    
+            sheets_written += 1
+    
+    
+        # -------------------------------------------------
+        # Complete P-X Report
+        # -------------------------------------------------
+    
         if not combined_report.empty:
-
+    
             combined_report.to_excel(
                 writer,
                 sheet_name="P-X Report",
                 index=False
             )
-
-
-        # ---------------------------------------------
-        # Mismatches per file
-        # ---------------------------------------------
-
+    
+            sheets_written += 1
+    
+    
+        # -------------------------------------------------
+        # Mismatch sheets
+        # -------------------------------------------------
+    
         for filename, data in all_results.items():
-
+    
             result_df = data["data"]
-
-            safe_name = re.sub(
-                r'[\[\]\:\*\?\/\\]',
-                "_",
-                filename
-            )
-
-            sheet_name = (
-                safe_name[:25]
-                + "_Mismatch"
-            )
-
+    
             result_columns = data[
                 "result_columns"
             ]
-
+    
+            if not result_columns:
+                continue
+    
+            # Find mismatched rows
             mismatch_mask = pd.Series(
                 False,
                 index=result_df.index
             )
-
+    
             for result_col in result_columns:
-
+    
                 mismatch_mask |= (
-                    result_df[
-                        result_col
-                    ] == False
+                    result_df[result_col] == False
                 )
-
+    
             mismatch_df = result_df[
                 mismatch_mask
             ]
-
+    
+            # Create a safe Excel sheet name
+            safe_name = re.sub(
+                r'[\[\]\:\*\?\/\\]',
+                "_",
+                str(filename)
+            )
+    
+            # Excel allows maximum 31 characters
+            sheet_name = (
+                safe_name[:25] + "_Mismatch"
+            )
+    
+            # Make sure sheet name isn't too long
+            sheet_name = sheet_name[:31]
+    
+            # Make sure there is no duplicate sheet name
+            existing_sheets = writer.book.sheetnames
+    
+            base_name = sheet_name
+            counter = 1
+    
+            while sheet_name in existing_sheets:
+    
+                suffix = f"_{counter}"
+    
+                sheet_name = (
+                    base_name[:31 - len(suffix)]
+                    + suffix
+                )
+    
+                counter += 1
+    
+    
+            # Write sheet even if there are zero mismatches
             mismatch_df.to_excel(
                 writer,
-                sheet_name=sheet_name[:31]
+                sheet_name=sheet_name,
+                index=True
             )
-
-
+    
+            sheets_written += 1
+    
+    
+        # -------------------------------------------------
+        # Safety sheet
+        # -------------------------------------------------
+    
+        if sheets_written == 0:
+    
+            pd.DataFrame({
+                "Message": [
+                    "No files were successfully processed.",
+                    "Please check the uploaded files."
+                ]
+            }).to_excel(
+                writer,
+                sheet_name="Result",
+                index=False
+            )
+    
+    
     output.seek(0)
-
-
+    
+    
     st.download_button(
-
         label="⬇ Download Complete Report",
-
-        data=output,
-
+        data=output.getvalue(),
         file_name="PX_Comparison_Report.xlsx",
-
         mime=(
             "application/vnd.openxmlformats-officedocument."
             "spreadsheetml.sheet"
         )
     )
-
 
 else:
 
