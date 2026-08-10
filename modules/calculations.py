@@ -403,25 +403,26 @@ from scipy.optimize import differential_evolution
 def calculate_loss_corrected_weights(
     area_df,
     efficiency_loss,
-    weight_factors
+    weight_factors,
+    has_cluster=True
 ):
     """
-    Calculate effective area / efficiency weights.
+    Calculate effective area / weights.
 
-    Cluster plant:
-        weight_factors = [factor1, factor2, ..., factor5]
+    Cluster:
+        Returns one weight per cluster.
 
-    Non-cluster plant:
-        weight_factors = [1.0]
+    Non-cluster:
+        Returns one total plant weight.
     """
 
     df = area_df.copy()
 
-    # ---------------------------------------------
-    # Efficiency correction
-    # ---------------------------------------------
+    # ----------------------------------------------------------
+    # Efficiency
+    # ----------------------------------------------------------
 
-    df["Efficiency Losses(%)"] = float(
+    df["Efficiency Losses(%)"] = (
         efficiency_loss
     )
 
@@ -430,33 +431,48 @@ def calculate_loss_corrected_weights(
         - df["Efficiency Losses(%)"]
     )
 
-    # ---------------------------------------------
+    # ----------------------------------------------------------
     # Effective area
-    # ---------------------------------------------
+    # ----------------------------------------------------------
 
-    effective_area = (
+    df["Effective Area"] = (
         df["Total area(m2)"]
         * df["Net Efficiency (%)"]
-        / 100.0
+        / 100
     )
 
     total_effective_area = (
-        effective_area.sum()
+        df["Effective Area"].sum()
     )
 
-    # ---------------------------------------------
-    # Apply weight factors
-    # ---------------------------------------------
+    # ----------------------------------------------------------
+    # NON-CLUSTER
+    # ----------------------------------------------------------
 
-    weights = (
-        total_effective_area
-        * np.asarray(
-            weight_factors,
+    if not has_cluster:
+
+        return np.asarray(
+            [total_effective_area],
             dtype=float
         )
-    )
 
-    return weights
+    # ----------------------------------------------------------
+    # CLUSTER
+    # ----------------------------------------------------------
+
+    weights = []
+
+    for factor in weight_factors:
+
+        weights.append(
+            total_effective_area
+            * factor
+        )
+
+    return np.asarray(
+        weights,
+        dtype=float
+    )
 
 
 def optimize_tracking_parameters(
