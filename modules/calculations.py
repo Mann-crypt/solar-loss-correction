@@ -473,7 +473,7 @@ def optimize_tracking_parameters(
     callback=None
 ):
     """
-    Optimize:
+    Optimize tracking parameters:
 
         DHI
         GHI Starting Block
@@ -481,7 +481,13 @@ def optimize_tracking_parameters(
         GHI Max Block
         East Tracking Limit
         West Tracking Limit
+
+    Works for both cluster and non-cluster plants.
     """
+
+    # ==================================================
+    # CLEAN INPUT
+    # ==================================================
 
     actual = np.asarray(
         actual,
@@ -493,34 +499,90 @@ def optimize_tracking_parameters(
         dtype=float
     )
 
-    # ---------------------------------------------
-    # Effective area / weights
-    # ---------------------------------------------
+    # ==================================================
+    # VALIDATION
+    # ==================================================
+
+    if len(actual) != len(blocks):
+
+        raise ValueError(
+            "Actual and Blocks must have same length."
+        )
+
+    if len(ghi_arrays) == 0:
+
+        raise ValueError(
+            "At least one GHI array is required."
+        )
+
+    for ghi in ghi_arrays:
+
+        if len(ghi) != len(blocks):
+
+            raise ValueError(
+                "GHI array length must match blocks."
+            )
+
+    # ==================================================
+    # CALCULATE WEIGHTS
+    # ==================================================
 
     weights = calculate_loss_corrected_weights(
+
         area_df=area_df,
+
         efficiency_loss=efficiency_loss,
+
         weight_factors=weight_factors
     )
 
-    # ---------------------------------------------
-    # Objective
-    # ---------------------------------------------
+    # ==================================================
+    # VALIDATE WEIGHTS
+    # ==================================================
+
+    if len(weights) != len(ghi_arrays):
+
+        raise ValueError(
+            f"GHI arrays ({len(ghi_arrays)}) "
+            f"and weights ({len(weights)}) "
+            f"must have same length."
+        )
+
+    # ==================================================
+    # OBJECTIVE FUNCTION
+    # ==================================================
 
     def objective(x):
 
+        # ---------------------------------------------
+        # Parameters
+        # ---------------------------------------------
+
         DHI = int(round(x[0]))
+
         start = int(round(x[1]))
+
         end = int(round(x[2]))
+
         max_block = int(round(x[3]))
+
         east = int(round(x[4]))
+
         west = int(round(x[5]))
 
-        # Invalid configuration
+        # ---------------------------------------------
+        # Block configuration
+        # ---------------------------------------------
+
         if not (
             start < max_block < end
         ):
+
             return 1e9
+
+        # ---------------------------------------------
+        # Calculate forecast
+        # ---------------------------------------------
 
         try:
 
@@ -549,35 +611,42 @@ def optimize_tracking_parameters(
 
             return 1e9
 
-        # -----------------------------------------
+        # ---------------------------------------------
         # Daylight mask
-        # -----------------------------------------
+        # ---------------------------------------------
 
-        mask = (
-            actual != 0
-        )
+        mask = actual > 0
 
         act = actual[mask]
+
         pred = prediction[mask]
 
         if len(act) == 0:
+
             return 1e9
 
         if act.max() <= 0:
+
             return 1e9
 
-        # -----------------------------------------
-        # Error metrics
-        # -----------------------------------------
+        # ---------------------------------------------
+        # Block error
+        # ---------------------------------------------
 
-        block_error = (
+        block_error_value = (
             np.mean(
-                np.abs(act - pred)
+                np.abs(
+                    act - pred
+                )
             )
             / act.max()
         )
 
-        peak_error = (
+        # ---------------------------------------------
+        # Peak error
+        # ---------------------------------------------
+
+        peak_error_value = (
             abs(
                 act.max()
                 - pred.max()
@@ -585,33 +654,54 @@ def optimize_tracking_parameters(
             / act.max()
         )
 
-        energy_error = (
+        # ---------------------------------------------
+        # Energy error
+        # ---------------------------------------------
+
+        if act.sum() == 0:
+
+            return 1e9
+
+        energy_error_value = (
             abs(
                 act.sum()
                 - pred.sum()
             )
             / act.sum()
-            if act.sum() != 0
-            else 1e9
         )
 
+        # ---------------------------------------------
+        # Combined score
+        # ---------------------------------------------
+
         score = (
-            0.80 * block_error
-            + 0.10 * peak_error
-            + 0.10 * energy_error
+
+            0.80
+            * block_error_value
+
+            +
+
+            0.10
+            * peak_error_value
+
+            +
+
+            0.10
+            * energy_error_value
         )
 
         if (
             np.isnan(score)
             or np.isinf(score)
         ):
+
             return 1e9
 
         return score
 
-    # ---------------------------------------------
-    # Optimization
-    # ---------------------------------------------
+    # ==================================================
+    # DIFFERENTIAL EVOLUTION
+    # ==================================================
 
     result = differential_evolution(
 
@@ -640,13 +730,18 @@ def optimize_tracking_parameters(
         callback=callback
     )
 
+    # ==================================================
+    # BEST PARAMETERS
+    # ==================================================
+
     best = np.round(
         result.x
     ).astype(int)
 
     parameters = {
 
-        "DHI": int(best[0]),
+        "DHI":
+            int(best[0]),
 
         "Starting Block":
             int(best[1]),
@@ -664,9 +759,21 @@ def optimize_tracking_parameters(
             int(best[5]),
     }
 
+    # ==================================================
+    # RETURN
+    # ==================================================
+
     return {
-        "parameters": parameters,
-        "score": float(result.fun),
-        "weights": weights,
-        "result": result,
+
+        "parameters":
+            parameters,
+
+        "score":
+            float(result.fun),
+
+        "weights":
+            weights,
+
+        "result":
+            result,
     }
