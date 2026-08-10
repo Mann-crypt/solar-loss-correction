@@ -6,90 +6,16 @@ from modules.validators import validate_uploaded_file
 from modules.utils import generate_blocks, generate_time_blocks
 from modules.metrics import calculate_all_metrics
 from modules.plotting import plot_loss_correction
+from modules.excel_reader import read_loss_correction_input
+from modules.utils import generate_blocks, generate_time_blocks
 
 
-def read_loss_input(uploaded_file):
-    """
-    Read a simple Loss Correction input file.
+try:
+    df = read_loss_correction_input(uploaded_file)
 
-    Required columns:
-        GHI_Forecast
-        Actual
-
-    Supports CSV and Excel.
-    """
-
-    if uploaded_file.name.lower().endswith(".csv"):
-        df = pd.read_csv(uploaded_file)
-
-    else:
-        df = pd.read_excel(uploaded_file)
-
-    # Clean column names
-    df.columns = (
-        df.columns
-        .astype(str)
-        .str.strip()
-        .str.replace("\n", " ", regex=False)
-    )
-
-    required = ["GHI_Forecast", "Actual"]
-
-    missing = [
-        col for col in required
-        if col not in df.columns
-    ]
-
-    if missing:
-        raise ValueError(
-            f"Missing required column(s): {', '.join(missing)}"
-        )
-
-    # Keep only required columns
-    df = df[required].copy()
-
-    # Convert to numeric
-    for col in required:
-        df[col] = pd.to_numeric(
-            df[col],
-            errors="coerce"
-        )
-
-    # Remove completely invalid rows
-    df = df.dropna(
-        subset=required,
-        how="all"
-    ).reset_index(drop=True)
-
-    # Replace remaining NaN with zero
-    df[required] = df[required].fillna(0)
-
-    # Keep maximum one day
-    if len(df) > 96:
-        df = df.iloc[:96].copy()
-
-    # Require exactly 96 blocks
-    if len(df) != 96:
-        raise ValueError(
-            f"Loss Correction requires 96 blocks. "
-            f"Found {len(df)} rows."
-        )
-
-    # Add standard block information
-    df.insert(
-        0,
-        "Blocks",
-        generate_blocks(96)
-    )
-
-    df.insert(
-        1,
-        "Time-Blocks",
-        generate_time_blocks(96)
-    )
-
-    return df
-
+except Exception as e:
+    st.error(f"Unable to read input file: {e}")
+    return
 
 def reset_loss_correction_state():
     """
