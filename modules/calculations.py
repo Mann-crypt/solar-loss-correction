@@ -475,10 +475,22 @@ def optimize_tracking_parameters(
             CL4-GHI,
             CL5-GHI
         ]
+        
+        weights = [
+            weight_1,
+            weight_2,
+            weight_3,
+            weight_4,
+            weight_5
+        ]
 
     Non-cluster:
         ghi_arrays = [
-            normal GHI
+            GHI_Forecast
+        ]
+        
+        weights = [
+            total_effective_area
         ]
     """
 
