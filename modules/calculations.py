@@ -263,39 +263,7 @@ def calculate_tracking_forecast(
 ):
     """
     Calculate final tracking power forecast.
-
-    Supports:
-
-    Cluster:
-        ghi_arrays = [
-            CL1-GHI,
-            CL2-GHI,
-            CL3-GHI,
-            CL4-GHI,
-            CL5-GHI
-        ]
-
-        weights = [
-            weight1,
-            weight2,
-            weight3,
-            weight4,
-            weight5
-        ]
-
-    Non-cluster:
-        ghi_arrays = [
-            normal_GHI
-        ]
-
-        weights = [
-            total_effective_area
-        ]
     """
-
-    # ==================================================
-    # VALIDATE INPUT
-    # ==================================================
 
     if len(ghi_arrays) != len(weights):
 
@@ -314,11 +282,17 @@ def calculate_tracking_forecast(
     # ==================================================
 
     _, panel = calculate_tracking_angles(
+
         blocks=blocks,
+
         ghi_start=ghi_start,
+
         ghi_end=ghi_end,
+
         ghi_max=ghi_max,
+
         east_limit=east_limit,
+
         west_limit=west_limit
     )
 
@@ -337,7 +311,7 @@ def calculate_tracking_forecast(
     )
 
     # ==================================================
-    # FINAL FORECAST
+    # FORECAST
     # ==================================================
 
     forecast = np.zeros(
@@ -346,7 +320,7 @@ def calculate_tracking_forecast(
     )
 
     # ==================================================
-    # PROCESS EACH GHI ARRAY
+    # EACH CLUSTER / NORMAL GHI
     # ==================================================
 
     for ghi, weight in zip(
@@ -366,29 +340,18 @@ def calculate_tracking_forecast(
                 "match blocks."
             )
 
-        # ---------------------------------------------
         # DHI
-        # ---------------------------------------------
-
         dhi = calculate_dhi(
-            ghi=ghi,
-            dhi_percent=dhi_percent
+            ghi,
+            dhi_percent
         )
 
-        # ---------------------------------------------
         # DNI
-        # ---------------------------------------------
+        dni = (
+            ghi - dhi
+        ) / cos_alpha
 
-        dni = calculate_dni(
-            ghi=ghi,
-            dhi=dhi,
-            panel_angle=panel
-        )
-
-        # ---------------------------------------------
-        # POWER
-        # ---------------------------------------------
-
+        # Power
         forecast += (
             dni * weight
         ) / 1_000_000
@@ -403,7 +366,7 @@ from scipy.optimize import differential_evolution
 def calculate_loss_corrected_weights(
     area_df,
     efficiency_loss,
-    weight_factors,
+    weight_factors=None,
     has_cluster=True
 ):
     """
@@ -418,22 +381,20 @@ def calculate_loss_corrected_weights(
 
     df = area_df.copy()
 
-    # ----------------------------------------------------------
-    # Efficiency
-    # ----------------------------------------------------------
+    # --------------------------------------------------
+    # Efficiency loss
+    # --------------------------------------------------
 
-    df["Efficiency Losses(%)"] = (
-        efficiency_loss
-    )
+    df["Efficiency Losses(%)"] = efficiency_loss
 
     df["Net Efficiency (%)"] = (
         df["Standard PV Efficiency (%)"]
         - df["Efficiency Losses(%)"]
     )
 
-    # ----------------------------------------------------------
+    # --------------------------------------------------
     # Effective area
-    # ----------------------------------------------------------
+    # --------------------------------------------------
 
     df["Effective Area"] = (
         df["Total area(m2)"]
@@ -445,9 +406,9 @@ def calculate_loss_corrected_weights(
         df["Effective Area"].sum()
     )
 
-    # ----------------------------------------------------------
+    # ==================================================
     # NON-CLUSTER
-    # ----------------------------------------------------------
+    # ==================================================
 
     if not has_cluster:
 
@@ -456,41 +417,47 @@ def calculate_loss_corrected_weights(
             dtype=float
         )
 
-    # ----------------------------------------------------------
+    # ==================================================
     # CLUSTER
-    # ----------------------------------------------------------
+    # ==================================================
 
-    weights = []
+    if weight_factors is None:
 
-    for factor in weight_factors:
-
-        weights.append(
-            total_effective_area
-            * factor
+        raise ValueError(
+            "weight_factors are required "
+            "when cluster data is present."
         )
 
-    return np.asarray(
-        weights,
+    weight_factors = np.asarray(
+        weight_factors,
         dtype=float
     )
 
+    weights = (
+        total_effective_area
+        * weight_factors
+    )
+
+    return weights
 
 def optimize_tracking_parameters(
     actual,
     ghi_arrays,
     blocks,
     area_df,
-    weight_factors,
-    efficiency_loss,
-    bounds,
+    weight_factors=None,
+    efficiency_loss=0,
+    bounds=None,
+    has_cluster=False,
     maxiter=100,
     popsize=15,
     seed=42,
     callback=None
 ):
     """
-    Optimize tracking parameters:
+    Optimize tracking parameters.
 
+    Parameters optimized:
         DHI
         GHI Starting Block
         GHI Ending Block
@@ -498,7 +465,21 @@ def optimize_tracking_parameters(
         East Tracking Limit
         West Tracking Limit
 
-    Works for both cluster and non-cluster plants.
+    Supports both:
+
+    Cluster:
+        ghi_arrays = [
+            CL1-GHI,
+            CL2-GHI,
+            CL3-GHI,
+            CL4-GHI,
+            CL5-GHI
+        ]
+
+    Non-cluster:
+        ghi_arrays = [
+            normal GHI
+        ]
     """
 
     # ==================================================
@@ -549,7 +530,9 @@ def optimize_tracking_parameters(
 
         efficiency_loss=efficiency_loss,
 
-        weight_factors=weight_factors
+        weight_factors=weight_factors,
+
+        has_cluster=has_cluster
     )
 
     # ==================================================
@@ -570,9 +553,9 @@ def optimize_tracking_parameters(
 
     def objective(x):
 
-        # ---------------------------------------------
+        # ----------------------------------------------
         # Parameters
-        # ---------------------------------------------
+        # ----------------------------------------------
 
         DHI = int(round(x[0]))
 
@@ -586,9 +569,9 @@ def optimize_tracking_parameters(
 
         west = int(round(x[5]))
 
-        # ---------------------------------------------
-        # Block configuration
-        # ---------------------------------------------
+        # ----------------------------------------------
+        # Validate block configuration
+        # ----------------------------------------------
 
         if not (
             start < max_block < end
@@ -596,9 +579,9 @@ def optimize_tracking_parameters(
 
             return 1e9
 
-        # ---------------------------------------------
+        # ----------------------------------------------
         # Calculate forecast
-        # ---------------------------------------------
+        # ----------------------------------------------
 
         try:
 
@@ -627,9 +610,9 @@ def optimize_tracking_parameters(
 
             return 1e9
 
-        # ---------------------------------------------
-        # Daylight mask
-        # ---------------------------------------------
+        # ==================================================
+        # DAYLIGHT MASK
+        # ==================================================
 
         mask = actual > 0
 
@@ -645,9 +628,9 @@ def optimize_tracking_parameters(
 
             return 1e9
 
-        # ---------------------------------------------
-        # Block error
-        # ---------------------------------------------
+        # ==================================================
+        # BLOCK ERROR
+        # ==================================================
 
         block_error_value = (
             np.mean(
@@ -658,9 +641,9 @@ def optimize_tracking_parameters(
             / act.max()
         )
 
-        # ---------------------------------------------
-        # Peak error
-        # ---------------------------------------------
+        # ==================================================
+        # PEAK ERROR
+        # ==================================================
 
         peak_error_value = (
             abs(
@@ -670,13 +653,9 @@ def optimize_tracking_parameters(
             / act.max()
         )
 
-        # ---------------------------------------------
-        # Energy error
-        # ---------------------------------------------
-
-        if act.sum() == 0:
-
-            return 1e9
+        # ==================================================
+        # ENERGY ERROR
+        # ==================================================
 
         energy_error_value = (
             abs(
@@ -686,9 +665,9 @@ def optimize_tracking_parameters(
             / act.sum()
         )
 
-        # ---------------------------------------------
-        # Combined score
-        # ---------------------------------------------
+        # ==================================================
+        # COMBINED SCORE
+        # ==================================================
 
         score = (
 
@@ -714,6 +693,21 @@ def optimize_tracking_parameters(
             return 1e9
 
         return score
+
+    # ==================================================
+    # DEFAULT BOUNDS
+    # ==================================================
+
+    if bounds is None:
+
+        bounds = [
+            (0, 30),     # DHI %
+            (10, 30),    # Starting block
+            (70, 90),    # Ending block
+            (40, 70),    # Max block
+            (10, 70),    # East limit
+            (10, 70),    # West limit
+        ]
 
     # ==================================================
     # DIFFERENTIAL EVOLUTION
@@ -792,4 +786,7 @@ def optimize_tracking_parameters(
 
         "result":
             result,
+
+        "has_cluster":
+            has_cluster,
     }
