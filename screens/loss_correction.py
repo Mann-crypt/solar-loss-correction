@@ -1,1658 +1,402 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.graph_objects as go
-from scipy.optimize import differential_evolution
-import streamlit.components.v1 as components
-import itertools
-from datetime import datetime, timedelta
+
+from modules.validators import validate_uploaded_file
+from modules.utils import generate_blocks, generate_time_blocks
+from modules.metrics import calculate_all_metrics
+from modules.plotting import plot_loss_correction
+
+
+def read_loss_input(uploaded_file):
+    """
+    Read a simple Loss Correction input file.
+
+    Required columns:
+        GHI_Forecast
+        Actual
+
+    Supports CSV and Excel.
+    """
+
+    if uploaded_file.name.lower().endswith(".csv"):
+        df = pd.read_csv(uploaded_file)
+
+    else:
+        df = pd.read_excel(uploaded_file)
+
+    # Clean column names
+    df.columns = (
+        df.columns
+        .astype(str)
+        .str.strip()
+        .str.replace("\n", " ", regex=False)
+    )
+
+    required = ["GHI_Forecast", "Actual"]
+
+    missing = [
+        col for col in required
+        if col not in df.columns
+    ]
+
+    if missing:
+        raise ValueError(
+            f"Missing required column(s): {', '.join(missing)}"
+        )
+
+    # Keep only required columns
+    df = df[required].copy()
+
+    # Convert to numeric
+    for col in required:
+        df[col] = pd.to_numeric(
+            df[col],
+            errors="coerce"
+        )
+
+    # Remove completely invalid rows
+    df = df.dropna(
+        subset=required,
+        how="all"
+    ).reset_index(drop=True)
+
+    # Replace remaining NaN with zero
+    df[required] = df[required].fillna(0)
+
+    # Keep maximum one day
+    if len(df) > 96:
+        df = df.iloc[:96].copy()
+
+    # Require exactly 96 blocks
+    if len(df) != 96:
+        raise ValueError(
+            f"Loss Correction requires 96 blocks. "
+            f"Found {len(df)} rows."
+        )
+
+    # Add standard block information
+    df.insert(
+        0,
+        "Blocks",
+        generate_blocks(96)
+    )
+
+    df.insert(
+        1,
+        "Time-Blocks",
+        generate_time_blocks(96)
+    )
+
+    return df
+
+
+def reset_loss_correction_state():
+    """
+    Clear Loss Correction session state.
+    """
+
+    keys = [
+        "loss_input",
+        "loss_original",
+        "loss_result",
+        "loss_params",
+    ]
+
+    for key in keys:
+        st.session_state.pop(key, None)
 
 
 def show_loss_correction():
 
-    st.title("Pakima Pakam Ravi, 3-4 Loss Correction kar chuke hai!!😎")
+    st.title("⛅ Loss Correction")
+
+    st.caption(
+        "Upload GHI Forecast and Actual data for one day "
+        "(96 × 15-minute blocks)."
+    )
+
+    # --------------------------------------------------
+    # FILE UPLOAD
+    # --------------------------------------------------
 
     uploaded_file = st.file_uploader(
-        "Yaha Feko!!",
-        type=["xlsx"],
-        key="excel_uploader"
+        "Upload input file",
+        type=["csv", "xlsx"],
+        key="loss_correction_uploader",
     )
+
     if uploaded_file is None:
-        st.info("Pehle File toh upload karo!!!")
-        st.stop()
-        
-    # ---------- Detect new uploaded file ----------
-    if "last_uploaded_file" not in st.session_state:
-        st.session_state.last_uploaded_file = uploaded_file.name
-    
-    elif st.session_state.last_uploaded_file != uploaded_file.name:
-    
-        # Clear cached functions
-        st.cache_data.clear()
-    
-        # Remove previous optimization
-        st.session_state.pop("params", None)
-        st.session_state.pop("run_model", None)
-    
-        # Remove all user-editable values
-        for key in [
-            "loss",
-            "dhi",
-            "start",
-            "end",
-            "max",
-            "east",
-            "west",
-        ]:
-            st.session_state.pop(key, None)
-    
-        st.session_state.last_uploaded_file = uploaded_file.name
-    
-        st.rerun()
-    # Read workbook
-    xls = pd.ExcelFile(uploaded_file)
-    
-    # Detect workbook type
-    is_cluster = "Fixed-CL1" in xls.sheet_names
-    
-    if is_cluster:
-        #st.success("Arey Yarrr!! phir se Cluster")
-        sheet = "Fixed-CL1"
-        ghi_cols = ["CL1-GHI", "CL2-GHI", "CL3-GHI", "CL4-GHI", "CL5-GHI"]
-    else:
-        #st.success("Arey Waah!! no Cluster")
-        sheet = "Fixed"
-        ghi_cols = ["GHI_Forecast"]
-    
-    df_fix = pd.read_excel(uploaded_file, sheet_name=sheet, header=[1])
-    df_fix.columns = df_fix.columns.str.strip()
-    df_fix["Actual"] = df_fix["Actual"].fillna(0)
-    
-    # Remove empty rows
-    null_indices = df_fix[df_fix["Date"].isna()].index
-    if len(null_indices) > 0:
-        first_null = df_fix.index.get_loc(null_indices[0])
-        df_fix = df_fix.iloc[:first_null]
-    
-    # Keep only first 96 blocks
-    df_fix = df_fix.iloc[:96].copy()
-    
+        st.info(
+            "Upload a CSV or Excel file containing "
+            "`GHI_Forecast` and `Actual` columns."
+        )
+        return
+
+    # --------------------------------------------------
+    # NEW FILE DETECTION
+    # --------------------------------------------------
+
+    file_signature = (
+        uploaded_file.name,
+        uploaded_file.size,
+    )
+
+    if (
+        st.session_state.get("loss_file_signature")
+        != file_signature
+    ):
+        reset_loss_correction_state()
+
+        st.session_state.loss_file_signature = (
+            file_signature
+        )
+
+    # --------------------------------------------------
+    # READ INPUT
+    # --------------------------------------------------
+
+    try:
+        df = read_loss_input(uploaded_file)
+
+    except Exception as e:
+        st.error(f"Unable to read input file: {e}")
+        return
+
+    # --------------------------------------------------
+    # STORE ORIGINAL DATA
+    # --------------------------------------------------
+
+    if "loss_original" not in st.session_state:
+        st.session_state.loss_original = df.copy()
+
+    # --------------------------------------------------
+    # INPUT TABLE
+    # --------------------------------------------------
+
     st.subheader("Input Data")
-    
-    input_df = df_fix[ghi_cols + ["Actual"]].copy()
-    
-    original_df = input_df.copy()
-    
+
+    st.caption(
+        "You can directly edit GHI Forecast and Actual values."
+    )
+
+    editable_df = df[
+        [
+            "Blocks",
+            "Time-Blocks",
+            "GHI_Forecast",
+            "Actual",
+        ]
+    ].copy()
+
     edited_df = st.data_editor(
-        input_df,
+        editable_df,
         use_container_width=True,
         hide_index=True,
         num_rows="fixed",
-        key="editor"
-    )
-    
-    edited_numeric = edited_df.copy()
-    
-    edited_numeric[ghi_cols] = edited_numeric[ghi_cols].apply(
-        pd.to_numeric,
-        errors="coerce"
-    ).fillna(0)
-    
-    edited_numeric["Actual"] = (
-        pd.to_numeric(edited_numeric["Actual"], errors="coerce")
-        .fillna(0)
-    )
-    
-    changed_rows = (
-        edited_numeric.ne(original_df.fillna(0))
-    ).any(axis=1)
-    
-    if changed_rows.any():
-        st.toast(
-            f"✨ {changed_rows.sum()} rows updated successfully!",
-            icon="✅"
-        )
-    
-    edited_df = edited_df.iloc[:96].reset_index(drop=True)
-    
-    # Convert everything to numeric.
-    # Any text or invalid value becomes 0.
-    edited_df[ghi_cols] = edited_df[ghi_cols].apply(
-        pd.to_numeric,
-        errors="coerce"
-    ).fillna(0)
-    
-    edited_df["Actual"] = (
-        pd.to_numeric(edited_df["Actual"], errors="coerce")
-        .fillna(0)
-    )
-    
-    # Update df_fix only once
-    df_fix.loc[:, ghi_cols] = edited_df[ghi_cols].values
-    df_fix.loc[:, "Actual"] = edited_df["Actual"].values
-    
-    plant_type = st.pills(
-        "Select Plant Type",
-        [
-            "🏗️ Fixed",
-            "🔄 Tracking"
+        disabled=[
+            "Blocks",
+            "Time-Blocks",
         ],
-        default="🏗️ Fixed"
+        column_config={
+            "Blocks": st.column_config.NumberColumn(
+                "Block",
+                format="%d",
+            ),
+            "Time-Blocks": st.column_config.TextColumn(
+                "Time",
+            ),
+            "GHI_Forecast": st.column_config.NumberColumn(
+                "GHI Forecast",
+                format="%.2f",
+            ),
+            "Actual": st.column_config.NumberColumn(
+                "Actual",
+                format="%.2f",
+            ),
+        },
+        key="loss_input_editor",
     )
-    
-    if "run_model" not in st.session_state:
-        st.session_state.run_model = False
-    
-    if st.button("🚀 Dabao magar pyaar se!!", use_container_width=True, type="primary"):
-        st.session_state.pop("params", None)   # Delete old optimized values
-        st.session_state.run_model = True
-    
-    if st.session_state.run_model:
-        if is_cluster:
-            if plant_type == "🏗️ Fixed":
-                df = pd.read_excel(uploaded_file, sheet_name="Area & Efficiency", header=[1], usecols=range(8))
-                null_indices = df[df['Module Type'].isna()].index
-                first_null_pos = df.index.get_loc(null_indices[0])
-                df = df.iloc[:first_null_pos]
-                df.columns = df.columns.str.strip()
-                df_w = pd.read_excel(uploaded_file, sheet_name="Area & Efficiency", header=2, usecols=[12, 13, 14, 15, 16])
-                df_st = pd.read_excel(uploaded_file, sheet_name="Forecast Config", header=[8])
-                lat = float(df_st.loc[0, "Lat"])
-                df_tilt = pd.read_excel(uploaded_file, sheet_name="Config Tilt Angle", header=[7])
-                df_tilt.columns = df_tilt.columns.str.strip()
-                null_indices = df_tilt[df_tilt['Fixed'].isna()].index
-                first_null_pos = df_tilt.index.get_loc(null_indices[0])
-                df_tilt = df_tilt.iloc[:first_null_pos]
-                df_tilt = df_tilt.dropna(how='all', axis=1)
-                df_tilt = df_tilt.rename(columns={
-                    'Unnamed: 2': 'Month_Num',
-                    'Unnamed: 3': 'Month',
-                })
-                month_lookup = df_tilt.set_index('Month')['Fixed'].to_dict()
-                df_ghi = pd.read_excel(uploaded_file, sheet_name="Result", usecols=[0, 1, 2, 3, 4, 5])
-                df_ghi = df_ghi.fillna(0)
-                df_fix = pd.read_excel(uploaded_file, sheet_name="Fixed-CL1", header=[1])
-                df_fix.columns = df_fix.columns.str.strip()
-                null_indices = df_fix[df_fix['Date'].isna()].index
-                first_null_pos = df_fix.index.get_loc(null_indices[0])
-                df_fix = df_fix.iloc[:first_null_pos]
-                
-                df_fix["Date"] = pd.Timestamp.today()
-                first_date = pd.Timestamp.today().replace(month=1, day=1).normalize()
-                
-                df_fix["Declination Angle ∆"] = 23.45 * (
-                    np.sin(
-                        np.radians(
-                            360 * (284 + (df_fix["Date"] - first_date).dt.days + 1) / 365
-                        )
-                    )
-                )
-                df_fix["Elevation angle a"] = (90 - lat + df_fix["Declination Angle ∆"])
-                df_fix["Tilt Angle b"] = df_fix["Date"].dt.strftime('%B').map(month_lookup)
-                df_fix["a+b"] = df_fix["Elevation angle a"] + df_fix["Tilt Angle b"]
-                df_fix["SIN(a+b)"] = np.sin(np.radians(df_fix["a+b"]))
-                df_fix["Sin(a)"] = np.sin(np.radians(df_fix["Elevation angle a"]))
-                df_fix["GHI*sin(a)"] = df_fix["CL1-GHI"] * df_fix["Sin(a)"]
-                df_fix["GHI*sin(a+b)"] = df_fix["CL1-GHI"] * df_fix["SIN(a+b)"]
-                df_fix["POA fixed"] = df_fix["GHI*sin(a+b)"] / df_fix["Sin(a)"]
-                df_fix["GHI*sin(a)-CL2"] = df_fix["CL2-GHI"] * df_fix["Sin(a)"]
-                df_fix["GHI*sin(a+b)-CL2"] = df_fix["CL2-GHI"] * df_fix["SIN(a+b)"]
-                df_fix["POA fixed-CL2"] = df_fix["GHI*sin(a+b)-CL2"] / df_fix["Sin(a)"]
-                df_fix["GHI*sin(a)-CL3"] = df_fix["CL3-GHI"] * df_fix["Sin(a)"]
-                df_fix["GHI*sin(a+b)-CL3"] = df_fix["CL3-GHI"] * df_fix["SIN(a+b)"]
-                df_fix["POA fixed-CL3"] = df_fix["GHI*sin(a+b)-CL3"] / df_fix["Sin(a)"]
-                df_fix["GHI*sin(a)-CL4"] = df_fix["CL4-GHI"] * df_fix["Sin(a)"]
-                df_fix["GHI*sin(a+b)-CL4"] = df_fix["CL4-GHI"] * df_fix["SIN(a+b)"]
-                df_fix["POA fixed-CL4"] = df_fix["GHI*sin(a+b)-CL4"] / df_fix["Sin(a)"]
-                df_fix["GHI*sin(a)-CL5"] = df_fix["CL5-GHI"] * df_fix["Sin(a)"]
-                df_fix["GHI*sin(a+b)-CL5"] = df_fix["CL5-GHI"] * df_fix["SIN(a+b)"]
-                df_fix["POA fixed-CL5"] = df_fix["GHI*sin(a+b)-CL5"] / df_fix["Sin(a)"]
-                
-                
-                # Maximum possible loss
-                max_loss = df["Standard PV Efficiency (%)"].min()
-                
-                #peak_error = abs(actual_peak - predicted_peak) / actual_peak * 100
-                
-                results = []
-                
-                for loss in np.arange(0, max_loss + 0.01, 0.1):
-                
-                    df["Efficiency Losses(%)"] = loss
-                    df["Net Efficiency (%)"] = df["Standard PV Efficiency (%)"] - df["Efficiency Losses(%)"]
-                    df_weight = pd.DataFrame({
-                        "CL-1" : ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-1"].values[0:1],
-                        "CL-2" : ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-2"].values[0:1],
-                        "CL-3" : ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-3"].values[0:1],
-                        "CL-4" : ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-4"].values[0:1],
-                        "CL-5" : ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-5"].values[0:1],
-                    })
-                
-                    df_fix["CL1_Fixed Power=I*Ƞ*A"] = (
-                        df_fix["POA fixed"] * np.sum(df_weight["CL-1"])
-                    ) / 1000000
-                
-                    df_fix["CL2_Fixed Power=I*Ƞ*A"] = (
-                        df_fix["POA fixed-CL2"] * np.sum(df_weight["CL-2"])
-                    ) / 1000000
-                
-                    df_fix["CL3_Fixed Power=I*Ƞ*A"] = (
-                        df_fix["POA fixed-CL3"] * np.sum(df_weight["CL-3"])
-                    ) / 1000000
-                
-                    df_fix["CL4_Fixed Power=I*Ƞ*A"] = (
-                        df_fix["POA fixed-CL4"] * np.sum(df_weight["CL-4"])
-                    ) / 1000000
-                
-                    df_fix["CL5_Fixed Power=I*Ƞ*A"] = (
-                        df_fix["POA fixed-CL5"] * np.sum(df_weight["CL-5"])
-                    ) / 1000000
-                
-                    df_fix["Total Power (CL1+CL2+…)"] = df_fix["CL1_Fixed Power=I*Ƞ*A"] + df_fix["CL2_Fixed Power=I*Ƞ*A"] + df_fix["CL3_Fixed Power=I*Ƞ*A"] + df_fix["CL4_Fixed Power=I*Ƞ*A"] + df_fix["CL5_Fixed Power=I*Ƞ*A"]
-                    
-                
-                    # Peak power comparison
-                    actual_peak = df_fix["Actual"].max()
-                    predicted_peak = df_fix["Total Power (CL1+CL2+…)"].max()
-                
-                    peak_error = abs(actual_peak - predicted_peak)
-                
-                    results.append({
-                        "Efficiency Loss (%)": loss,
-                        "Actual Peak": actual_peak,
-                        "Predicted Peak": predicted_peak,
-                        "Peak Error": peak_error
-                    })
-                
-                results_df = pd.DataFrame(results)
-                
-                # Get efficiency loss with least Peak Error
-                best_loss = results_df.loc[
-                    results_df["Peak Error"].idxmin(),
-                    "Efficiency Loss (%)"
-                ]
-                
-                # Assign best efficiency loss
-                df["Efficiency Losses(%)"] = best_loss
-                
-                # Recalculate dependent columns
-                df["Net Efficiency (%)"] = df["Standard PV Efficiency (%)"] - df["Efficiency Losses(%)"]
-                df_weight["CL-1"] = ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-1"].values[0:1]
-                df_weight["CL-2"] = ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-2"].values[0:1]
-                df_weight["CL-3"] = ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-3"].values[0:1]
-                df_weight["CL-4"] = ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-4"].values[0:1]
-                df_weight["CL-5"] = ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-5"].values[0:1]
-                    
-                df_fix["CL1_Fixed Power=I*Ƞ*A"] = (
-                    df_fix["POA fixed"] * np.sum(df_weight["CL-1"])
-                ) / 1000000
-                
-                df_fix["CL2_Fixed Power=I*Ƞ*A"] = (
-                    df_fix["POA fixed-CL2"] * np.sum(df_weight["CL-2"])
-                ) / 1000000
-                
-                df_fix["CL3_Fixed Power=I*Ƞ*A"] = (
-                    df_fix["POA fixed-CL3"] * np.sum(df_weight["CL-3"])
-                ) / 1000000
-                
-                df_fix["CL4_Fixed Power=I*Ƞ*A"] = (
-                    df_fix["POA fixed-CL4"] * np.sum(df_weight["CL-4"])
-                ) / 1000000
-                
-                df_fix["CL5_Fixed Power=I*Ƞ*A"] = (
-                    df_fix["POA fixed-CL5"] * np.sum(df_weight["CL-5"])
-                ) / 1000000
-                
-                df_fix["Total Power (CL1+CL2+…)"] = df_fix["CL1_Fixed Power=I*Ƞ*A"] + df_fix["CL2_Fixed Power=I*Ƞ*A"] + df_fix["CL3_Fixed Power=I*Ƞ*A"] + df_fix["CL4_Fixed Power=I*Ƞ*A"] + df_fix["CL5_Fixed Power=I*Ƞ*A"]
-                st.metric(
-                    "Efficiency Loss",
-                    f"{best_loss:.2f}%"
-                )
-                
-                display_df = df[
-                    [
-                        "Module Type",
-                        "Standard PV Efficiency (%)",
-                        "Efficiency Losses(%)",
-                        "Net Efficiency (%)",
-                        "Total area(m2)"
-                    ]
-                ].copy()
-                
-                num_cols = display_df.select_dtypes(include="number").columns
-                display_df[num_cols] = display_df[num_cols].round(2)
-                
-                with st.expander("🔍 View Efficiency Calculations"):
-                    st.dataframe(
-                        display_df,
-                        use_container_width=True,
-                        hide_index=True,
-                    )
-                    
-                x = np.arange(1, 97)
-        
-                fig = go.Figure()
-        
-                fig.add_trace(
-                    go.Scatter(
-                        x=x,
-                        y=df_fix["Total Power (CL1+CL2+…)"],
-                        mode="lines",
-                        name="Forecast",
-                        line=dict(color="#3B82F6", width=3),
-                    )
-                )
-        
-                fig.add_trace(
-                    go.Scatter(
-                        x=x,
-                        y=df_fix["Actual"],
-                        mode="lines",
-                        name="Actual",
-                        line=dict(color="#EF4444", width=3),
-                    )
-                )
-        
-                fig.update_layout(
-                    title="Forecast vs Actual Power",
-                    template="plotly_white",
-                    height=500,
-                    hovermode="x unified",
-                    xaxis=dict(
-                        title="15 Minute Block",
-                        dtick=4
-                    ),
-                    yaxis=dict(
-                        title="Power (MW)"
-                    ),
-                    legend=dict(
-                        orientation="h",
-                        y=1.08,
-                        x=0
-                    ),
-                    margin=dict(l=20, r=20, t=60, b=20)
-                )
-        
-                st.plotly_chart(fig, use_container_width=True)
-            elif plant_type == "🔄 Tracking":
-                df = pd.read_excel(uploaded_file, sheet_name="Area & Efficiency", header=[1], usecols=range(8))
-                null_indices = df[df['Module Type'].isna()].index
-                first_null_pos = df.index.get_loc(null_indices[0])
-                df = df.iloc[:first_null_pos]
-                df.columns = df.columns.str.strip()
-                df_w = pd.read_excel(uploaded_file, sheet_name="Area & Efficiency", header=2, usecols=[12, 13, 14, 15, 16])
-                df_st = pd.read_excel(uploaded_file, sheet_name="Forecast Config", header=[8])
-                lat = float(df_st.loc[0, "Lat"])
-                df_tilt = pd.read_excel(uploaded_file, sheet_name="Config Tilt Angle", header=[7])
-                df_tilt.columns = df_tilt.columns.str.strip()
-                null_indices = df_tilt[df_tilt['Fixed'].isna()].index
-                first_null_pos = df_tilt.index.get_loc(null_indices[0])
-                df_tilt = df_tilt.iloc[:first_null_pos]
-                df_tilt = df_tilt.dropna(how='all', axis=1)
-                df_tilt = df_tilt.rename(columns={
-                    'Unnamed: 2': 'Month_Num',
-                    'Unnamed: 3': 'Month',
-                })
-                #month_lookup = df_tilt.set_index('Month')['Fixed'].to_dict()
-                
-                df_fix["Date"] = pd.Timestamp.today()
-                first_date = pd.Timestamp.today().replace(month=1, day=1).normalize()
-                
-                df_fix["Declination Angle ∆"] = 23.45 * (
-                    np.sin(
-                        np.radians(
-                            360 * (284 + (df_fix["Date"] - first_date).dt.days + 1) / 365
-                        )
-                    )
-                )
-                df_fix["Elevation angle a"] = (90 - lat + df_fix["Declination Angle ∆"])
-                #df_fix["Tilt Angle b"] = df_fix["Date"].dt.strftime('%B').map(month_lookup)
-                df_fix["a+b"] = df_fix["Elevation angle a"] + 0
-                df_fix["SIN(a+b)"] = np.sin(np.radians(df_fix["a+b"]))
-                df_fix["Sin(a)"] = np.sin(np.radians(df_fix["Elevation angle a"]))
-                df_fix["GHI*sin(a)"] = df_fix["CL1-GHI"] * df_fix["Sin(a)"]
-                df_fix["GHI*sin(a+b)"] = df_fix["CL1-GHI"] * df_fix["SIN(a+b)"]
-                df_fix["POA fixed"] = df_fix["GHI*sin(a+b)"] / df_fix["Sin(a)"]
-                df_fix["GHI*sin(a)-CL2"] = df_fix["CL2-GHI"] * df_fix["Sin(a)"]
-                df_fix["GHI*sin(a+b)-CL2"] = df_fix["CL2-GHI"] * df_fix["SIN(a+b)"]
-                df_fix["POA fixed-CL2"] = df_fix["GHI*sin(a+b)-CL2"] / df_fix["Sin(a)"]
-                df_fix["GHI*sin(a)-CL3"] = df_fix["CL3-GHI"] * df_fix["Sin(a)"]
-                df_fix["GHI*sin(a+b)-CL3"] = df_fix["CL3-GHI"] * df_fix["SIN(a+b)"]
-                df_fix["POA fixed-CL3"] = df_fix["GHI*sin(a+b)-CL3"] / df_fix["Sin(a)"]
-                df_fix["GHI*sin(a)-CL4"] = df_fix["CL4-GHI"] * df_fix["Sin(a)"]
-                df_fix["GHI*sin(a+b)-CL4"] = df_fix["CL4-GHI"] * df_fix["SIN(a+b)"]
-                df_fix["POA fixed-CL4"] = df_fix["GHI*sin(a+b)-CL4"] / df_fix["Sin(a)"]
-                df_fix["GHI*sin(a)-CL5"] = df_fix["CL5-GHI"] * df_fix["Sin(a)"]
-                df_fix["GHI*sin(a+b)-CL5"] = df_fix["CL5-GHI"] * df_fix["SIN(a+b)"]
-                df_fix["POA fixed-CL5"] = df_fix["GHI*sin(a+b)-CL5"] / df_fix["Sin(a)"]
-                
-                
-                # Maximum possible loss
-                max_loss = df["Standard PV Efficiency (%)"].min()
-                
-                results = []
-                
-                for loss in np.arange(0, max_loss + 0.01, 0.1):
-                
-                    df["Efficiency Losses(%)"] = loss
-                    df["Net Efficiency (%)"] = df["Standard PV Efficiency (%)"] - df["Efficiency Losses(%)"]
-                    df_weight = pd.DataFrame({
-                        "CL-1" : ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-1"].values[0:1],
-                        "CL-2" : ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-2"].values[0:1],
-                        "CL-3" : ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-3"].values[0:1],
-                        "CL-4" : ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-4"].values[0:1],
-                        "CL-5" : ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-5"].values[0:1],
-                    })
-                
-                    df_fix["CL1_Fixed Power=I*Ƞ*A"] = (
-                        df_fix["POA fixed"] * np.sum(df_weight["CL-1"])
-                    ) / 1000000
-                
-                    df_fix["CL2_Fixed Power=I*Ƞ*A"] = (
-                        df_fix["POA fixed-CL2"] * np.sum(df_weight["CL-2"])
-                    ) / 1000000
-                
-                    df_fix["CL3_Fixed Power=I*Ƞ*A"] = (
-                        df_fix["POA fixed-CL3"] * np.sum(df_weight["CL-3"])
-                    ) / 1000000
-                
-                    df_fix["CL4_Fixed Power=I*Ƞ*A"] = (
-                        df_fix["POA fixed-CL4"] * np.sum(df_weight["CL-4"])
-                    ) / 1000000
-                
-                    df_fix["CL5_Fixed Power=I*Ƞ*A"] = (
-                        df_fix["POA fixed-CL5"] * np.sum(df_weight["CL-5"])
-                    ) / 1000000
-                
-                    df_fix["Total Power (CL1+CL2+…)"] = df_fix["CL1_Fixed Power=I*Ƞ*A"] + df_fix["CL2_Fixed Power=I*Ƞ*A"] + df_fix["CL3_Fixed Power=I*Ƞ*A"] + df_fix["CL4_Fixed Power=I*Ƞ*A"] + df_fix["CL5_Fixed Power=I*Ƞ*A"]
-                    
-                
-                    # Peak power comparison
-                    actual_peak = df_fix["Actual"].max()
-                    predicted_peak = df_fix["Total Power (CL1+CL2+…)"].max()
-                
-                    peak_error = abs(actual_peak - predicted_peak)
-                
-                    results.append({
-                        "Efficiency Loss (%)": loss,
-                        "Actual Peak": actual_peak,
-                        "Predicted Peak": predicted_peak,
-                        "Peak Error": peak_error
-                    })
-                
-                results_df = pd.DataFrame(results)
-                
-                # Get efficiency loss with least Peak Error
-                best_loss = results_df.loc[
-                    results_df["Peak Error"].idxmin(),
-                    "Efficiency Loss (%)"
-                ]
-                
-                # Assign best efficiency loss
-                df["Efficiency Losses(%)"] = best_loss
-                # Recalculate dependent columns
-                df["Net Efficiency (%)"] = df["Standard PV Efficiency (%)"] - df["Efficiency Losses(%)"]
-                df_weight["CL-1"] = ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-1"].values[0:1]
-                df_weight["CL-2"] = ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-2"].values[0:1]
-                df_weight["CL-3"] = ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-3"].values[0:1]
-                df_weight["CL-4"] = ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-4"].values[0:1]
-                df_weight["CL-5"] = ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-5"].values[0:1]
-                    
-                
-                # ------------------ Read Data ------------------
-    
-                df_bcal1 = pd.read_excel(uploaded_file, sheet_name="Backend Cal CL1")
-                df_bcal2 = pd.read_excel(uploaded_file, sheet_name="Backend Cal CL2")
-                df_bcal3 = pd.read_excel(uploaded_file, sheet_name="Backend Cal CL3")
-                df_bcal4 = pd.read_excel(uploaded_file, sheet_name="Backend Cal CL4")
-                df_bcal5 = pd.read_excel(uploaded_file, sheet_name="Backend Cal CL5")
-                df_trac = pd.read_excel(uploaded_file, sheet_name="Tracking", header=[1])
-    
-                backend_list = [
-                    df_bcal1,
-                    df_bcal2,
-                    df_bcal3,
-                    df_bcal4,
-                    df_bcal5
-                ]
-                
-                ghi_cols = [
-                    "CL1-GHI",
-                    "CL2-GHI",
-                    "CL3-GHI",
-                    "CL4-GHI",
-                    "CL5-GHI"
-                ]
-                
-                weight_cols = [
-                    "CL-1",
-                    "CL-2",
-                    "CL-3",
-                    "CL-4",
-                    "CL-5"
-                ]
-                
-                # ------------------ Objective Function ------------------
-                actual = df_fix["Actual"].to_numpy(dtype=np.float64)
-    
-                mask = actual != 0
-                actual = actual[mask]
-                
-                blocks = backend_list[0]["Block No."].to_numpy(dtype=np.float64)
-                
-                ghi_arrays = [
-                    df_fix[col].to_numpy(dtype=np.float64)
-                    for col in ghi_cols
-                ]
-                
-                weight_sum = np.array([
-                    df_weight["CL-1"].sum(),
-                    df_weight["CL-2"].sum(),
-                    df_weight["CL-3"].sum(),
-                    df_weight["CL-4"].sum(),
-                    df_weight["CL-5"].sum(),
-                ], dtype=np.float64)
-                
-                def objective(x):
-                    try:
-                        DHI = int(round(x[0]))
-                        GHI_Starting_Block = int(round(x[1]))
-                        GHI_Ending_Block = int(round(x[2]))
-                        GHI_Max_Block = int(round(x[3]))
-                        Tracking_angle_lim_E = int(round(x[4]))
-                        Tracking_angle_lim_W = int(round(x[5]))
-                    
-                        # Invalid combinations
-                        if (
-                            GHI_Starting_Block >= GHI_Max_Block
-                            or GHI_Max_Block >= GHI_Ending_Block
-                        ):
-                            return 1e9
-                    
-                        m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
-                        m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
-                    
-                        predictions = []
-        
-                        blocks = backend_list[0]["Block No."]
-                        
-                        zenith = np.where(
-                            blocks <= GHI_Max_Block,
-                            np.minimum(89, m1 * (blocks - GHI_Max_Block)),
-                            np.minimum(89, m2 * (blocks - GHI_Max_Block))
-                        )
-                        
-                        panel = np.where(
-                            blocks < GHI_Max_Block,
-                            np.minimum(zenith, abs(Tracking_angle_lim_E)),
-                            np.where(
-                                (blocks > GHI_Max_Block) & (zenith > Tracking_angle_lim_W),
-                                Tracking_angle_lim_W,
-                                zenith
-                            )
-                        )
-                        
-                        cos_alpha = np.cos(np.radians(panel))
-                        
-                        cos_alpha = np.clip(cos_alpha, 1e-6, None)
-    
-                        prediction = np.zeros_like(blocks, dtype=np.float64)
-    
-                        for i, ghi in enumerate(ghi_arrays):
-                        
-                            dhi = ghi * DHI / 100
-                        
-                            dni = (ghi - dhi) / cos_alpha
-                        
-                            prediction += (
-                                dni * weight_sum[i]
-                            ) / 1_000_000
-                    
-                        # Comparision
-                    
-                    
-                        # Consider only daylight blocks
-                        #mask = ghi_cols > 50
-                    
-                        prediction = prediction[mask]
-                    
-                        # Higher weights near peak generation
-                    
-                        # Weighted RMSE
-                        block_error = np.mean(np.abs(actual - prediction)) / actual.max()
-                    
-                        # Peak error
-                        peak_error = abs(actual.max() - prediction.max()) / actual.max()
-                    
-                        # Daily energy error
-                        energy_error = abs(actual.sum() - prediction.sum()) / actual.sum()
-                    
-                        score = (
-                            0.80 * block_error +
-                            0.10 * peak_error +
-                            0.10 * energy_error
-                        )
-                        if (
-                            np.isnan(prediction).any()
-                            or np.isinf(prediction).any()
-                        ):
-                            return 1e9
-                        if actual.max() == 0:
-                            return 1e9
-                    
-                        return score
-                    except Exception as e:
-                        print(e)
-                        import traceback
-                        traceback.print_exc()
-                        raise
-                
-                
-                # ------------------ Parameter Bounds ------------------
-                
-                bounds = [
-                    (0, 10),      # DHI (%)
-                    (0, 30),     # GHI Starting Block
-                    (65, 80),     # GHI Ending Block
-                    (44, 60),     # GHI Max Block
-                    (0, 70),     # Tracking East Limit
-                    (0, 70)      # Tracking West Limit
-                ]
-                
-                # ------------------ Optimization ------------------
-        
-                import random
-        
-                if "params" not in st.session_state:
-        
-                    progress = st.progress(0)
-                    status = st.empty()
-        
-                    quotes = [
-                        "☕ Vo kehte the kya ho tum, aaj hum kehte hai tum kya ho be?",
-                        "🌦 Aapka mann nahi kar raha bahar jaane ka?..",
-                        "😊 Jinke ghar sheeshe ke bane hote hai vo basement mai kapde change krte h...",
-                        "😋 Aromatic Rose Latte with Frothy Milk pine ka mann hor hai na...",
-                        "🥛 Garmi mai daalo dudh mai Ice🧊 Dudh bangya Very Nice - Dudh Dudh Dudh Dudh...",
-                        "🌟 Aapke face pr toh Modiji se bhi jyda glow hai..",
-                        "😁 Horaha hai benstokes Kaan mai ghusjao insaan ke...",
-                        "😗 Muskuraiye aap MAL mai hai...",
-                        "🥱 Hum na hote toh Operations ka kya hota?..",
-                        "😎 6:30 hote hi Billu MAL se faraar...",
-                        "😇 Guruji ne ek baat kahi thi....",
-                        "🎼 Karna hai kuchh kaam M se gaao...",
-                        "😠 Nahi karni Loss Correction, Now what to do?...",
-                        "💸 Iss Job ko chhod or chhod kar ameer ho.."
-                    ]
-        
-                    MAX_ITER = 100
-                    last_quote = {"text": None}
-        
-                    def random_quote():
-                        available = [q for q in quotes if q != last_quote["text"]]
-                        q = random.choice(available)
-                        last_quote["text"] = q
-                        return q
-                        
-                    generation = {"count": 0}
-                    current_quote = {"text": random_quote()}
-        
-                    status.info(current_quote["text"])
-        
-                    def callback(xk, convergence):
-        
-                        generation["count"] += 1
-                        progress.progress(generation["count"] / MAX_ITER)
-        
-                        # Change quote every 7 generations
-                        if generation["count"] % 20 == 1:
-                            current_quote["text"] = random_quote()
-        
-                        status.info(
-                            f"{current_quote['text']}\n\n"
-                            f"Generation {generation['count']} / {MAX_ITER}"
-                        )
-        
-                        return False
-        
-                    with st.spinner("Ho raha hai aap tab tak saath waale se baat karlo...🗣"):
-        
-                        result = differential_evolution(
-                            objective,
-                            bounds=bounds,
-                            strategy="best1bin",
-                            maxiter=MAX_ITER,
-                            popsize=15,
-                            tol=0.001,
-                            mutation=(0.5,1),
-                            recombination=0.7,
-                            seed=42,
-                            polish=True,
-                            workers=1,
-                            callback=callback
-                        )
-        
-                    progress.empty()
-                    status.success("✅ Dekha Kitni Jaldi Hogaya!")
-                    
-    
-                    best = np.round(result.x).astype(int)
-                    
-        
-                    st.session_state.params = {
-                        "loss": float(best_loss),
-                        "DHI": int(best[0]),
-                        "start": int(best[1]),
-                        "end": int(best[2]),
-                        "max": int(best[3]),
-                        "east": int(best[4]),
-                        "west": int(best[5]),
-                    }
-                    st.session_state.loss = st.session_state.params["loss"]
-                    st.session_state.dhi = st.session_state.params["DHI"]
-                    st.session_state.start = st.session_state.params["start"]
-                    st.session_state.end = st.session_state.params["end"]
-                    st.session_state.max = st.session_state.params["max"]
-                    st.session_state.east = st.session_state.params["east"]
-                    st.session_state.west = st.session_state.params["west"]
-                
-                #print("Error Score:", result.fun)
-                #print("DHI:", dhi)
-                #print("GHI Starting Block:", GHI_Starting_Block)
-                #print("GHI Ending Block:", GHI_Ending_Block)
-                #print("GHI Max Block:", GHI_Max_Block)
-                #print("Tracking East Limit:", Tracking_angle_lim_E)
-                #print("Tracking West Limit:", Tracking_angle_lim_W)
-                #print("Efficiency Loss:", best_loss)
-        
-                if "params" in st.session_state:
-                    defaults = {
-                        "loss": st.session_state.params["loss"],
-                        "dhi": st.session_state.params["DHI"],
-                        "start": st.session_state.params["start"],
-                        "end": st.session_state.params["end"],
-                        "max": st.session_state.params["max"],
-                        "east": st.session_state.params["east"],
-                        "west": st.session_state.params["west"],
-                    }
-        
-                    for k, v in defaults.items():
-                        if k not in st.session_state:
-                            st.session_state[k] = v
-                    
-                    st.subheader("Optimized Parameters")
-        
-                    best_loss = st.number_input(
-                        "Efficiency Loss (%)",
-                        step=0.1,
-                        key="loss"
-                    )
-        
-                    col1, col2, col3 = st.columns(3)
-        
-                    DHI = col1.number_input(
-                        "DHI (%)",
-                        step=1,
-                        key="dhi"
-                    )
-        
-                    GHI_Starting_Block = col2.number_input(
-                        "Starting Block",
-                        step=1,
-                        key="start"
-                    )
-        
-                    GHI_Ending_Block = col3.number_input(
-                        "Ending Block",
-                        step=1,
-                        key="end"
-                    )
-        
-                    col1, col2, col3 = st.columns(3)
-        
-                    GHI_Max_Block = col1.number_input(
-                        "Max Block",
-                        step=1,
-                        key="max"
-                    )
-        
-                    Tracking_angle_lim_E = col2.number_input(
-                        "East Limit",
-                        step=1,
-                        key="east"
-                    )
-        
-                    Tracking_angle_lim_W = col3.number_input(
-                        "West Limit",
-                        step=1,
-                        key="west"
-                    )
-        
-                    #best_loss = st.session_state.loss
-                    #DHI = st.session_state.dhi
-                    #GHI_Starting_Block = st.session_state.start
-                    #GHI_Ending_Block = st.session_state.end
-                    #GHI_Max_Block = st.session_state.max
-                    #Tracking_angle_lim_E = st.session_state.east
-                    #Tracking_angle_lim_W = st.session_state.west
-        
-        
-                
-                    # ------------------ Final Calculation Using Best Parameters ------------------
-                    df["Efficiency Losses(%)"] = best_loss
-    
-                    # Recalculate
-                    df["Net Efficiency (%)"] = (
-                        df["Standard PV Efficiency (%)"]
-                        - df["Efficiency Losses(%)"]
-                    )
-                    
-                    display_df = df[
-                        [
-                            "Module Type",
-                            "Standard PV Efficiency (%)",
-                            "Efficiency Losses(%)",
-                            "Net Efficiency (%)",
-                            "Total area(m2)"
-                        ]
-                    ].copy()
-                    
-                    num_cols = display_df.select_dtypes(include="number").columns
-                    display_df[num_cols] = display_df[num_cols].round(2)
-                
-                    with st.expander("🔍 View Efficiency Calculations"):
-                        st.dataframe(
-                            display_df,
-                            use_container_width=True,
-                            hide_index=True,
-                        )
-                    
-                    m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
-                    m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
-                    
-                    blocks = backend_list[0]["Block No."]
-        
-                    zenith = np.where(
-                        blocks <= GHI_Max_Block,
-                        np.minimum(89, m1 * (blocks - GHI_Max_Block)),
-                        np.minimum(89, m2 * (blocks - GHI_Max_Block))
-                    )
-                    
-                    panel = np.where(
-                        blocks < GHI_Max_Block,
-                        np.minimum(zenith, abs(Tracking_angle_lim_E)),
-                        np.where(
-                            (blocks > GHI_Max_Block) & (zenith > Tracking_angle_lim_W),
-                            Tracking_angle_lim_W,
-                            zenith
-                        )
-                    )
-                    
-                    cos_alpha = np.cos(np.radians(panel))
-    
-                    df_weight["CL-1"] = ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-1"].values[0:1]
-                    df_weight["CL-2"] = ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-2"].values[0:1]
-                    df_weight["CL-3"] = ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-3"].values[0:1]
-                    df_weight["CL-4"] = ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-4"].values[0:1]
-                    df_weight["CL-5"] = ((df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100) * df_w["CL-5"].values[0:1]
-                    
-                    weights = df_weight.sum()
-                    
-                    forecast = np.zeros(len(df_fix))
-                    
-                    for ghi_col, weight_col in zip(
-                            ghi_cols,
-                            weight_cols):
-                    
-                        ghi = df_fix[ghi_col].to_numpy()
-                    
-                        dhi = ghi * DHI / 100
-                    
-                        dni = (ghi - dhi) / cos_alpha
-                    
-                        forecast += (
-                            dni * weights[weight_col]
-                        ) / 1_000_000
-                    
-                    df_trac["Fixed Power=I*Ƞ*A"] = forecast
-                    x = np.arange(1, 97)
-            
-                    fig = go.Figure()
-        
-                    fig.add_trace(
-                        go.Scatter(
-                            x=x,
-                            y=df_trac["Fixed Power=I*Ƞ*A"],
-                            mode="lines",
-                            name="Forecast",
-                            line=dict(color="#2563EB", width=3),
-                        )
-                    )
-        
-                    fig.add_trace(
-                        go.Scatter(
-                            x=x,
-                            y=df_fix["Actual"],
-                            mode="lines",
-                            name="Actual",
-                            line=dict(color="#DC2626", width=3),
-                        )
-                    )
-        
-                    fig.update_layout(
-                        title="Forecast vs Actual Power",
-                        template="plotly_white",
-                        height=500,
-                        hovermode="x unified",
-                        xaxis=dict(
-                            title="15 Minute Block",
-                            dtick=4
-                        ),
-                        yaxis=dict(
-                            title="Power (MW)"
-                        ),
-                        legend=dict(
-                            orientation="h",
-                            y=1.08,
-                            x=0
-                        ),
-                        margin=dict(l=20, r=20, t=60, b=20)
-                    )
-        
-                    st.plotly_chart(fig, use_container_width=True)
-    
-        else: 
-            if plant_type == "🏗️ Fixed":
-                df = pd.read_excel(uploaded_file, sheet_name="Area & Efficiency", header=[1])
-                df.columns = df.columns.str.strip()
-                null_indices = df[df['Module Type'].isna()].index
-                first_null_pos = df.index.get_loc(null_indices[0])
-                df = df.iloc[:first_null_pos]
-        
-                df_st = pd.read_excel(uploaded_file, sheet_name="Forecast Config", header=[8])
-                lat = float(df_st.loc[0, "Lat"])
-        
-                df_tilt = pd.read_excel(uploaded_file, sheet_name="Config Tilt Angle", header=[7])
-                df_tilt.columns = df_tilt.columns.str.strip()
-                null_indices = df_tilt[df_tilt['Fixed'].isna()].index
-                df_tilt["Fixed"] = df_tilt["Fixed"].fillna(0)
-                first_null_pos = df_tilt.index.get_loc(null_indices[0])
-                df_tilt = df_tilt.iloc[:first_null_pos]
-                df_tilt = df_tilt.dropna(how='all', axis=1)
-                df_tilt = df_tilt.rename(columns={
-                    'Unnamed: 2': 'Month_Num',
-                    'Unnamed: 3': 'Month',
-                })
-                month_lookup = df_tilt.set_index('Month')['Fixed'].to_dict()
-        
-                df_fix = pd.read_excel(uploaded_file, sheet_name="Fixed", header=[1])
-                df_fix["GHI_Forecast"] = edited_df["GHI_Forecast"]
-                df_fix["Actual"] = edited_df["Actual"]
-                df_fix.columns = df_fix.columns.str.strip()
-                null_indices = df_fix[df_fix['Date'].isna()].index
-                first_null_pos = df_fix.index.get_loc(null_indices[0])
-                df_fix = df_fix.iloc[:first_null_pos]
-        
-                df_fix["Date"] = pd.Timestamp.today()
-                first_date = pd.Timestamp.today().replace(month=1, day=1).normalize()
-        
-                df_fix["Declination Angle ∆"] = 23.45 * (
-                    np.sin(
-                        np.radians(
-                            360 * (284 + (df_fix["Date"] - first_date).dt.days + 1) / 365
-                        )
-                    )
-                )
-        
-                df_fix["Elevation angle a"] = (90 - lat + df_fix["Declination Angle ∆"])
-                df_fix["Tilt Angle b"] = df_fix["Date"].dt.strftime('%B').map(month_lookup)
-                df_fix["a+b"] = df_fix["Elevation angle a"] + df_fix["Tilt Angle b"]
-                df_fix["SIN(a+b)"] = np.sin(np.radians(df_fix["a+b"]))
-                df_fix["Sin(a)"] = np.sin(np.radians(df_fix["Elevation angle a"]))
-                df_fix["GHI*sin(a)"] = df_fix["GHI_Forecast"] * df_fix["Sin(a)"]
-                df_fix["GHI*sin(a+b)"] = df_fix["GHI_Forecast"] * df_fix["SIN(a+b)"]
-                df_fix["POA fixed"] = df_fix["GHI*sin(a+b)"] / df_fix["Sin(a)"]
-        
-                # Maximum possible loss
-                max_loss = df["Standard PV Efficiency (%)"].min()
-        
-                #peak_error = abs(actual_peak - predicted_peak) / actual_peak * 100
-        
-                results = []
-        
-                for loss in np.arange(0, max_loss + 0.01, 0.1):
-        
-                    df["Efficiency Losses(%)"] = loss
-                    df["Net Efficiency (%)"] = df["Standard PV Efficiency (%)"] - df["Efficiency Losses(%)"]
-                    df["Eff Area"] = (df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100
-            
-                    df_fix["Fixed Power=I*Ƞ*A"] = (
-                        df_fix["POA fixed"] * np.sum(df["Eff Area"])
-                    ) / 1000000
-        
-                    # Peak power comparison
-                    actual_peak = df_fix["Actual"].max()
-                    predicted_peak = df_fix["Fixed Power=I*Ƞ*A"].max()
-        
-                    peak_error = abs(actual_peak - predicted_peak)
-        
-                    results.append({
-                        "Efficiency Loss (%)": loss,
-                        "Actual Peak": actual_peak,
-                        "Predicted Peak": predicted_peak,
-                        "Peak Error": peak_error
-                    })
-                    results_df = pd.DataFrame(results)
-        
-                # Get efficiency loss with least Peak Error
-                best_loss = results_df.loc[
-                    results_df["Peak Error"].idxmin(),
-                    "Efficiency Loss (%)"
-                ]
-        
-                # Assign best efficiency loss
-                df["Efficiency Losses(%)"] = best_loss
-        
-                # Recalculate dependent columns
-                df["Net Efficiency (%)"] = (
-                    df["Standard PV Efficiency (%)"] - df["Efficiency Losses(%)"]
-                )
-        
-                df["Eff Area"] = (
-                    df["Total area(m2)"] * df["Net Efficiency (%)"]
-                ) / 100
-        
-                # Recalculate final power using the best efficiency loss
-                df_fix["Fixed Power=I*Ƞ*A"] = (
-                    df_fix["POA fixed"] * df["Eff Area"].sum()
-                ) / 1_000_000
-        
-                print(f"Best Efficiency Loss = {best_loss:.2f}%")
-                st.metric(
-                    "Efficiency Loss",
-                    f"{best_loss:.2f}%"
-                )
-                
-                display_df = df[
-                    [
-                        "Module Type",
-                        "Standard PV Efficiency (%)",
-                        "Efficiency Losses(%)",
-                        "Net Efficiency (%)",
-                        "Total area(m2)"
-                    ]
-                ].copy()
-                
-                num_cols = display_df.select_dtypes(include="number").columns
-                display_df[num_cols] = display_df[num_cols].round(2)
-            
-                with st.expander("🔍 View Efficiency Calculations"):
-                    st.dataframe(
-                        display_df,
-                        use_container_width=True,
-                        hide_index=True,
-                    )
-                
-                num_cols = display_df.select_dtypes(include="number").columns
-                display_df[num_cols] = display_df[num_cols].round(2)
-                    
-                x = np.arange(1, 97)
-        
-                fig = go.Figure()
-        
-                fig.add_trace(
-                    go.Scatter(
-                        x=x,
-                        y=df_fix["Fixed Power=I*Ƞ*A"],
-                        mode="lines",
-                        name="Forecast",
-                        line=dict(color="#3B82F6", width=3),
-                    )
-                )
-        
-                fig.add_trace(
-                    go.Scatter(
-                        x=x,
-                        y=df_fix["Actual"],
-                        mode="lines",
-                        name="Actual",
-                        line=dict(color="#EF4444", width=3),
-                    )
-                )
-        
-                fig.update_layout(
-                    title="Forecast vs Actual Power",
-                    template="plotly_white",
-                    height=500,
-                    hovermode="x unified",
-                    xaxis=dict(
-                        title="15 Minute Block",
-                        dtick=4
-                    ),
-                    yaxis=dict(
-                        title="Power (MW)"
-                    ),
-                    legend=dict(
-                        orientation="h",
-                        y=1.08,
-                        x=0
-                    ),
-                    margin=dict(l=20, r=20, t=60, b=20)
-                )
-        
-                st.plotly_chart(fig, use_container_width=True)
-            elif plant_type == "🔄 Tracking":
-                df = pd.read_excel(uploaded_file, sheet_name="Area & Efficiency", header=[1])
-                df.columns = df.columns.str.strip()
-                null_indices = df[df['Module Type'].isna()].index
-                first_null_pos = df.index.get_loc(null_indices[0])
-                df = df.iloc[:first_null_pos]
-        
-                df_st = pd.read_excel(uploaded_file, sheet_name="Forecast Config", header=[8])
-                lat = float(df_st.loc[0, "Lat"])
-        
-                df_tilt = pd.read_excel(uploaded_file, sheet_name="Config Tilt Angle", header=[7])
-                df_tilt.columns = df_tilt.columns.str.strip()
-                null_indices = df_tilt[df_tilt['Fixed'].isna()].index
-                first_null_pos = df_tilt.index.get_loc(null_indices[0])
-                df_tilt = df_tilt.iloc[:first_null_pos]
-                df_tilt = df_tilt.rename(columns={
-                    'Unnamed: 2': 'Month_Num',
-                    'Unnamed: 3': 'Month',
-                })
-                df_tilt['Month_Num'] = df_tilt['Month_Num'].fillna(0)
-                df_tilt['Month'] = df_tilt['Month'].fillna(0)
-                df_tilt = df_tilt.dropna(how='all', axis=1)
-                #month_lookup = df_tilt.set_index('Month')['Fixed'].to_dict()
-        
-                df_fix = pd.read_excel(uploaded_file, sheet_name="Fixed", header=[1])
-                df_fix.columns = df_fix.columns.str.strip()
-                df_fix["GHI_Forecast"] = edited_df["GHI_Forecast"]
-                df_fix["Actual"] = edited_df["Actual"]
-                df_fix["Actual"] = df_fix["Actual"].fillna(0)
-                null_indices = df_fix[df_fix['Date'].isna()].index
-                first_null_pos = df_fix.index.get_loc(null_indices[0])
-                df_fix = df_fix.iloc[:first_null_pos]
-        
-                df_fix["Date"] = pd.Timestamp.today()
-                first_date = pd.Timestamp.today().replace(month=1, day=1).normalize()
-        
-                df_fix["Declination Angle ∆"] = 23.45 * (
-                    np.sin(
-                        np.radians(
-                            360 * (284 + (df_fix["Date"] - first_date).dt.days + 1) / 365
-                        )
-                    )
-                )
-        
-                df_fix["Elevation angle a"] = (90 - lat + df_fix["Declination Angle ∆"])
-                df_fix["Tilt Angle b"] = 0
-                df_fix["a+b"] = df_fix["Elevation angle a"] + df_fix["Tilt Angle b"]
-                df_fix["SIN(a+b)"] = np.sin(np.radians(df_fix["a+b"]))
-                df_fix["Sin(a)"] = np.sin(np.radians(df_fix["Elevation angle a"]))
-                df_fix["GHI*sin(a)"] = df_fix["GHI_Forecast"] * df_fix["Sin(a)"]
-                df_fix["GHI*sin(a+b)"] = df_fix["GHI_Forecast"] * df_fix["SIN(a+b)"]
-                df_fix["POA fixed"] = df_fix["GHI*sin(a+b)"] / df_fix["Sin(a)"]
-        
-                # Maximum possible loss
-                max_loss = df["Standard PV Efficiency (%)"].min()
-        
-                #peak_error = abs(actual_peak - predicted_peak) / actual_peak * 100
-        
-                results = []
-        
-                for loss in np.arange(0, max_loss + 0.01, 0.1):
-        
-                    df["Efficiency Losses(%)"] = loss
-                    df["Net Efficiency (%)"] = df["Standard PV Efficiency (%)"] - df["Efficiency Losses(%)"]
-                    df["Eff Area"] = (df["Total area(m2)"] * df["Net Efficiency (%)"]) / 100
-            
-                    df_fix["Fixed Power=I*Ƞ*A"] = (
-                        df_fix["POA fixed"] * np.sum(df["Eff Area"])
-                    ) / 1000000
-        
-                    # Peak power comparison
-                    actual_peak = df_fix["Actual"].max()
-                    predicted_peak = df_fix["Fixed Power=I*Ƞ*A"].max()
-        
-                    peak_error = abs(actual_peak - predicted_peak)
-        
-                    results.append({
-                        "Efficiency Loss (%)": loss,
-                        "Actual Peak": actual_peak,
-                        "Predicted Peak": predicted_peak,
-                        "Peak Error": peak_error
-                    })
-        
-                results_df = pd.DataFrame(results)
-        
-                # Get efficiency loss with least Peak Error
-                best_loss = results_df.loc[
-                    results_df["Peak Error"].idxmin(),
-                    "Efficiency Loss (%)"
-                ]
-        
-                # Assign best efficiency loss
-                df["Efficiency Losses(%)"] = best_loss
-        
-                # Recalculate dependent columns
-                df["Net Efficiency (%)"] = (
-                    df["Standard PV Efficiency (%)"] - df["Efficiency Losses(%)"]
-                )
-        
-                df["Eff Area"] = (
-                    df["Total area(m2)"] * df["Net Efficiency (%)"]
-                ) / 100
-        
-                # Recalculate final power using the best efficiency loss
-                df_fix["Fixed Power=I*Ƞ*A"] = (
-                    df_fix["POA fixed"] * df["Eff Area"].sum()
-                ) / 1_000_000
-                # ------------------ Read Data ------------------
-        
-                df_bcal = pd.read_excel(uploaded_file, sheet_name="Backend Cal")
-                df_trac = pd.read_excel(uploaded_file, sheet_name="Tracking", header=[1])
-        
-                # ------------------ Objective Function ------------------
-                # ---------- Precompute once ----------
-    
-                actual = df_fix["Actual"].to_numpy(dtype=np.float64)
-                
-                mask = actual != 0
-                actual = actual[mask]
-                
-                blocks = df_bcal["Block No."].to_numpy(dtype=np.float64)
-                
-                ghi_arrays = [
-                    df_fix[col].to_numpy(dtype=np.float64)
-                    for col in ghi_cols
-                ]
-                
-        
-                def objective(x):
-        
-                    DHI = int(round(x[0]))
-                    GHI_Starting_Block = int(round(x[1]))
-                    GHI_Ending_Block = int(round(x[2]))
-                    GHI_Max_Block = int(round(x[3]))
-                    Tracking_angle_lim_E = int(round(x[4]))
-                    Tracking_angle_lim_W = int(round(x[5]))
-        
-                    # Invalid combinations
-                    if (
-                        GHI_Starting_Block >= GHI_Max_Block
-                        or GHI_Max_Block >= GHI_Ending_Block
-                    ):
-                        return 1e9
-        
-                    m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
-                    m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
-        
-                    ghi = ghi_arrays[0]
-    
-                    dhi = ghi * DHI / 100
-                    
-                    g_minus_d = ghi - dhi
-        
-        
-                    zenith = np.where(
-                        blocks <= GHI_Max_Block,
-                        np.minimum(89, m1 * (blocks - GHI_Max_Block)),
-                        np.minimum(89, m2 * (blocks - GHI_Max_Block))
-                    )
-        
-                    panel = np.where(
-                        blocks < GHI_Max_Block,
-                        np.minimum(zenith, abs(Tracking_angle_lim_E)),
-                        np.where(
-                            (blocks > GHI_Max_Block) & (zenith > Tracking_angle_lim_W),
-                            Tracking_angle_lim_W,
-                            zenith
-                        )
-                    )
-        
-                    cos_alpha = np.cos(np.radians(panel))
-        
-                    dni = g_minus_d / cos_alpha
-                    eff_area = df["Eff Area"].sum()
-        
-                    prediction = dni * eff_area / 1_000_000
-        
-                    mask = df_fix["Actual"] != 0
-        
-                    from sklearn.metrics import mean_squared_error
-        
-                    actual = df_fix["Actual"].values
-        
-                    # Consider only daylight blocks
-                    #mask = df_fix["GHI_Forecast"].values > 50
-        
-                    actual = actual[mask]
-                    prediction = prediction[mask]
-        
-                    # Higher weights near peak generation
-                    weights = actual / actual.max()
-        
-                    # Weighted RMSE
-                    block_error = np.mean(np.abs(actual - prediction)) / actual.max()
-        
-                    # Peak error
-                    peak_error = abs(actual.max() - prediction.max()) / actual.max()
-        
-                    # Daily energy error
-                    energy_error = abs(actual.sum() - prediction.sum()) / actual.sum()
-        
-                    score = (
-                        0.80 * block_error +
-                        0.10 * peak_error +
-                        0.10 * energy_error
-                    )
-        
-                    return score
-        
-        
-                # ------------------ Parameter Bounds ------------------
-        
-                bounds = [
-                    (0, 10),      # DHI (%)
-                    (0, 30),     # GHI Starting Block
-                    (65, 80),     # GHI Ending Block
-                    (44, 60),     # GHI Max Block
-                    (0, 70),     # Tracking East Limit
-                    (0, 70)      # Tracking West Limit
-                ]
-        
-                # ------------------ Optimization ------------------
-        
-                import random
-        
-                if "params" not in st.session_state:
-        
-                    progress = st.progress(0)
-                    status = st.empty()
-        
-                    quotes = [
-                        "☕ Vo kehte the kya ho tum, aaj hum kehte hai tum kya ho be?",
-                        "🌦 Aapka mann nahi kar raha bahar jaane ka?..",
-                        "😊 Jinke ghar sheeshe ke bane hote hai vo basement mai kapde change krte h...",
-                        "😋 Aromatic Rose Latte with Frothy Milk pine ka mann hor hai na...",
-                        "🥛 Garmi mai daalo dudh mai Ice🧊 Dudh bangya Very Nice - Dudh Dudh Dudh Dudh...",
-                        "🌟 Aapke face pr toh Modiji se bhi jyda glow hai..",
-                        "😁 Horaha hai benstokes Kaan mai ghusjao insaan ke...",
-                        "😗 Muskuraiye aap MAL mai hai...",
-                        "🥱 Hum na hote toh Operations ka kya hota?..",
-                        "😎 6:30 hote hi Billu MAL se faraar...",
-                        "😇 Guruji ne ek baat kahi thi....",
-                        "🎼 Karna hai kuchh kaam M se gaao...",
-                        "😠 Nahi karni Loss Correction, Now what to do?...",
-                        "💸 Iss Job ko chhod or chhod kar ameer ho.."
-                    ]
-        
-                    MAX_ITER = 100
-                    last_quote = {"text": None}
-        
-                    def random_quote():
-                        available = [q for q in quotes if q != last_quote["text"]]
-                        q = random.choice(available)
-                        last_quote["text"] = q
-                        return q
-                        
-                    generation = {"count": 0}
-                    current_quote = {"text": random_quote()}
-        
-                    status.info(current_quote["text"])
-        
-                    def callback(xk, convergence):
-        
-                        generation["count"] += 1
-                        progress.progress(generation["count"] / MAX_ITER)
-        
-                        # Change quote every 7 generations
-                        if generation["count"] % 20 == 1:
-                            current_quote["text"] = random_quote()
-        
-                        status.info(
-                            f"{current_quote['text']}\n\n"
-                            f"Generation {generation['count']} / {MAX_ITER}"
-                        )
-        
-                        return False
-        
-                    with st.spinner("Ho raha hai aap tab tak saath waale se baat karlo...🗣"):
-        
-                        result = differential_evolution(
-                            objective,
-                            bounds=bounds,
-                            strategy="best1bin",
-                            maxiter=MAX_ITER,
-                            popsize=15,
-                            tol=0.001,
-                            mutation=(0.5,1),
-                            recombination=0.7,
-                            seed=42,
-                            polish=True,
-                            workers=1,
-                            callback=callback
-                        )
-        
-                    progress.empty()
-                    status.success("✅ Dekha Kitni Jaldi Hogaya!")
-    
-                    best = np.round(result.x).astype(int)
-        
-                    st.session_state.params = {
-                        "loss": float(best_loss),
-                        "DHI": int(best[0]),
-                        "start": int(best[1]),
-                        "end": int(best[2]),
-                        "max": int(best[3]),
-                        "east": int(best[4]),
-                        "west": int(best[5]),
-                    }
-                    st.session_state.loss = st.session_state.params["loss"]
-                    st.session_state.dhi = st.session_state.params["DHI"]
-                    st.session_state.start = st.session_state.params["start"]
-                    st.session_state.end = st.session_state.params["end"]
-                    st.session_state.max = st.session_state.params["max"]
-                    st.session_state.east = st.session_state.params["east"]
-                    st.session_state.west = st.session_state.params["west"]
-                
-                #print("Error Score:", result.fun)
-                #print("DHI:", dhi)
-                #print("GHI Starting Block:", GHI_Starting_Block)
-                #print("GHI Ending Block:", GHI_Ending_Block)
-                #print("GHI Max Block:", GHI_Max_Block)
-                #print("Tracking East Limit:", Tracking_angle_lim_E)
-                #print("Tracking West Limit:", Tracking_angle_lim_W)
-                #print("Efficiency Loss:", best_loss)
-        
-                if "params" in st.session_state:
-                    defaults = {
-                        "loss": st.session_state.params["loss"],
-                        "dhi": st.session_state.params["DHI"],
-                        "start": st.session_state.params["start"],
-                        "end": st.session_state.params["end"],
-                        "max": st.session_state.params["max"],
-                        "east": st.session_state.params["east"],
-                        "west": st.session_state.params["west"],
-                    }
-        
-                    for k, v in defaults.items():
-                        if k not in st.session_state:
-                            st.session_state[k] = v
-                    
-                    st.subheader("Optimized Parameters")
-        
-                    best_loss = st.number_input(
-                        "Efficiency Loss (%)",
-                        step=0.1,
-                        key="loss"
-                    )
-        
-                    col1, col2, col3 = st.columns(3)
-        
-                    DHI = col1.number_input(
-                        "DHI (%)",
-                        step=1,
-                        key="dhi"
-                    )
-        
-                    GHI_Starting_Block = col2.number_input(
-                        "Starting Block",
-                        step=1,
-                        key="start"
-                    )
-        
-                    GHI_Ending_Block = col3.number_input(
-                        "Ending Block",
-                        step=1,
-                        key="end"
-                    )
-        
-                    col1, col2, col3 = st.columns(3)
-        
-                    GHI_Max_Block = col1.number_input(
-                        "Max Block",
-                        step=1,
-                        key="max"
-                    )
-        
-                    Tracking_angle_lim_E = col2.number_input(
-                        "East Limit",
-                        step=1,
-                        key="east"
-                    )
-        
-                    Tracking_angle_lim_W = col3.number_input(
-                        "West Limit",
-                        step=1,
-                        key="west"
-                    )
-        
-                    #best_loss = st.session_state.loss
-                    #DHI = st.session_state.dhi
-                    #GHI_Starting_Block = st.session_state.start
-                    #GHI_Ending_Block = st.session_state.end
-                    #GHI_Max_Block = st.session_state.max
-                    #Tracking_angle_lim_E = st.session_state.east
-                    #Tracking_angle_lim_W = st.session_state.west
-                
-                    # ------------------ Final Calculation Using Best Parameters ------------------
-                    # User edited efficiency loss
-                    df["Efficiency Losses(%)"] = best_loss
-        
-                    # Recalculate
-                    df["Net Efficiency (%)"] = (
-                        df["Standard PV Efficiency (%)"]
-                        - df["Efficiency Losses(%)"]
-                    )
-        
-                    df["Eff Area"] = (
-                        df["Total area(m2)"]
-                        * df["Net Efficiency (%)"]
-                    ) / 100
-                    
-                    display_df = df[
-                        [
-                            "Module Type",
-                            "Standard PV Efficiency (%)",
-                            "Efficiency Losses(%)",
-                            "Net Efficiency (%)",
-                            "Total area(m2)"
-                        ]
-                    ].copy()
-                    
-                    num_cols = display_df.select_dtypes(include="number").columns
-                    display_df[num_cols] = display_df[num_cols].round(2)
-                
-                    with st.expander("🔍 View Efficiency Calculations"):
-                        st.dataframe(
-                            display_df,
-                            use_container_width=True,
-                            hide_index=True,
-                        )
-        
-        
-                    # ---------- Fast final calculation ----------
-    
-                    m1 = 90 / (GHI_Starting_Block - 1 - GHI_Max_Block)
-                    m2 = 90 / (GHI_Ending_Block + 1 - GHI_Max_Block)
-                    
-                    ghi = df_fix["GHI_Forecast"].to_numpy(dtype=np.float64)
-                    blocks = df_bcal["Block No."].to_numpy(dtype=np.float64)
-                    
-                    dhi = ghi * DHI / 100.0
-                    ghi_minus_dhi = ghi - dhi
-                    
-                    zenith = np.where(
-                        blocks <= GHI_Max_Block,
-                        np.minimum(89.0, m1 * (blocks - GHI_Max_Block)),
-                        np.minimum(89.0, m2 * (blocks - GHI_Max_Block))
-                    )
-                    
-                    panel = np.where(
-                        blocks < GHI_Max_Block,
-                        np.minimum(zenith, abs(Tracking_angle_lim_E)),
-                        np.where(
-                            (blocks > GHI_Max_Block) & (zenith > Tracking_angle_lim_W),
-                            Tracking_angle_lim_W,
-                            zenith
-                        )
-                    )
-                    
-                    cos_alpha = np.cos(np.radians(panel))
-                    cos_alpha = np.clip(cos_alpha, 1e-6, None)
-                    
-                    dni = ghi_minus_dhi / cos_alpha
-                    
-                    eff_area = df["Eff Area"].sum()
-                    
-                    forecast = dni * eff_area / 1_000_000
-                    
-                    df_trac["Fixed Power=I*Ƞ*A"] = forecast
-        
-                    x = np.arange(1, 97)
-        
-                    fig = go.Figure()
-        
-                    fig.add_trace(
-                        go.Scatter(
-                            x=x,
-                            y=df_trac["Fixed Power=I*Ƞ*A"],
-                            mode="lines",
-                            name="Forecast",
-                            line=dict(color="#2563EB", width=3),
-                        )
-                    )
-        
-                    fig.add_trace(
-                        go.Scatter(
-                            x=x,
-                            y=df_fix["Actual"],
-                            mode="lines",
-                            name="Actual",
-                            line=dict(color="#DC2626", width=3),
-                        )
-                    )
-        
-                    fig.update_layout(
-                        title="Forecast vs Actual Power",
-                        template="plotly_white",
-                        height=500,
-                        hovermode="x unified",
-                        xaxis=dict(
-                            title="15 Minute Block",
-                            dtick=4
-                        ),
-                        yaxis=dict(
-                            title="Power (MW)"
-                        ),
-                        legend=dict(
-                            orientation="h",
-                            y=1.08,
-                            x=0
-                        ),
-                        margin=dict(l=20, r=20, t=60, b=20)
-                    )
-        
-                    st.plotly_chart(fig, use_container_width=True)
+
+    # --------------------------------------------------
+    # CLEAN EDITED DATA
+    # --------------------------------------------------
+
+    edited_df["GHI_Forecast"] = pd.to_numeric(
+        edited_df["GHI_Forecast"],
+        errors="coerce",
+    ).fillna(0)
+
+    edited_df["Actual"] = pd.to_numeric(
+        edited_df["Actual"],
+        errors="coerce",
+    ).fillna(0)
+
+    edited_df["GHI_Forecast"] = np.maximum(
+        edited_df["GHI_Forecast"],
+        0,
+    )
+
+    edited_df["Actual"] = np.maximum(
+        edited_df["Actual"],
+        0,
+    )
+
+    # --------------------------------------------------
+    # CHANGE DETECTION
+    # --------------------------------------------------
+
+    original = st.session_state.loss_original[
+        [
+            "Blocks",
+            "Time-Blocks",
+            "GHI_Forecast",
+            "Actual",
+        ]
+    ].copy()
+
+    changed = (
+        edited_df[
+            ["GHI_Forecast", "Actual"]
+        ].reset_index(drop=True)
+        !=
+        original[
+            ["GHI_Forecast", "Actual"]
+        ].reset_index(drop=True)
+    ).any(axis=1)
+
+    if changed.any():
+        st.toast(
+            f"{changed.sum()} row(s) updated",
+            icon="✅",
+        )
+
+    # --------------------------------------------------
+    # PLANT TYPE
+    # --------------------------------------------------
+
+    st.subheader("Plant Type")
+
+    plant_type = st.segmented_control(
+        "Select plant type",
+        options=[
+            "Fixed",
+            "Tracking",
+        ],
+        default="Fixed",
+        key="loss_plant_type",
+    )
+
+    # --------------------------------------------------
+    # RUN CORRECTION
+    # --------------------------------------------------
+
+    if st.button(
+        "🚀 Run Loss Correction",
+        type="primary",
+        use_container_width=True,
+    ):
+
+        actual = edited_df["Actual"].to_numpy(
+            dtype=float
+        )
+
+        forecast = edited_df["GHI_Forecast"].to_numpy(
+            dtype=float
+        )
+
+        # --------------------------------------------------
+        # TEMPORARY BASELINE
+        # --------------------------------------------------
+        # This is intentionally simple.
+        # Replace this section with the actual Fixed /
+        # Tracking correction calculation.
+
+        corrected = forecast.copy()
+
+        metrics = calculate_all_metrics(
+            actual,
+            corrected,
+        )
+
+        st.session_state.loss_result = {
+            "plant_type": plant_type,
+            "actual": actual,
+            "forecast": forecast,
+            "corrected": corrected,
+            "metrics": metrics,
+        }
+
+    # --------------------------------------------------
+    # RESULTS
+    # --------------------------------------------------
+
+    result = st.session_state.get(
+        "loss_result"
+    )
+
+    if result is None:
+        return
+
+    st.divider()
+
+    st.subheader("Loss Correction Result")
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    metrics = result["metrics"]
+
+    col1.metric(
+        "MAE",
+        f"{metrics['MAE']:.3f}",
+    )
+
+    col2.metric(
+        "RMSE",
+        f"{metrics['RMSE']:.3f}",
+    )
+
+    col3.metric(
+        "MAPE",
+        f"{metrics['MAPE']:.2f}%",
+    )
+
+    col4.metric(
+        "R²",
+        f"{metrics['R2']:.4f}",
+    )
+
+    # --------------------------------------------------
+    # GRAPH
+    # --------------------------------------------------
+
+    fig = plot_loss_correction(
+        blocks=edited_df["Blocks"],
+        actual=result["actual"],
+        forecast=result["forecast"],
+        corrected=result["corrected"],
+    )
+
+    st.plotly_chart(
+        fig,
+        use_container_width=True,
+    )
+
+    # --------------------------------------------------
+    # METRICS
+    # --------------------------------------------------
+
+    with st.expander("View All Metrics"):
+
+        metrics_df = pd.DataFrame(
+            {
+                "Metric": metrics.keys(),
+                "Value": metrics.values(),
+            }
+        )
+
+        st.dataframe(
+            metrics_df,
+            use_container_width=True,
+            hide_index=True,
+        )
