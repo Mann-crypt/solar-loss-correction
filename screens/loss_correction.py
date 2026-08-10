@@ -728,55 +728,62 @@ def show_loss_correction():
     # ======================================================
     # PARAMETER BOUNDS
     # ======================================================
-
+    
     st.subheader(
         "Parameter Bounds"
     )
-
+    
+    st.caption(
+        "These are the search ranges used by "
+        "Differential Evolution."
+    )
+    
+    # ------------------------------------------------------
+    # Parameter bounds
+    # ------------------------------------------------------
+    
     bounds = [
         (0, 10),       # DHI
         (10, 30),      # Starting Block
         (65, 80),      # Ending Block
         (47, 53),      # Max Block
-        (10, 70),      # East Limit
-        (10, 70),      # West Limit
+        (10, 70),      # East Tracking Limit
+        (10, 70),      # West Tracking Limit
         (0, 10),       # Efficiency Loss
     ]
-
-    bounds_df = pd.DataFrame({
-
-        "Parameter": [
-
-            "DHI",
-
-            "Starting Block",
-
-            "Ending Block",
-
-            "Max Block",
-
-            "East Tracking Limit",
-
-            "West Tracking Limit",
-
-        ],
-
-        "Minimum": [
-
-            x[0]
-            for x in bounds
-
-        ],
-
-        "Maximum": [
-
-            x[1]
-            for x in bounds
-
-        ],
-
-    })
-
+    
+    # ------------------------------------------------------
+    # Parameter names
+    # ------------------------------------------------------
+    
+    parameter_names = [
+        "DHI",
+        "Starting Block",
+        "Ending Block",
+        "Max Block",
+        "East Tracking Limit",
+        "West Tracking Limit",
+        "Efficiency Loss",
+    ]
+    
+    # ------------------------------------------------------
+    # Create bounds table
+    # ------------------------------------------------------
+    
+    bounds_df = pd.DataFrame(
+        {
+            "Parameter": parameter_names,
+            "Minimum": [
+                bound[0]
+                for bound in bounds
+            ],
+            "Maximum": [
+                bound[1]
+                for bound in bounds
+            ],
+        }
+    )
+    
     st.dataframe(
         bounds_df,
         use_container_width=True,
