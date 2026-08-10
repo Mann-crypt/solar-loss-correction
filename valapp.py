@@ -1312,6 +1312,212 @@ if uploaded_files:
                                 "No P-X comparison results available "
                                 "for the selected dates."
                             )
+
+            # =================================================
+            # MISMATCHED BLOCK DRILL DOWN
+            # =================================================
+            
+            st.markdown("### ❌ Mismatched Blocks")
+            
+            # =================================================
+            # DATE SELECTION
+            # =================================================
+            
+            selected_mismatch_dates = st.multiselect(
+                "Select Date(s) for Mismatch Analysis",
+                options=available_dates,
+                default=available_dates,
+                key=f"mismatch_dates_{filename}"
+            )
+            
+            
+            if selected_mismatch_dates:
+            
+                # =================================================
+                # P-X PAIR SELECTION
+                # =================================================
+            
+                pair_options = {}
+            
+                for result_col in result_columns:
+            
+                    if result_col not in pair_lookup:
+                        continue
+            
+                    p_col, x_col = pair_lookup[
+                        result_col
+                    ]
+            
+                    # Show actual P-X columns
+                    pair_options[result_col] = (
+                        f"{p_col}  ↔  {x_col}"
+                    )
+            
+            
+                if pair_options:
+            
+                    selected_result_col = st.selectbox(
+                        "Select P-X Pair",
+                        list(pair_options.keys()),
+                        format_func=lambda x:
+                            pair_options[x],
+                        key=f"mismatch_pair_{filename}"
+                    )
+            
+            
+                    p_col, x_col = pair_lookup[
+                        selected_result_col
+                    ]
+            
+            
+                    # =================================================
+                    # FILTER SELECTED DATES
+                    # =================================================
+            
+                    selected_df = result_df[
+                        result_df[date_col]
+                        .dt.date
+                        .isin(selected_mismatch_dates)
+                    ].copy()
+            
+            
+                    # =================================================
+                    # MATCH STATUS
+                    # =================================================
+            
+                    selected_df["Match"] = (
+                        selected_df[
+                            selected_result_col
+                        ]
+                        .fillna(False)
+                        .astype(bool)
+                    )
+            
+            
+                    # =================================================
+                    # METRICS
+                    # =================================================
+            
+                    total_blocks = len(
+                        selected_df
+                    )
+            
+                    identical_blocks = int(
+                        selected_df["Match"].sum()
+                    )
+            
+                    mismatch_blocks = (
+                        total_blocks
+                        - identical_blocks
+                    )
+            
+            
+                    d1, d2, d3 = st.columns(3)
+            
+                    d1.metric(
+                        "Total Blocks",
+                        total_blocks
+                    )
+            
+                    d2.metric(
+                        "Identical Blocks",
+                        identical_blocks
+                    )
+            
+                    d3.metric(
+                        "Mismatched Blocks",
+                        mismatch_blocks
+                    )
+            
+            
+                    # =================================================
+                    # ONLY MISMATCHED BLOCKS
+                    # =================================================
+            
+                    mismatch_df = selected_df[
+                        selected_df["Match"] == False
+                    ].copy()
+            
+            
+                    if not mismatch_df.empty:
+            
+                        st.markdown(
+                            f"#### ❌ Mismatches: {p_col} ↔ {x_col}"
+                        )
+            
+            
+                        # ---------------------------------------------
+                        # Keep Date + P + X
+                        # ---------------------------------------------
+            
+                        display_df = mismatch_df[
+                            [
+                                date_col,
+                                p_col,
+                                x_col,
+                                "Match"
+                            ]
+                        ].copy()
+            
+            
+                        # =================================================
+                        # HIGHLIGHT MISMATCHES
+                        # =================================================
+            
+                        def highlight_mismatch_row(row):
+            
+                            styles = pd.Series(
+                                "",
+                                index=row.index
+                            )
+            
+            
+                            styles[p_col] = (
+                                "background-color: #ffcccc;"
+                                "color: #9c0006;"
+                                "font-weight: bold;"
+                            )
+            
+            
+                            styles[x_col] = (
+                                "background-color: #ffcccc;"
+                                "color: #9c0006;"
+                                "font-weight: bold;"
+                            )
+            
+            
+                            styles["Match"] = (
+                                "background-color: #ff6666;"
+                                "color: white;"
+                                "font-weight: bold;"
+                            )
+            
+            
+                            return styles
+            
+            
+                        st.dataframe(
+                            display_df.style.apply(
+                                highlight_mismatch_row,
+                                axis=1
+                            ),
+                            use_container_width=True,
+                            height=450
+                        )
+            
+            
+                    else:
+            
+                        st.success(
+                            "No mismatches found for the "
+                            "selected dates and P-X pair."
+                        )
+            
+            else:
+            
+                st.info(
+                    "Select at least one date for mismatch analysis."
+                )
     # =====================================================
     # DOWNLOAD
     # =====================================================
