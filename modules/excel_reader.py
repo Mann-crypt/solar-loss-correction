@@ -3,6 +3,11 @@
 import pandas as pd
 import numpy as np
 
+from modules.utils import (
+    generate_blocks,
+    generate_time_blocks,
+)
+
 
 def excel_reader(uploaded_file):
     """
