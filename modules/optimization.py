@@ -5,12 +5,7 @@ from scipy.optimize import differential_evolution
 
 from modules.calculations import (
     calculate_tracking_forecast,
-)
-
-from modules.metrics import (
-    block_error,
-    peak_error,
-    energy_error,
+    calculate_loss_corrected_weights,
 )
 
 
@@ -50,17 +45,17 @@ def optimize_tracking_parameters(
     blocks,
     area_df,
     weight_factors,
-    efficiency_loss,
-    bounds,
+    efficiency_loss=None,
+    bounds=None,
     maxiter=100,
     popsize=15,
     seed=42,
-    callback=None
+    callback=None,
 ):
     """
     Optimize Tracking Loss Correction parameters.
 
-    Parameters optimized:
+    Optimized parameters:
 
         DHI
         GHI Starting Block
@@ -70,10 +65,38 @@ def optimize_tracking_parameters(
         West Tracking Limit
         Efficiency Loss
 
-    Returns:
-        Dictionary containing best parameters,
-        score, weights and optimizer result.
+    Parameters
+    ----------
+    efficiency_loss : optional
+        Kept for compatibility with the screen.
+        When Efficiency Loss is included in bounds,
+        the optimizer uses x[6].
+
+    bounds
+        Expected order:
+
+        [
+            (DHI_min, DHI_max),
+            (start_min, start_max),
+            (end_min, end_max),
+            (max_min, max_max),
+            (east_min, east_max),
+            (west_min, west_max),
+            (loss_min, loss_max),
+        ]
+
+    Returns
+    -------
+    dict
+        parameters
+        score
+        weights
+        result
     """
+
+    # ======================================================
+    # CLEAN INPUT
+    # ======================================================
 
     actual = np.asarray(
         actual,
@@ -85,16 +108,18 @@ def optimize_tracking_parameters(
         dtype=float,
     )
 
-    # ------------------------------------------------------
-    # Validation
-    # ------------------------------------------------------
+    # ======================================================
+    # VALIDATION
+    # ======================================================
 
     if len(actual) != len(blocks):
+
         raise ValueError(
             "Actual and Blocks must have same length."
         )
 
     if len(ghi_arrays) == 0:
+
         raise ValueError(
             "No GHI arrays supplied."
         )
@@ -102,154 +127,252 @@ def optimize_tracking_parameters(
     for ghi in ghi_arrays:
 
         if len(ghi) != len(blocks):
+
             raise ValueError(
-                "GHI array length does not match Blocks."
+                "GHI array length does not "
+                "match Blocks."
             )
 
+    if bounds is None:
+
+        raise ValueError(
+            "Optimization bounds are required."
+        )
+
+    if len(bounds) != 7:
+
+        raise ValueError(
+            "Tracking optimization requires "
+            "7 parameter bounds: "
+            "DHI, Starting Block, Ending Block, "
+            "Max Block, East Limit, West Limit "
+            "and Efficiency Loss."
+        )
+
     # ======================================================
-    # OBJECTIVE
+    # DETERMINE PLANT TYPE
+    # ======================================================
+
+    has_cluster = (
+        len(ghi_arrays) > 1
+    )
+
+    # ======================================================
+    # OBJECTIVE FUNCTION
     # ======================================================
 
     def objective(x):
 
-        # ----------------------------------------------
-        # Parameters
-        # ----------------------------------------------
+        # --------------------------------------------------
+        # PARAMETERS
+        # --------------------------------------------------
 
-        DHI = int(round(x[0]))
+        DHI = int(
+            round(x[0])
+        )
 
-        start = int(round(x[1]))
+        start = int(
+            round(x[1])
+        )
 
-        end = int(round(x[2]))
+        end = int(
+            round(x[2])
+        )
 
-        max_block = int(round(x[3]))
+        max_block = int(
+            round(x[3])
+        )
 
-        east = int(round(x[4]))
+        east = int(
+            round(x[4])
+        )
 
-        west = int(round(x[5]))
+        west = int(
+            round(x[5])
+        )
 
-        efficiency_loss = float(x[6])
+        loss = float(
+            x[6]
+        )
 
-        # ----------------------------------------------
-        # Block validation
-        # ----------------------------------------------
+        # --------------------------------------------------
+        # VALIDATE BLOCK CONFIGURATION
+        # --------------------------------------------------
 
         if not (
             start < max_block < end
         ):
+
             return 1e9
 
-        # ----------------------------------------------
-        # Calculate corrected effective weights
-        # ----------------------------------------------
+        # --------------------------------------------------
+        # CALCULATE EFFECTIVE WEIGHTS
+        # --------------------------------------------------
 
         try:
 
-            from modules.calculations import (
-                calculate_loss_corrected_weights
-            )
+            weights = (
+                calculate_loss_corrected_weights(
 
-            weights = calculate_loss_corrected_weights(
-                area_df=area_df,
-                efficiency_loss=efficiency_loss,
-                weight_factors=weight_factors,
-                has_cluster=(len(ghi_arrays) > 1),
+                    area_df=area_df,
+
+                    efficiency_loss=loss,
+
+                    weight_factors=weight_factors,
+
+                    has_cluster=has_cluster,
+
+                )
             )
 
         except Exception:
 
             return 1e9
 
-        # ----------------------------------------------
-        # Calculate tracking forecast
-        # ----------------------------------------------
+        # --------------------------------------------------
+        # VALIDATE WEIGHTS
+        # --------------------------------------------------
+
+        if len(weights) != len(
+            ghi_arrays
+        ):
+
+            return 1e9
+
+        # --------------------------------------------------
+        # CALCULATE FORECAST
+        # --------------------------------------------------
 
         try:
 
-            prediction = calculate_tracking_forecast(
+            prediction = (
+                calculate_tracking_forecast(
 
-                ghi_arrays=ghi_arrays,
+                    ghi_arrays=ghi_arrays,
 
-                weights=weights,
+                    weights=weights,
 
-                blocks=blocks,
+                    blocks=blocks,
 
-                dhi_percent=DHI,
+                    dhi_percent=DHI,
 
-                ghi_start=start,
+                    ghi_start=start,
 
-                ghi_end=end,
+                    ghi_end=end,
 
-                ghi_max=max_block,
+                    ghi_max=max_block,
 
-                east_limit=east,
+                    east_limit=east,
 
-                west_limit=west,
+                    west_limit=west,
+
+                )
             )
 
         except Exception:
 
             return 1e9
 
-        # ----------------------------------------------
-        # Daylight mask
-        # ----------------------------------------------
+        # --------------------------------------------------
+        # DAYLIGHT MASK
+        # --------------------------------------------------
 
-        mask = actual > 0
+        mask = (
+            actual > 0
+        )
 
         act = actual[mask]
 
         pred = prediction[mask]
 
         if len(act) == 0:
+
             return 1e9
 
         if act.max() <= 0:
+
             return 1e9
 
-        # ----------------------------------------------
-        # Metrics
-        # ----------------------------------------------
+        # --------------------------------------------------
+        # BLOCK ERROR
+        # --------------------------------------------------
 
-        b_error = (
+        block_error_value = (
+
             np.mean(
                 np.abs(
                     act - pred
                 )
             )
+
             / act.max()
+
         )
 
-        p_error = (
+        # --------------------------------------------------
+        # PEAK ERROR
+        # --------------------------------------------------
+
+        peak_error_value = (
+
             abs(
                 act.max()
                 - pred.max()
             )
+
             / act.max()
+
         )
 
-        e_error = (
+        # --------------------------------------------------
+        # ENERGY ERROR
+        # --------------------------------------------------
+
+        if act.sum() == 0:
+
+            return 1e9
+
+        energy_error_value = (
+
             abs(
                 act.sum()
                 - pred.sum()
             )
+
             / act.sum()
+
         )
 
-        # ----------------------------------------------
-        # Combined score
-        # ----------------------------------------------
+        # --------------------------------------------------
+        # COMBINED SCORE
+        # --------------------------------------------------
 
         score = (
-            0.80 * b_error
-            + 0.10 * p_error
-            + 0.10 * e_error
+
+            0.80
+            * block_error_value
+
+            +
+
+            0.10
+            * peak_error_value
+
+            +
+
+            0.10
+            * energy_error_value
+
         )
+
+        # --------------------------------------------------
+        # VALIDATE SCORE
+        # --------------------------------------------------
 
         if (
             np.isnan(score)
             or np.isinf(score)
         ):
+
             return 1e9
 
         return score
@@ -283,6 +406,7 @@ def optimize_tracking_parameters(
         workers=1,
 
         callback=callback,
+
     )
 
     # ======================================================
@@ -291,36 +415,97 @@ def optimize_tracking_parameters(
 
     best = result.x
 
-    parameters = {
-        "DHI": int(best[0]),
-        "Starting Block": int(best[1]),
-        "Ending Block": int(best[2]),
-        "Max Block": int(best[3]),
-        "East Limit": int(best[4]),
-        "West Limit": int(best[5]),
-        "Efficiency Loss": float(efficiency_loss),
-    }
+    best_DHI = int(
+        round(best[0])
+    )
+
+    best_start = int(
+        round(best[1])
+    )
+
+    best_end = int(
+        round(best[2])
+    )
+
+    best_max = int(
+        round(best[3])
+    )
+
+    best_east = int(
+        round(best[4])
+    )
+
+    best_west = int(
+        round(best[5])
+    )
+
+    best_loss = float(
+        best[6]
+    )
 
     # ======================================================
     # FINAL WEIGHTS
     # ======================================================
 
-    from modules.calculations import (
-        calculate_loss_corrected_weights
+    final_weights = (
+        calculate_loss_corrected_weights(
+
+            area_df=area_df,
+
+            efficiency_loss=best_loss,
+
+            weight_factors=weight_factors,
+
+            has_cluster=has_cluster,
+
+        )
     )
 
-    final_weights = calculate_loss_corrected_weights(
+    # ======================================================
+    # FINAL PARAMETERS
+    # ======================================================
 
-        area_df=area_df,
+    parameters = {
 
-        efficiency_loss=float(best[6]),
+        "DHI":
+            best_DHI,
 
-        weight_factors=weight_factors,
-    )
+        "Starting Block":
+            best_start,
+
+        "Ending Block":
+            best_end,
+
+        "Max Block":
+            best_max,
+
+        "East Limit":
+            best_east,
+
+        "West Limit":
+            best_west,
+
+        "Efficiency Loss":
+            best_loss,
+
+    }
+
+    # ======================================================
+    # RETURN
+    # ======================================================
 
     return {
-        "parameters": parameters,
-        "score": float(result.fun),
-        "weights": weights,
-        "result": result,
+
+        "parameters":
+            parameters,
+
+        "score":
+            float(result.fun),
+
+        "weights":
+            final_weights,
+
+        "result":
+            result,
+
     }
