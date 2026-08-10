@@ -16,10 +16,6 @@ from modules.optimization import (
     optimize_tracking_parameters,
 )
 
-from modules.metrics import (
-    calculate_all_metrics,
-)
-
 from modules.plotting import (
     plot_loss_correction,
 )
@@ -968,17 +964,7 @@ def show_loss_correction():
                 )
             )
 
-            # --------------------------------------------------
-            # METRICS
-            # --------------------------------------------------
-
-            metrics = calculate_all_metrics(
-
-                actual,
-
-                final_forecast,
-
-            )
+            
 
             # --------------------------------------------------
             # SAVE RESULT
@@ -1044,92 +1030,70 @@ def show_loss_correction():
     # OPTIMIZED PARAMETERS
     # ======================================================
 
-    st.markdown(
-        "### Optimized Parameters"
-    )
+    st.subheader("🎯 Tracking Parameters")
 
+    parameters = result["parameters"]
+    
     col1, col2, col3, col4 = st.columns(4)
-
-    col1.metric(
-        "DHI",
-        parameters["DHI"],
+    
+    col1.number_input(
+        "DHI (%)",
+        value=float(parameters["DHI"]),
+        min_value=0.0,
+        max_value=100.0,
+        step=1.0,
     )
-
-    col2.metric(
+    
+    col2.number_input(
         "Starting Block",
-        parameters["Starting Block"],
+        value=float(parameters["Starting Block"]),
+        min_value=0.0,
+        max_value=95.0,
+        step=1.0,
     )
-
-    col3.metric(
+    
+    col3.number_input(
         "Ending Block",
-        parameters["Ending Block"],
+        value=float(parameters["Ending Block"]),
+        min_value=1.0,
+        max_value=96.0,
+        step=1.0,
     )
-
-    col4.metric(
+    
+    col4.number_input(
         "Max Block",
-        parameters["Max Block"],
+        value=float(parameters["Max Block"]),
+        min_value=1.0,
+        max_value=96.0,
+        step=1.0,
     )
-
+    
     col1, col2, col3 = st.columns(3)
-
-    col1.metric(
+    
+    col1.number_input(
         "East Tracking Limit",
-        parameters["East Limit"],
+        value=float(parameters["East Limit"]),
+        min_value=0.0,
+        max_value=90.0,
+        step=1.0,
     )
-
-    col2.metric(
+    
+    col2.number_input(
         "West Tracking Limit",
-        parameters["West Limit"],
+        value=float(parameters["West Limit"]),
+        min_value=0.0,
+        max_value=90.0,
+        step=1.0,
     )
-
-    col3.metric(
-        "Efficiency Loss",
-        f"{parameters['Efficiency Loss']:.2f}%",
+    
+    col3.number_input(
+        "Efficiency Loss (%)",
+        value=float(parameters["Efficiency Loss"]),
+        min_value=0.0,
+        max_value=10.0,
+        step=0.1,
     )
-
-    # ======================================================
-    # FORECAST PERFORMANCE
-    # ======================================================
-
-    st.markdown(
-        "### Forecast Performance"
-    )
-
-    metrics = result[
-        "metrics"
-    ]
-
-    col1, col2, col3, col4 = st.columns(4)
-
-    col1.metric(
-        "MAE",
-        f"{metrics['MAE']:.3f}",
-    )
-
-    col2.metric(
-        "RMSE",
-        f"{metrics['RMSE']:.3f}",
-    )
-
-    col3.metric(
-        "MAPE",
-        f"{metrics['MAPE']:.2f}%",
-    )
-
-    col4.metric(
-        "R²",
-        f"{metrics['R2']:.4f}",
-    )
-
-    # ======================================================
-    # SCORE
-    # ======================================================
-
-    st.metric(
-        "Combined Optimization Score",
-        f"{result['score']:.6f}",
-    )
-
+    
     # ======================================================
     # GRAPH
     # ======================================================
