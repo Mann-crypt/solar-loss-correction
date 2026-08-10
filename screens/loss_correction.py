@@ -54,6 +54,15 @@ def reset_loss_correction_state():
 # ==========================================================
 
 def find_column(df, possible_names):
+    """
+    Find a column using normalized column names.
+
+    Handles:
+        - spaces
+        - underscores
+        - new lines
+        - case differences
+    """
 
     if df is None:
         return None
@@ -61,14 +70,19 @@ def find_column(df, possible_names):
     if df.empty:
         return None
 
-    normalized = {
-        str(col)
-        .strip()
-        .lower()
-        .replace("\n", " ")
-        .replace("_", " "): col
-        for col in df.columns
-    }
+    normalized = {}
+
+    for col in df.columns:
+
+        key = (
+            str(col)
+            .strip()
+            .lower()
+            .replace("\n", " ")
+            .replace("_", " ")
+        )
+
+        normalized[key] = col
 
     for name in possible_names:
 
@@ -95,8 +109,12 @@ def prepare_array(
     length=96,
     name="Array",
 ):
+    """
+    Convert input data into a clean 96-block array.
+    """
 
     if values is None:
+
         raise ValueError(
             f"{name} data is missing."
         )
@@ -134,6 +152,13 @@ def prepare_array(
 # ==========================================================
 
 def extract_actual(data):
+    """
+    Extract actual generation.
+
+    Priority:
+        1. Tracking -> Act Power
+        2. Backend Cal -> Actual/Power
+    """
 
     tracking = data.get("tracking")
     backend = data.get("backend")
@@ -232,6 +257,15 @@ def extract_actual(data):
 # ==========================================================
 
 def extract_ghi_arrays(data):
+    """
+    Extract GHI arrays.
+
+    Cluster:
+        CL1-GHI ... CL5-GHI
+
+    Non-cluster:
+        GHI from Backend Cal
+    """
 
     has_cluster = data.get(
         "has_cluster",
@@ -291,6 +325,7 @@ def extract_ghi_arrays(data):
             )
 
             if actual_column is None:
+
                 raise ValueError(
                     f"Missing cluster GHI column: "
                     f"{column}"
@@ -350,7 +385,9 @@ def extract_ghi_arrays(data):
     ).fillna(0)
 
     ghi = np.maximum(
-        ghi.to_numpy(dtype=float),
+        ghi.to_numpy(
+            dtype=float
+        ),
         0,
     )
 
@@ -371,6 +408,16 @@ def extract_weight_factors(
     data,
     number_of_arrays,
 ):
+    """
+    Extract cluster weights.
+
+    Non-cluster:
+        Weight = 1
+
+    Cluster:
+        Use provided weights.
+        Otherwise equal weighting.
+    """
 
     # ------------------------------------------------------
     # Non-cluster
@@ -428,6 +475,8 @@ def extract_weight_factors(
                     )
                 )
 
+                # Convert percentage
+                # to fraction
                 if np.nanmax(
                     np.abs(values)
                 ) > 1:
@@ -465,9 +514,9 @@ def show_loss_correction():
     )
 
     st.caption(
-        "Optimize DHI, GHI block configuration "
-        "and tracking limits against actual "
-        "generation."
+        "Optimize DHI, GHI block configuration, "
+        "tracking limits and efficiency loss "
+        "against actual generation."
     )
 
     # ======================================================
@@ -580,7 +629,17 @@ def show_loss_correction():
     # AREA DATA
     # ======================================================
 
-    area_df = data["area"]
+    area_df = data.get(
+        "area"
+    )
+
+    if area_df is None:
+
+        st.error(
+            "Area data is missing from workbook."
+        )
+
+        return
 
     # ======================================================
     # WEIGHT FACTORS
@@ -617,7 +676,8 @@ def show_loss_correction():
 
     col2.metric(
         "Plant Type",
-        "Cluster" if has_cluster
+        "Cluster"
+        if has_cluster
         else "Non-Cluster",
     )
 
@@ -652,16 +712,22 @@ def show_loss_correction():
 
         })
 
-        for i, ghi in enumerate(
-            ghi_arrays,
-            start=1,
-        ):
+        if has_cluster:
 
-            input_df[
-                f"CL{i}-GHI"
-                if has_cluster
-                else "GHI"
-            ] = ghi
+            for i, ghi in enumerate(
+                ghi_arrays,
+                start=1,
+            ):
+
+                input_df[
+                    f"CL{i}-GHI"
+                ] = ghi
+
+        else:
+
+            input_df["GHI"] = (
+                ghi_arrays[0]
+            )
 
         st.dataframe(
             input_df,
@@ -710,80 +776,86 @@ def show_loss_correction():
         )
 
     # ======================================================
-    # EFFICIENCY LOSS
-    # ======================================================
-
-    st.subheader(
-        "Efficiency Loss"
-    )
-
-    efficiency_loss = st.number_input(
-        "Tracking Efficiency Loss (%)",
-        min_value=0.0,
-        max_value=10.0,
-        value=0.0,
-        step=0.1,
-    )
-
-    # ======================================================
     # PARAMETER BOUNDS
     # ======================================================
-    
+
     st.subheader(
         "Parameter Bounds"
     )
-    
+
     st.caption(
         "These are the search ranges used by "
         "Differential Evolution."
     )
-    
-    # ------------------------------------------------------
-    # Parameter bounds
-    # ------------------------------------------------------
-    
+
     bounds = [
+
         (0, 10),       # DHI
+
         (10, 30),      # Starting Block
+
         (65, 80),      # Ending Block
+
         (47, 53),      # Max Block
+
         (10, 70),      # East Tracking Limit
+
         (10, 70),      # West Tracking Limit
+
         (0, 10),       # Efficiency Loss
+
     ]
-    
-    # ------------------------------------------------------
-    # Parameter names
-    # ------------------------------------------------------
-    
+
     parameter_names = [
+
         "DHI",
+
         "Starting Block",
+
         "Ending Block",
+
         "Max Block",
+
         "East Tracking Limit",
+
         "West Tracking Limit",
+
         "Efficiency Loss",
+
     ]
-    
-    # ------------------------------------------------------
-    # Create bounds table
-    # ------------------------------------------------------
-    
-    bounds_df = pd.DataFrame(
-        {
-            "Parameter": parameter_names,
-            "Minimum": [
+
+    # Safety check
+    if len(bounds) != len(
+        parameter_names
+    ):
+
+        st.error(
+            "Parameter bounds configuration error: "
+            "number of bounds does not match "
+            "number of parameter names."
+        )
+
+        return
+
+    bounds_df = pd.DataFrame({
+
+        "Parameter":
+            parameter_names,
+
+        "Minimum":
+            [
                 bound[0]
                 for bound in bounds
             ],
-            "Maximum": [
+
+        "Maximum":
+            [
                 bound[1]
                 for bound in bounds
             ],
-        }
-    )
-    
+
+    })
+
     st.dataframe(
         bounds_df,
         use_container_width=True,
@@ -827,8 +899,6 @@ def show_loss_correction():
                 area_df=area_df,
 
                 weight_factors=weight_factors,
-
-                efficiency_loss=efficiency_loss,
 
                 bounds=bounds,
 
@@ -911,7 +981,7 @@ def show_loss_correction():
             )
 
             # --------------------------------------------------
-            # SAVE
+            # SAVE RESULT
             # --------------------------------------------------
 
             st.session_state.loss_result = {
@@ -938,6 +1008,10 @@ def show_loss_correction():
 
         except Exception as e:
 
+            progress.empty()
+
+            status.empty()
+
             st.error(
                 f"Optimization failed: {e}"
             )
@@ -953,6 +1027,7 @@ def show_loss_correction():
     )
 
     if result is None:
+
         return
 
     st.divider()
@@ -966,7 +1041,7 @@ def show_loss_correction():
     ]
 
     # ======================================================
-    # PARAMETERS
+    # OPTIMIZED PARAMETERS
     # ======================================================
 
     st.markdown(
@@ -1009,11 +1084,11 @@ def show_loss_correction():
 
     col3.metric(
         "Efficiency Loss",
-        f"{efficiency_loss:.2f}%",
+        f"{parameters['Efficiency Loss']:.2f}%",
     )
 
     # ======================================================
-    # METRICS
+    # FORECAST PERFORMANCE
     # ======================================================
 
     st.markdown(
@@ -1079,12 +1154,17 @@ def show_loss_correction():
     )
 
     # ======================================================
-    # WEIGHTS
+    # EFFECTIVE WEIGHTS
     # ======================================================
 
     with st.expander(
         "View Effective Weights"
     ):
+
+        weights = np.asarray(
+            result["weights"],
+            dtype=float,
+        )
 
         if has_cluster:
 
@@ -1092,9 +1172,7 @@ def show_loss_correction():
                 f"CL{i}"
                 for i in range(
                     1,
-                    len(
-                        result["weights"]
-                    ) + 1
+                    len(weights) + 1
                 )
             ]
 
@@ -1104,21 +1182,24 @@ def show_loss_correction():
                 "Total Plant"
             ]
 
-        weights_df = pd.DataFrame({
+        # Safety check
+        if len(labels) == len(weights):
 
-            "Group":
-                labels,
+            weights_df = pd.DataFrame({
 
-            "Effective Weight":
-                result["weights"],
+                "Group":
+                    labels,
 
-        })
+                "Effective Weight":
+                    weights,
 
-        st.dataframe(
-            weights_df,
-            use_container_width=True,
-            hide_index=True,
-        )
+            })
+
+            st.dataframe(
+                weights_df,
+                use_container_width=True,
+                hide_index=True,
+            )
 
     # ======================================================
     # ALL METRICS
