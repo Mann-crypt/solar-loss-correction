@@ -5,226 +5,226 @@ import pandas as pd
 
 
 # ==========================================================
-# BASIC MATH HELPERS
+# BASIC HELPERS
 # ==========================================================
-
-def sin_deg(angle):
-    """
-    Sine of an angle given in degrees.
-    """
-    return np.sin(np.radians(angle))
-
-
-def cos_deg(angle):
-    """
-    Cosine of an angle given in degrees.
-    """
-    return np.cos(np.radians(angle))
-
 
 def clip_zero(values):
     """
-    Replace negative values with zero.
+    Replace NaN/inf and negative values with zero.
     """
     values = np.asarray(values, dtype=float)
+
+    values = np.nan_to_num(
+        values,
+        nan=0.0,
+        posinf=0.0,
+        neginf=0.0,
+    )
 
     return np.maximum(values, 0.0)
 
 
-# ==========================================================
-# SOLAR DECLINATION
-# ==========================================================
-
-def calculate_declination_angle(day_of_year):
+def sin_deg(angle):
     """
-    Calculate solar declination angle in degrees.
+    Sine where angle is supplied in degrees.
+    """
+    return np.sin(
+        np.radians(angle)
+    )
 
-    Uses the common approximation:
 
-        δ = 23.45 * sin(360 * (284 + n) / 365)
+def cos_deg(angle):
+    """
+    Cosine where angle is supplied in degrees.
+    """
+    return np.cos(
+        np.radians(angle)
+    )
 
-    Parameters
-    ----------
-    day_of_year : int or array-like
-        Day number of the year.
 
-    Returns
-    -------
-    numpy.ndarray or float
+# ==========================================================
+# SOLAR GEOMETRY
+# ==========================================================
+
+def declination(day_of_year):
+    """
+    Solar declination angle in degrees.
+
+    Cooper equation.
     """
 
-    n = np.asarray(
+    day_of_year = np.asarray(
         day_of_year,
         dtype=float,
     )
 
-    return 23.45 * np.sin(
-        np.radians(
-            360.0 * (284.0 + n) / 365.0
+    return (
+        23.45
+        * np.sin(
+            np.radians(
+                360.0
+                * (284.0 + day_of_year)
+                / 365.0
+            )
         )
     )
 
 
+def elevation_from_zenith(zenith):
+    """
+    Convert solar zenith angle to elevation angle.
+    """
+
+    zenith = np.asarray(
+        zenith,
+        dtype=float,
+    )
+
+    return 90.0 - zenith
+
+
 # ==========================================================
-# SOLAR ELEVATION
+# TRACKING ANGLE
 # ==========================================================
 
-def calculate_elevation_angle(
-    latitude,
-    declination,
-    hour_angle,
+def calculate_tracking_angles(
+    blocks,
+    ghi_start,
+    ghi_end,
+    ghi_max,
+    east_limit,
+    west_limit,
 ):
     """
-    Calculate solar elevation angle.
+    Generate the panel tracking angle for 96 blocks.
 
-    Formula:
+    Logic:
 
-        sin(elevation)
-        =
-        sin(latitude) sin(declination)
-        +
-        cos(latitude) cos(declination) cos(hour_angle)
+        Before GHI Max Block:
+            panel moves from East limit toward 0.
 
-    All angles are in degrees.
+        At GHI Max Block:
+            panel angle = 0.
+
+        After GHI Max Block:
+            panel moves from 0 toward West limit.
+
+    Parameters
+    ----------
+    blocks : array-like
+        Block numbers.
+
+    ghi_start : int
+        Block where tracking starts.
+
+    ghi_end : int
+        Block where tracking ends.
+
+    ghi_max : int
+        Peak / maximum GHI block.
+
+    east_limit : float
+        Maximum east tracking angle.
+
+    west_limit : float
+        Maximum west tracking angle.
+
+    Returns
+    -------
+    numpy.ndarray
+        Tracking angle for each block.
     """
 
-    latitude = np.asarray(
-        latitude,
+    blocks = np.asarray(
+        blocks,
         dtype=float,
     )
 
-    declination = np.asarray(
-        declination,
-        dtype=float,
-    )
-
-    hour_angle = np.asarray(
-        hour_angle,
-        dtype=float,
-    )
-
-    sin_elevation = (
-        sin_deg(latitude)
-        * sin_deg(declination)
-        +
-        cos_deg(latitude)
-        * cos_deg(declination)
-        * cos_deg(hour_angle)
-    )
-
-    sin_elevation = np.clip(
-        sin_elevation,
-        -1.0,
-        1.0,
-    )
-
-    return np.degrees(
-        np.arcsin(sin_elevation)
-    )
-
-
-# ==========================================================
-# POA CALCULATION
-# ==========================================================
-
-def calculate_poa(
-    dni,
-    dhi,
-    ghi,
-    zenith_angle,
-    panel_angle=0,
-):
-    """
-    Calculate Plane of Array irradiance.
-
-    Simplified single-axis formulation used by the project.
-
-    Direct component:
-
-        DNI * cos(theta - alpha)
-
-    Diffuse component:
-
-        DHI
-
-    Returns POA in the same irradiance unit as the inputs.
-    """
-
-    dni = np.asarray(
-        dni,
-        dtype=float,
-    )
-
-    dhi = np.asarray(
-        dhi,
-        dtype=float,
-    )
-
-    ghi = np.asarray(
-        ghi,
-        dtype=float,
-    )
-
-    zenith_angle = np.asarray(
-        zenith_angle,
-        dtype=float,
-    )
-
-    panel_angle = np.asarray(
-        panel_angle,
-        dtype=float,
-    )
-
-    projection = calculate_projection(
-        zenith_angle,
-        panel_angle,
-    )
-
-    poa = (
-        dni * projection
-        + dhi
-    )
-
-    return np.maximum(
-        poa,
-        0.0,
-    )
-
-
-# ==========================================================
-# PROJECTION
-# ==========================================================
-
-def calculate_projection(
-    zenith_angle,
-    panel_angle,
-):
-    """
-    Calculate the cosine projection factor.
-
-        projection = cos(zenith - panel_angle)
-    """
-
-    zenith_angle = np.asarray(
-        zenith_angle,
-        dtype=float,
-    )
-
-    panel_angle = np.asarray(
-        panel_angle,
-        dtype=float,
-    )
-
-    projection = np.cos(
-        np.radians(
-            zenith_angle - panel_angle
+    if not (
+        ghi_start
+        < ghi_max
+        < ghi_end
+    ):
+        raise ValueError(
+            "GHI Starting Block must be less "
+            "than GHI Max Block and GHI Max Block "
+            "must be less than GHI Ending Block."
         )
+
+    angles = np.zeros(
+        len(blocks),
+        dtype=float,
     )
 
-    return np.maximum(
-        projection,
-        0.0,
+    # ------------------------------------------------------
+    # Morning / East side
+    # ------------------------------------------------------
+
+    morning = (
+        (blocks >= ghi_start)
+        & (blocks <= ghi_max)
     )
+
+    if np.any(morning):
+
+        denominator = (
+            ghi_max
+            - ghi_start
+        )
+
+        if denominator > 0:
+
+            fraction = (
+                blocks[morning]
+                - ghi_start
+            ) / denominator
+
+            fraction = np.clip(
+                fraction,
+                0.0,
+                1.0,
+            )
+
+            angles[morning] = (
+                east_limit
+                * (1.0 - fraction)
+            )
+
+    # ------------------------------------------------------
+    # Evening / West side
+    # ------------------------------------------------------
+
+    evening = (
+        (blocks >= ghi_max)
+        & (blocks <= ghi_end)
+    )
+
+    if np.any(evening):
+
+        denominator = (
+            ghi_end
+            - ghi_max
+        )
+
+        if denominator > 0:
+
+            fraction = (
+                blocks[evening]
+                - ghi_max
+            ) / denominator
+
+            fraction = np.clip(
+                fraction,
+                0.0,
+                1.0,
+            )
+
+            angles[evening] = (
+                -west_limit
+                * fraction
+            )
+
+    return angles
 
 
 # ==========================================================
@@ -238,18 +238,29 @@ def calculate_dhi(
     """
     Calculate DHI from GHI.
 
-        DHI = GHI * DHI%
+        DHI = GHI × DHI%
 
     dhi_percent is supplied as a percentage.
+
+    Example:
+        GHI = 800
+        DHI = 20%
+
+        DHI = 160
     """
 
-    ghi = np.asarray(
-        ghi,
-        dtype=float,
+    ghi = clip_zero(
+        ghi
     )
 
     dhi_percent = float(
         dhi_percent
+    )
+
+    dhi_percent = np.clip(
+        dhi_percent,
+        0.0,
+        100.0,
     )
 
     dhi = (
@@ -258,9 +269,8 @@ def calculate_dhi(
         / 100.0
     )
 
-    return np.maximum(
-        dhi,
-        0.0,
+    return clip_zero(
+        dhi
     )
 
 
@@ -271,524 +281,116 @@ def calculate_dhi(
 def calculate_dni(
     ghi,
     dhi,
+    panel_angle=None,
     zenith_angle=None,
-    cos_zenith=None,
 ):
     """
-    Calculate DNI.
+    Calculate DNI from GHI and DHI.
 
-    If cos_zenith is supplied:
+    GHI = DNI × cos(zenith) + DHI
+
+    Therefore:
 
         DNI = (GHI - DHI) / cos(zenith)
 
-    If zenith_angle is supplied, its cosine is calculated.
+    If zenith_angle is not supplied, panel_angle
+    is used only as a compatibility fallback.
 
-    Small cosine values are protected against division by zero.
+    Negative values are clipped to zero.
     """
 
-    ghi = np.asarray(
-        ghi,
-        dtype=float,
+    ghi = clip_zero(
+        ghi
     )
 
-    dhi = np.asarray(
-        dhi,
-        dtype=float,
+    dhi = clip_zero(
+        dhi
     )
 
-    if cos_zenith is None:
+    if zenith_angle is None:
 
-        if zenith_angle is None:
+        if panel_angle is None:
 
-            raise ValueError(
-                "Either zenith_angle or "
-                "cos_zenith must be supplied."
+            # Horizontal fallback.
+            cos_zenith = np.ones(
+                len(ghi),
+                dtype=float,
             )
 
-        cos_zenith = np.cos(
-            np.radians(
-                zenith_angle
+        else:
+
+            panel_angle = np.asarray(
+                panel_angle,
+                dtype=float,
             )
+
+            cos_zenith = cos_deg(
+                panel_angle
+            )
+
+    else:
+
+        zenith_angle = np.asarray(
+            zenith_angle,
+            dtype=float,
         )
 
-    cos_zenith = np.asarray(
-        cos_zenith,
-        dtype=float,
-    )
+        cos_zenith = cos_deg(
+            zenith_angle
+        )
 
     cos_zenith = np.clip(
         cos_zenith,
-        1e-6,
-        None,
+        0.05,
+        1.0,
     )
 
     dni = (
         ghi - dhi
     ) / cos_zenith
 
-    return np.maximum(
-        dni,
-        0.0,
+    return clip_zero(
+        dni
     )
 
 
 # ==========================================================
-# TRACKING ANGLES
+# POA IRRADIANCE
 # ==========================================================
 
-def calculate_tracking_angles(
-    blocks,
-    ghi_start,
-    ghi_end,
-    ghi_max,
-    east_limit,
-    west_limit,
-):
-    """
-    Calculate solar zenith and tracker panel angle
-    from the optimized block configuration.
-
-    Parameters
-    ----------
-    blocks : array-like
-        15-minute block numbers.
-
-    ghi_start : int
-        Starting block.
-
-    ghi_end : int
-        Ending block.
-
-    ghi_max : int
-        Block corresponding to maximum solar elevation.
-
-    east_limit : float
-        Maximum tracker angle on the east side.
-
-    west_limit : float
-        Maximum tracker angle on the west side.
-
-    Returns
-    -------
-    zenith, panel
-    """
-
-    blocks = np.asarray(
-        blocks,
-        dtype=float,
-    )
-
-    ghi_start = float(
-        ghi_start
-    )
-
-    ghi_end = float(
-        ghi_end
-    )
-
-    ghi_max = float(
-        ghi_max
-    )
-
-    east_limit = float(
-        east_limit
-    )
-
-    west_limit = float(
-        west_limit
-    )
-
-    # ------------------------------------------------------
-    # Safety validation
-    # ------------------------------------------------------
-
-    if not (
-        ghi_start
-        < ghi_max
-        < ghi_end
-    ):
-
-        raise ValueError(
-            "GHI Start must be less than "
-            "GHI Max and GHI Max must be "
-            "less than GHI End."
-        )
-
-    # ------------------------------------------------------
-    # Slopes
-    #
-    # These are the same relationships used in the
-    # original tracking optimization.
-    # ------------------------------------------------------
-
-    denominator_1 = (
-        ghi_start
-        - 1
-        - ghi_max
-    )
-
-    denominator_2 = (
-        ghi_end
-        + 1
-        - ghi_max
-    )
-
-    if (
-        denominator_1 == 0
-        or denominator_2 == 0
-    ):
-
-        raise ValueError(
-            "Invalid GHI block configuration."
-        )
-
-    m1 = (
-        90.0
-        / denominator_1
-    )
-
-    m2 = (
-        90.0
-        / denominator_2
-    )
-
-    # ------------------------------------------------------
-    # Zenith
-    # ------------------------------------------------------
-
-    zenith = np.where(
-
-        blocks <= ghi_max,
-
-        np.minimum(
-            89.0,
-            m1
-            * (
-                blocks
-                - ghi_max
-            ),
-        ),
-
-        np.minimum(
-            89.0,
-            m2
-            * (
-                blocks
-                - ghi_max
-            ),
-        ),
-    )
-
-    # ------------------------------------------------------
-    # Panel angle
-    # ------------------------------------------------------
-
-    panel = np.where(
-
-        blocks < ghi_max,
-
-        np.minimum(
-            zenith,
-            abs(east_limit),
-        ),
-
-        np.where(
-
-            (
-                (blocks > ghi_max)
-                &
-                (zenith > west_limit)
-            ),
-
-            west_limit,
-
-            zenith,
-        ),
-    )
-
-    return (
-        zenith,
-        panel,
-    )
-
-
-# ==========================================================
-# TRACKING FORECAST
-# ==========================================================
-
-def calculate_tracking_forecast(
-    ghi_arrays,
-    weights,
-    blocks,
-    dhi_percent,
-    ghi_start,
-    ghi_end,
-    ghi_max,
-    east_limit,
-    west_limit,
-):
-    """
-    Calculate tracking power forecast.
-
-    Main calculation:
-
-        DHI = GHI * DHI%
-
-        DNI = (GHI - DHI) / cos(panel angle)
-
-        Power =
-            DNI * effective area / 1,000,000
-
-    For cluster plants:
-
-        Power =
-            sum(
-                DNI_cluster
-                * effective_weight_cluster
-            )
-
-    For non-cluster plants:
-
-        one GHI array + one effective weight.
-
-    Returns
-    -------
-    numpy.ndarray
-        Forecast power in MW.
-    """
-
-    # ======================================================
-    # CLEAN INPUTS
-    # ======================================================
-
-    blocks = np.asarray(
-        blocks,
-        dtype=float,
-    )
-
-    if len(ghi_arrays) == 0:
-
-        raise ValueError(
-            "No GHI arrays supplied."
-        )
-
-    weights = np.asarray(
-        weights,
-        dtype=float,
-    )
-
-    if len(weights) != len(
-        ghi_arrays
-    ):
-
-        raise ValueError(
-            "Number of weights must "
-            "match number of GHI arrays."
-        )
-
-    cleaned_ghi = []
-
-    for i, ghi in enumerate(
-        ghi_arrays
-    ):
-
-        ghi = np.asarray(
-            ghi,
-            dtype=float,
-        )
-
-        if len(ghi) != len(
-            blocks
-        ):
-
-            raise ValueError(
-                f"GHI array {i + 1} "
-                "length does not match blocks."
-            )
-
-        ghi = np.nan_to_num(
-            ghi,
-            nan=0.0,
-            posinf=0.0,
-            neginf=0.0,
-        )
-
-        ghi = np.maximum(
-            ghi,
-            0.0,
-        )
-
-        cleaned_ghi.append(
-            ghi
-        )
-
-    weights = np.nan_to_num(
-        weights,
-        nan=0.0,
-        posinf=0.0,
-        neginf=0.0,
-    )
-
-    weights = np.maximum(
-        weights,
-        0.0,
-    )
-
-    # ======================================================
-    # TRACKING ANGLES
-    # ======================================================
-
-    zenith, panel = (
-        calculate_tracking_angles(
-
-            blocks=blocks,
-
-            ghi_start=ghi_start,
-
-            ghi_end=ghi_end,
-
-            ghi_max=ghi_max,
-
-            east_limit=east_limit,
-
-            west_limit=west_limit,
-        )
-    )
-
-    # ======================================================
-    # COSINE OF PANEL ANGLE
-    # ======================================================
-
-    cos_panel = np.cos(
-        np.radians(
-            panel
-        )
-    )
-
-    # Same protection used in the original calculation.
-    cos_panel = np.clip(
-        cos_panel,
-        1e-6,
-        None,
-    )
-
-    # ======================================================
-    # FORECAST
-    # ======================================================
-
-    prediction = np.zeros(
-        len(blocks),
-        dtype=float,
-    )
-
-    for ghi, weight in zip(
-        cleaned_ghi,
-        weights,
-    ):
-
-        # --------------------------------------------------
-        # DHI
-        # --------------------------------------------------
-
-        dhi = (
-            ghi
-            * float(dhi_percent)
-            / 100.0
-        )
-
-        # --------------------------------------------------
-        # DNI
-        #
-        # Important:
-        # This follows the original tracking calculation,
-        # where the panel-angle cosine is used.
-        # --------------------------------------------------
-
-        dni = (
-            ghi - dhi
-        ) / cos_panel
-
-        dni = np.maximum(
-            dni,
-            0.0,
-        )
-
-        # --------------------------------------------------
-        # Power
-        #
-        # Effective weight has units corresponding to
-        # m² × efficiency.
-        #
-        # Irradiance × effective area / 1,000,000
-        # gives MW.
-        # --------------------------------------------------
-
-        prediction += (
-            dni
-            * float(weight)
-        ) / 1_000_000.0
-
-    # ======================================================
-    # CLEAN RESULT
-    # ======================================================
-
-    prediction = np.nan_to_num(
-        prediction,
-        nan=0.0,
-        posinf=0.0,
-        neginf=0.0,
-    )
-
-    prediction = np.maximum(
-        prediction,
-        0.0,
-    )
-
-    return prediction
-
-
-# ==========================================================
-# RT FORECAST
-# ==========================================================
-
-def calculate_rt_forecast(
-    ghi,
+def calculate_poa(
+    dni,
+    dhi,
+    zenith_angle,
     panel_angle,
-    efficiency,
-    area,
-    dhi_percent=0,
 ):
     """
-    Generic fixed/RT power forecast.
+    Calculate plane-of-array irradiance.
 
-    This function is kept for compatibility with the
-    earlier solar forecasting screens.
+    Direct component:
 
-    Parameters
-    ----------
-    ghi : array-like
-        GHI values.
+        DNI × cos(theta - alpha)
 
-    panel_angle : array-like
-        Panel angle relative to the incoming radiation.
+    Diffuse component:
 
-    efficiency : float
-        Efficiency in percentage.
+        DHI × (1 + cos(alpha)) / 2
 
-    area : float
-        Total panel area in m².
+    where:
 
-    dhi_percent : float
-        DHI percentage.
-
-    Returns
-    -------
-    numpy.ndarray
-        Power forecast in MW.
+        theta = solar zenith angle
+        alpha = panel angle
     """
 
-    ghi = np.asarray(
-        ghi,
+    dni = clip_zero(
+        dni
+    )
+
+    dhi = clip_zero(
+        dhi
+    )
+
+    zenith_angle = np.asarray(
+        zenith_angle,
         dtype=float,
     )
 
@@ -798,171 +400,49 @@ def calculate_rt_forecast(
     )
 
     # ------------------------------------------------------
-    # DHI / DNI
+    # Direct irradiance on panel
     # ------------------------------------------------------
 
-    dhi = (
-        ghi
-        * float(dhi_percent)
-        / 100.0
+    incidence_cos = cos_deg(
+        zenith_angle
+        - panel_angle
     )
 
-    cos_angle = np.cos(
-        np.radians(
-            panel_angle
+    incidence_cos = np.maximum(
+        incidence_cos,
+        0.0,
+    )
+
+    direct_poa = (
+        dni
+        * incidence_cos
+    )
+
+    # ------------------------------------------------------
+    # Diffuse sky component
+    # ------------------------------------------------------
+
+    diffuse_poa = (
+        dhi
+        * (
+            1.0
+            + cos_deg(panel_angle)
         )
+        / 2.0
     )
-
-    cos_angle = np.clip(
-        cos_angle,
-        1e-6,
-        None,
-    )
-
-    dni = (
-        ghi - dhi
-    ) / cos_angle
-
-    # ------------------------------------------------------
-    # POA
-    # ------------------------------------------------------
 
     poa = (
-        dni
-        * np.maximum(
-            cos_angle,
-            0.0,
-        )
-        + dhi
+        direct_poa
+        + diffuse_poa
     )
 
-    # ------------------------------------------------------
-    # Power
-    # ------------------------------------------------------
-
-    power = (
+    return clip_zero(
         poa
-        * float(area)
-        * float(efficiency)
-        / 100.0
-    ) / 1_000_000.0
-
-    return np.maximum(
-        power,
-        0.0,
     )
 
 
 # ==========================================================
-# SYMMETRY
-# ==========================================================
-
-def calculate_symmetry(
-    values,
-    shift=0,
-    alpha=0.5,
-):
-    """
-    Create a symmetric profile from a solar generation curve.
-
-    The previous implementation used:
-
-        shifted = roll(profile, -shift)
-
-        symmetric =
-            alpha * profile
-            +
-            (1-alpha) * reversed(shifted)
-    """
-
-    values = np.asarray(
-        values,
-        dtype=float,
-    )
-
-    if len(values) == 0:
-        return values.copy()
-
-    shift = int(shift)
-
-    alpha = float(alpha)
-
-    shifted = np.roll(
-        values,
-        -shift,
-    )
-
-    symmetric = (
-        alpha * values
-        +
-        (1.0 - alpha)
-        * shifted[::-1]
-    )
-
-    return np.maximum(
-        symmetric,
-        0.0,
-    )
-
-
-# ==========================================================
-# BEST SYMMETRY SHIFT
-# ==========================================================
-
-def find_best_shift(
-    values,
-):
-    """
-    Find the shift producing the lowest RMSE
-    between a curve and its symmetric version.
-    """
-
-    values = np.asarray(
-        values,
-        dtype=float,
-    )
-
-    if len(values) == 0:
-        return 0
-
-    best_shift = 0
-    least_error = np.inf
-
-    for shift in range(
-        len(values)
-    ):
-
-        shifted = np.roll(
-            values,
-            -shift,
-        )
-
-        symmetric = (
-            values
-            + shifted[::-1]
-        ) / 2.0
-
-        error = np.sqrt(
-            np.mean(
-                (
-                    values
-                    - symmetric
-                ) ** 2
-            )
-        )
-
-        if error < least_error:
-
-            least_error = error
-            best_shift = shift
-
-    return int(
-        best_shift
-    )
-
-
-# ==========================================================
-# LOSS CORRECTED WEIGHTS
+# EFFECTIVE WEIGHTS
 # ==========================================================
 
 def calculate_loss_corrected_weights(
@@ -972,120 +452,121 @@ def calculate_loss_corrected_weights(
     has_cluster=True,
 ):
     """
-    Calculate effective area / weights.
+    Calculate effective plant weights after applying
+    efficiency loss.
 
     Cluster:
-        One effective weight per GHI cluster.
+        One weight per GHI cluster.
 
     Non-cluster:
-        One total plant effective weight.
+        One total plant weight.
 
-    Effective area:
+    Parameters
+    ----------
+    area_df : pandas.DataFrame
+        Area and efficiency data.
 
-        Total Area
-        ×
-        Net Efficiency
-        / 100
+    efficiency_loss : float
+        Efficiency loss in percentage points.
 
-    Net Efficiency:
+    weight_factors : array-like
+        Cluster weighting factors.
 
-        Standard PV Efficiency
-        -
-        Efficiency Loss
+    has_cluster : bool
+        Whether workbook contains cluster plants.
+
+    Returns
+    -------
+    numpy.ndarray
     """
 
     if area_df is None:
-
         raise ValueError(
             "Area data is missing."
         )
 
-    if area_df.empty:
-
-        raise ValueError(
-            "Area data is empty."
-        )
-
     df = area_df.copy()
 
-    # ======================================================
-    # REQUIRED COLUMNS
-    # ======================================================
+    # ------------------------------------------------------
+    # Required columns
+    # ------------------------------------------------------
 
-    required_columns = [
-        "Standard PV Efficiency (%)",
-        "Total area(m2)",
-    ]
+    efficiency_col = (
+        "Standard PV Efficiency (%)"
+    )
 
-    missing = [
-        col
-        for col in required_columns
-        if col not in df.columns
-    ]
+    area_col = (
+        "Total area(m2)"
+    )
 
-    if missing:
+    if efficiency_col not in df.columns:
 
         raise ValueError(
-            "Missing required area columns: "
-            + ", ".join(
-                missing
-            )
+            f"Missing column: {efficiency_col}"
         )
 
-    # ======================================================
-    # EFFICIENCY
-    # ======================================================
+    if area_col not in df.columns:
+
+        raise ValueError(
+            f"Missing column: {area_col}"
+        )
+
+    # ------------------------------------------------------
+    # Efficiency
+    # ------------------------------------------------------
+
+    efficiency_loss = float(
+        efficiency_loss
+    )
 
     df["Efficiency Losses(%)"] = (
-        float(efficiency_loss)
+        efficiency_loss
     )
 
-    standard_efficiency = pd.to_numeric(
-        df[
-            "Standard PV Efficiency (%)"
-        ],
-        errors="coerce",
-    ).fillna(0.0)
+    df["Standard PV Efficiency (%)"] = (
+        pd.to_numeric(
+            df[
+                "Standard PV Efficiency (%)"
+            ],
+            errors="coerce",
+        ).fillna(0.0)
+    )
 
     df["Net Efficiency (%)"] = (
-        standard_efficiency
-        - df[
-            "Efficiency Losses(%)"
+        df[
+            "Standard PV Efficiency (%)"
         ]
+        - efficiency_loss
     )
 
-    # Prevent negative efficiency
-
     df["Net Efficiency (%)"] = np.maximum(
-        df[
-            "Net Efficiency (%)"
-        ],
+        df["Net Efficiency (%)"],
         0.0,
     )
 
-    # ======================================================
-    # EFFECTIVE AREA
-    # ======================================================
+    # ------------------------------------------------------
+    # Area
+    # ------------------------------------------------------
 
-    total_area = pd.to_numeric(
-        df[
-            "Total area(m2)"
-        ],
-        errors="coerce",
-    ).fillna(0.0)
+    df["Total area(m2)"] = (
+        pd.to_numeric(
+            df["Total area(m2)"],
+            errors="coerce",
+        ).fillna(0.0)
+    )
+
+    # ------------------------------------------------------
+    # Effective area
+    # ------------------------------------------------------
 
     df["Effective Area"] = (
-        total_area
-        * df[
-            "Net Efficiency (%)"
-        ]
+        df["Total area(m2)"]
+        * df["Net Efficiency (%)"]
         / 100.0
     )
 
     total_effective_area = (
-        df[
-            "Effective Area"
-        ].sum()
+        df["Effective Area"].sum()
     )
 
     # ======================================================
@@ -1095,9 +576,7 @@ def calculate_loss_corrected_weights(
     if not has_cluster:
 
         return np.asarray(
-            [
-                total_effective_area
-            ],
+            [total_effective_area],
             dtype=float,
         )
 
@@ -1134,17 +613,19 @@ def calculate_loss_corrected_weights(
 
     if total_weight <= 0:
 
-        raise ValueError(
-            "Cluster weight factors "
-            "must have a positive sum."
+        weight_factors = (
+            np.ones(
+                len(weight_factors)
+            )
+            / len(weight_factors)
         )
 
-    # Normalize
+    else:
 
-    weight_factors = (
-        weight_factors
-        / total_weight
-    )
+        weight_factors = (
+            weight_factors
+            / total_weight
+        )
 
     weights = (
         total_effective_area
@@ -1154,4 +635,478 @@ def calculate_loss_corrected_weights(
     return np.asarray(
         weights,
         dtype=float,
+    )
+
+
+# ==========================================================
+# SINGLE GHI → POWER
+# ==========================================================
+
+def calculate_single_tracking_forecast(
+    ghi,
+    weights,
+    blocks,
+    dhi_percent,
+    ghi_start,
+    ghi_end,
+    ghi_max,
+    east_limit,
+    west_limit,
+):
+    """
+    Convert one GHI array into tracking generation.
+    """
+
+    ghi = clip_zero(
+        ghi
+    )
+
+    blocks = np.asarray(
+        blocks,
+        dtype=float,
+    )
+
+    # ------------------------------------------------------
+    # Tracking angle
+    # ------------------------------------------------------
+
+    panel_angle = calculate_tracking_angles(
+        blocks=blocks,
+        ghi_start=ghi_start,
+        ghi_end=ghi_end,
+        ghi_max=ghi_max,
+        east_limit=east_limit,
+        west_limit=west_limit,
+    )
+
+    # ------------------------------------------------------
+    # Solar geometry
+    # ------------------------------------------------------
+    #
+    # The forecasting screen works with block numbers.
+    # We use a 15-minute solar-day approximation where
+    # block 0 corresponds to midnight.
+    #
+    # This keeps the calculation independent from the
+    # workbook's date/time formatting.
+    # ------------------------------------------------------
+
+    time_hours = (
+        blocks / 4.0
+    )
+
+    # Solar hour angle.
+    hour_angle = (
+        time_hours - 12.0
+    ) * 15.0
+
+    # Default declination near equinox.
+    # This provides a stable geometry when the workbook
+    # does not explicitly provide zenith data.
+    dec = 0.0
+
+    latitude = 28.6
+
+    cos_zenith = (
+        sin_deg(latitude)
+        * sin_deg(dec)
+        +
+        cos_deg(latitude)
+        * cos_deg(dec)
+        * cos_deg(hour_angle)
+    )
+
+    cos_zenith = np.clip(
+        cos_zenith,
+        -1.0,
+        1.0,
+    )
+
+    zenith_angle = np.degrees(
+        np.arccos(
+            cos_zenith
+        )
+    )
+
+    # ------------------------------------------------------
+    # DHI
+    # ------------------------------------------------------
+
+    dhi = calculate_dhi(
+        ghi,
+        dhi_percent,
+    )
+
+    # ------------------------------------------------------
+    # DNI
+    # ------------------------------------------------------
+
+    dni = calculate_dni(
+        ghi=ghi,
+        dhi=dhi,
+        zenith_angle=zenith_angle,
+    )
+
+    # ------------------------------------------------------
+    # POA
+    # ------------------------------------------------------
+
+    poa = calculate_poa(
+        dni=dni,
+        dhi=dhi,
+        zenith_angle=zenith_angle,
+        panel_angle=panel_angle,
+    )
+
+    # ------------------------------------------------------
+    # Convert irradiance to generation
+    # ------------------------------------------------------
+
+    effective_area = float(
+        np.asarray(
+            weights,
+            dtype=float,
+        ).sum()
+    )
+
+    power = (
+        poa
+        * effective_area
+        / 1000.0
+    )
+
+    return clip_zero(
+        power
+    )
+
+
+# ==========================================================
+# TRACKING FORECAST
+# ==========================================================
+
+def calculate_tracking_forecast(
+    ghi_arrays,
+    weights,
+    blocks,
+    dhi_percent,
+    ghi_start,
+    ghi_end,
+    ghi_max,
+    east_limit,
+    west_limit,
+):
+    """
+    Calculate total tracking generation.
+
+    For a non-cluster plant:
+
+        GHI arrays = [GHI]
+
+        weights = [total effective area]
+
+    For a cluster plant:
+
+        GHI arrays = [
+            CL1-GHI,
+            CL2-GHI,
+            ...
+        ]
+
+        weights = [
+            effective CL1 area,
+            effective CL2 area,
+            ...
+        ]
+
+    Each cluster is calculated independently and then
+    summed into total generation.
+    """
+
+    if not ghi_arrays:
+
+        raise ValueError(
+            "No GHI arrays supplied."
+        )
+
+    blocks = np.asarray(
+        blocks,
+        dtype=float,
+    )
+
+    weights = np.asarray(
+        weights,
+        dtype=float,
+    )
+
+    if len(weights) != len(
+        ghi_arrays
+    ):
+
+        raise ValueError(
+            "Number of weights must match "
+            "number of GHI arrays."
+        )
+
+    forecasts = []
+
+    for ghi, weight in zip(
+        ghi_arrays,
+        weights,
+    ):
+
+        ghi = np.asarray(
+            ghi,
+            dtype=float,
+        )
+
+        if len(ghi) != len(blocks):
+
+            raise ValueError(
+                "GHI array length does not "
+                "match Blocks."
+            )
+
+        # Each array receives its own
+        # effective-area contribution.
+        forecast = (
+            calculate_single_tracking_forecast(
+                ghi=ghi,
+                weights=[weight],
+                blocks=blocks,
+                dhi_percent=dhi_percent,
+                ghi_start=ghi_start,
+                ghi_end=ghi_end,
+                ghi_max=ghi_max,
+                east_limit=east_limit,
+                west_limit=west_limit,
+            )
+        )
+
+        forecasts.append(
+            forecast
+        )
+
+    # ------------------------------------------------------
+    # Total plant generation
+    # ------------------------------------------------------
+
+    total_forecast = np.sum(
+        np.vstack(
+            forecasts
+        ),
+        axis=0,
+    )
+
+    return clip_zero(
+        total_forecast
+    )
+
+
+# ==========================================================
+# RT / PROJECTION HELPERS
+# ==========================================================
+
+def calculate_rt_projection(
+    actual,
+    forecast,
+):
+    """
+    Calculate actual-to-forecast projection ratio.
+
+    Useful for applying an RT correction to a forecast.
+    """
+
+    actual = np.asarray(
+        actual,
+        dtype=float,
+    )
+
+    forecast = np.asarray(
+        forecast,
+        dtype=float,
+    )
+
+    denominator = np.sum(
+        np.abs(forecast)
+    )
+
+    if denominator <= 0:
+
+        return 1.0
+
+    return (
+        np.sum(actual)
+        / denominator
+    )
+
+
+def apply_rt_projection(
+    forecast,
+    projection,
+    weight=1.0,
+):
+    """
+    Apply RT projection to forecast.
+
+        corrected =
+            forecast ×
+            [1 + weight × (projection - 1)]
+    """
+
+    forecast = np.asarray(
+        forecast,
+        dtype=float,
+    )
+
+    projection = float(
+        projection
+    )
+
+    weight = float(
+        weight
+    )
+
+    weight = np.clip(
+        weight,
+        0.0,
+        1.0,
+    )
+
+    factor = (
+        1.0
+        + weight
+        * (projection - 1.0)
+    )
+
+    return clip_zero(
+        forecast
+        * factor
+    )
+
+
+# ==========================================================
+# SYMMETRY
+# ==========================================================
+
+def apply_symmetry(
+    values,
+):
+    """
+    Mirror the first half of a daily curve onto the
+    second half.
+
+    Mainly useful for shape correction.
+    """
+
+    values = np.asarray(
+        values,
+        dtype=float,
+    )
+
+    n = len(values)
+
+    if n < 2:
+
+        return values.copy()
+
+    result = values.copy()
+
+    half = n // 2
+
+    left = values[
+        :half
+    ]
+
+    right_length = (
+        n - half
+    )
+
+    mirrored = left[
+        ::-1
+    ]
+
+    if len(mirrored) < right_length:
+
+        mirrored = np.resize(
+            mirrored,
+            right_length,
+        )
+
+    result[
+        half:
+    ] = mirrored[
+        :right_length
+    ]
+
+    return clip_zero(
+        result
+    )
+
+
+# ==========================================================
+# BEST SHIFT
+# ==========================================================
+
+def best_shift(
+    actual,
+    forecast,
+    max_shift=10,
+):
+    """
+    Find the time shift producing the smallest
+    absolute-error score.
+
+    Returns:
+        best_shift, shifted_forecast
+    """
+
+    actual = np.asarray(
+        actual,
+        dtype=float,
+    )
+
+    forecast = np.asarray(
+        forecast,
+        dtype=float,
+    )
+
+    if len(actual) != len(
+        forecast
+    ):
+
+        raise ValueError(
+            "Actual and forecast must "
+            "have the same length."
+        )
+
+    best_score = np.inf
+    best_value = 0
+    best_forecast = forecast.copy()
+
+    for shift in range(
+        -max_shift,
+        max_shift + 1,
+    ):
+
+        shifted = np.roll(
+            forecast,
+            shift,
+        )
+
+        score = np.mean(
+            np.abs(
+                actual
+                - shifted
+            )
+        )
+
+        if score < best_score:
+
+            best_score = score
+            best_value = shift
+            best_forecast = shifted.copy()
+
+    return (
+        best_value,
+        best_forecast,
     )
