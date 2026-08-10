@@ -152,25 +152,24 @@ def extract_px_identifier(col):
 
     col = str(col).upper()
 
-    # Ignore DEV columns
+    # DEV columns are never considered
     if col.startswith("DEV"):
         return None, None
 
-    # -----------------------------------------------------
-    # Examples:
+    # P/X must appear after start or separator
     #
-    # KUR_PN12C1PF001
-    #       ^^^
+    # Examples:
+    # KURxx_PN125C1PF001
+    #      -> P + N125
     #
     # KUR_XN12_01
-    #       ^^^
+    #     -> X + N12
     #
     # KURxx_PSD00C1PF001
-    #        ^^^^^
+    #      -> P + SD00
     #
     # KUR_XSD0_01
-    #       ^^^^
-    # -----------------------------------------------------
+    #     -> X + SD0
 
     match = re.search(
         r'(?:^|[_\-])([PX])([A-Z]+\d+)',
@@ -192,21 +191,11 @@ def extract_px_identifier(col):
 
 def normalize_identifier(identifier):
 
-    """
-    Normalizes identifiers so that cases such as:
-
-        PSD00
-        XSD0
-
-    can be matched through the common identifier SD0.
-    """
-
     if identifier is None:
         return None
 
-    identifier = identifier.upper()
+    identifier = str(identifier).upper()
 
-    # Split letters and numbers
     match = re.match(
         r'([A-Z]+)(\d+)',
         identifier
@@ -218,10 +207,9 @@ def normalize_identifier(identifier):
     letters = match.group(1)
     numbers = match.group(2)
 
-    # Remove trailing zeros from numeric portion
+    # Remove trailing zeros
     numbers = numbers.rstrip("0")
 
-    # If everything was zeros, retain one zero
     if numbers == "":
         numbers = "0"
 
@@ -237,11 +225,15 @@ def find_pairs(df):
     p_columns = {}
     x_columns = {}
 
+    # =====================================================
+    # FIND ALL P AND X COLUMNS
+    # =====================================================
+
     for col in df.columns:
 
         col_str = str(col)
 
-        # Ignore DEV columns
+        # Ignore DEV
         if col_str.upper().startswith("DEV"):
             continue
 
@@ -273,37 +265,75 @@ def find_pairs(df):
 
     pairs = []
 
-    # -----------------------------------------------------
-    # ONLY MATCH IDENTIFIERS EXISTING IN BOTH P AND X
-    # -----------------------------------------------------
+    # =====================================================
+    # MATCH P AND X
+    # =====================================================
 
-    common_identifiers = (
-        set(p_columns)
-        & set(x_columns)
-    )
+    for p_identifier, p_cols in p_columns.items():
 
-    for identifier in sorted(
-        common_identifiers
-    ):
+        for x_identifier, x_cols in x_columns.items():
 
-        for p_col in p_columns[
-            identifier
-        ]:
+            # ------------------------------------------------
+            # Exact match
+            # ------------------------------------------------
 
-            for x_col in x_columns[
-                identifier
-            ]:
+            exact_match = (
+                p_identifier == x_identifier
+            )
 
-                pairs.append(
-                    (
-                        identifier,
-                        p_col,
-                        x_col
+
+            # ------------------------------------------------
+            # Prefix match
+            #
+            # N125 -> N12
+            # SD0  -> SD0
+            # ------------------------------------------------
+
+            prefix_match = (
+                p_identifier.startswith(x_identifier)
+                or
+                x_identifier.startswith(p_identifier)
+            )
+
+
+            if not (
+                exact_match
+                or prefix_match
+            ):
+                continue
+
+
+            # ------------------------------------------------
+            # Choose the common identifier
+            # ------------------------------------------------
+
+            if len(p_identifier) <= len(x_identifier):
+
+                common_identifier = p_identifier
+
+            else:
+
+                common_identifier = x_identifier
+
+
+            # ------------------------------------------------
+            # Create P-X pairs
+            # ------------------------------------------------
+
+            for p_col in p_cols:
+
+                for x_col in x_cols:
+
+                    pairs.append(
+                        (
+                            common_identifier,
+                            p_col,
+                            x_col
+                        )
                     )
-                )
+
 
     return pairs
-
 
 # =========================================================
 # COMPARE DATA
@@ -987,8 +1017,384 @@ if uploaded_files:
         )
 
 
+    # =====================================================
+    # INDIVIDUAL FILE DETAILS
+    # =====================================================
+    
     st.markdown("## Detailed File Results")
-
+    
+    
+    for filename, data in all_results.items():
+    
+        result_df = data["data"].copy()
+    
+        result_columns = data["result_columns"]
+    
+        pair_lookup = data["pair_lookup"]
+    
+        report = data["report"].copy()
+    
+    
+        # =================================================
+        # FILE EXPANDER
+        # =================================================
+    
+        with st.expander(
+            f"📄 {filename}",
+            expanded=False
+        ):
+    
+            # -------------------------------------------------
+            # No P-X pairs
+            # -------------------------------------------------
+    
+            if report.empty:
+    
+                st.warning(
+                    "No valid P-X pairs were found in this file."
+                )
+    
+                continue
+    
+    
+            # =================================================
+            # FILE SUMMARY
+            # =================================================
+    
+            total_pairs = len(report)
+    
+            identical_pairs = int(
+                (
+                    report["100% Identical"]
+                    == "Yes"
+                ).sum()
+            )
+    
+            different_pairs = int(
+                (
+                    report["100% Identical"]
+                    == "No"
+                ).sum()
+            )
+    
+            different_blocks = int(
+                report["Different Blocks"].sum()
+            )
+    
+    
+            c1, c2, c3, c4 = st.columns(4)
+    
+            c1.metric(
+                "P-X Pairs",
+                total_pairs
+            )
+    
+            c2.metric(
+                "100% Identical",
+                identical_pairs
+            )
+    
+            c3.metric(
+                "Pairs With Differences",
+                different_pairs
+            )
+    
+            c4.metric(
+                "Different Blocks",
+                different_blocks
+            )
+    
+    
+            # =================================================
+            # PAIR SUMMARY
+            # =================================================
+    
+            st.markdown("### P-X Pair Summary")
+    
+            st.dataframe(
+                report[
+                    [
+                        "Identifier",
+                        "P Column",
+                        "X Column",
+                        "Total Blocks",
+                        "Identical Blocks",
+                        "Different Blocks",
+                        "100% Identical"
+                    ]
+                ],
+                use_container_width=True,
+                hide_index=True
+            )
+    
+    
+            # =================================================
+            # DATE-WISE DRILL DOWN
+            # =================================================
+    
+            st.markdown("### 📅 Date-wise Drill Down")
+    
+    
+            date_col = find_date_column(
+                result_df
+            )
+    
+    
+            if date_col is None:
+    
+                st.warning(
+                    "Date column could not be detected."
+                )
+    
+                continue
+    
+    
+            # Convert date
+            result_df[date_col] = pd.to_datetime(
+                result_df[date_col],
+                errors="coerce"
+            )
+    
+    
+            available_dates = sorted(
+                result_df[date_col]
+                .dropna()
+                .dt.date
+                .unique()
+                .tolist()
+            )
+    
+    
+            if not available_dates:
+    
+                st.warning(
+                    "No valid dates were found."
+                )
+    
+                continue
+    
+    
+            # =================================================
+            # DATE SELECTION
+            # =================================================
+    
+            selected_date = st.selectbox(
+                "Select Date",
+                available_dates,
+                key=f"date_select_{filename}"
+            )
+    
+    
+            # =================================================
+            # P-X PAIR SELECTION
+            # =================================================
+    
+            pair_options = {}
+    
+            for result_col in result_columns:
+    
+                if result_col not in pair_lookup:
+                    continue
+    
+                p_col, x_col = pair_lookup[
+                    result_col
+                ]
+    
+                pair_options[
+                    result_col
+                ] = (
+                    f"{p_col}  ↔  {x_col}"
+                )
+    
+    
+            if not pair_options:
+    
+                st.warning(
+                    "No P-X pairs available."
+                )
+    
+                continue
+    
+    
+            selected_result_col = st.selectbox(
+                "Select P-X Pair",
+                list(pair_options.keys()),
+                format_func=lambda x:
+                    pair_options[x],
+                key=f"pair_select_{filename}"
+            )
+    
+    
+            # =================================================
+            # SELECTED P/X COLUMNS
+            # =================================================
+    
+            p_col, x_col = pair_lookup[
+                selected_result_col
+            ]
+    
+    
+            # =================================================
+            # FILTER DATE
+            # =================================================
+    
+            date_df = result_df[
+                result_df[date_col].dt.date
+                == selected_date
+            ].copy()
+    
+    
+            # =================================================
+            # MATCH STATUS
+            # =================================================
+    
+            date_df["Match"] = date_df[
+                selected_result_col
+            ].astype(bool)
+    
+    
+            total_blocks = len(
+                date_df
+            )
+    
+            identical_blocks = int(
+                date_df["Match"].sum()
+            )
+    
+            mismatch_blocks = (
+                total_blocks
+                - identical_blocks
+            )
+    
+    
+            # =================================================
+            # DATE METRICS
+            # =================================================
+    
+            d1, d2, d3 = st.columns(3)
+    
+            d1.metric(
+                "Total Blocks",
+                total_blocks
+            )
+    
+            d2.metric(
+                "Identical Blocks",
+                identical_blocks
+            )
+    
+            d3.metric(
+                "Mismatched Blocks",
+                mismatch_blocks
+            )
+    
+    
+            # =================================================
+            # DISPLAY DATA
+            # =================================================
+    
+            display_df = date_df[
+                [
+                    date_col,
+                    p_col,
+                    x_col,
+                    "Match"
+                ]
+            ].copy()
+    
+    
+            # =================================================
+            # HIGHLIGHT FUNCTION
+            # =================================================
+    
+            def highlight_pair(row):
+    
+                styles = pd.Series(
+                    "",
+                    index=row.index
+                )
+    
+                if row["Match"]:
+    
+                    styles["Match"] = (
+                        "background-color: #d9f2d9;"
+                        "color: #176b17;"
+                        "font-weight: bold;"
+                    )
+    
+                else:
+    
+                    styles[p_col] = (
+                        "background-color: #ffcccc;"
+                        "color: #9c0006;"
+                        "font-weight: bold;"
+                    )
+    
+                    styles[x_col] = (
+                        "background-color: #ffcccc;"
+                        "color: #9c0006;"
+                        "font-weight: bold;"
+                    )
+    
+                    styles["Match"] = (
+                        "background-color: #ff6666;"
+                        "color: white;"
+                        "font-weight: bold;"
+                    )
+    
+                return styles
+    
+    
+            # =================================================
+            # ALL BLOCKS
+            # =================================================
+    
+            st.markdown(
+                f"#### {selected_date}"
+            )
+    
+            st.dataframe(
+                display_df.style.apply(
+                    highlight_pair,
+                    axis=1
+                ),
+                use_container_width=True,
+                height=400
+            )
+    
+    
+            # =================================================
+            # MISMATCHES ONLY
+            # =================================================
+    
+            if mismatch_blocks > 0:
+    
+                st.markdown(
+                    "#### ❌ Mismatched Blocks Only"
+                )
+    
+                mismatch_df = display_df[
+                    display_df["Match"] == False
+                ].copy()
+    
+    
+                st.dataframe(
+                    mismatch_df.style.apply(
+                        highlight_pair,
+                        axis=1
+                    ),
+                    use_container_width=True,
+                    height=300
+                )
+    
+            else:
+    
+                st.success(
+                    f"100% identical: "
+                    f"{p_col} ↔ {x_col} "
+                    f"on {selected_date}"
+                )
+    
     # =====================================================
     # DOWNLOAD
     # =====================================================
