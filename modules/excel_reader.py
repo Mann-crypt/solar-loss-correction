@@ -97,7 +97,9 @@ def read_loss_correction_input(uploaded_file):
         GHI_Forecast and Actual must exist.
 
     Returns:
-        DataFrame with exactly:
+        DataFrame with:
+        Blocks
+        Time-Blocks
         GHI_Forecast
         Actual
     """
@@ -145,8 +147,6 @@ def read_loss_correction_input(uploaded_file):
                 "Excel file must contain a 'Fixed' sheet."
             )
 
-        # IMPORTANT:
-        # Real column names are on row 2
         fixed = pd.read_excel(
             xls,
             sheet_name="Fixed",
@@ -183,7 +183,6 @@ def read_loss_correction_input(uploaded_file):
     # ==================================================
 
     for col in ["GHI_Forecast", "Actual"]:
-
         df[col] = pd.to_numeric(
             df[col],
             errors="coerce",
@@ -199,7 +198,6 @@ def read_loss_correction_input(uploaded_file):
         .fillna(0)
     )
 
-    # No negative values
     df["GHI_Forecast"] = np.maximum(
         df["GHI_Forecast"],
         0,
@@ -220,17 +218,10 @@ def read_loss_correction_input(uploaded_file):
             f"Found {len(df)}."
         )
 
-    # Keep first 96 blocks
     df = df.iloc[:96].copy()
 
-    if len(df) != 96:
-        raise ValueError(
-            f"Loss Correction requires exactly 96 blocks. "
-            f"Found {len(df)}."
-        )
-
     # ==================================================
-    # STANDARD BLOCK INFORMATION
+    # ADD BLOCK INFORMATION
     # ==================================================
 
     df.insert(
