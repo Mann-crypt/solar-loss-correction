@@ -150,26 +150,30 @@ def find_date_column(df):
 
 def extract_px_identifier(col):
 
-    """
-    Extracts the identifier following P or X.
-
-    Examples:
-
-    PN12              -> N12
-    XN12              -> N12
-
-    PE10              -> E10
-    XE10              -> E10
-
-    PSD00C1PF001      -> SD00
-    XSD0_01           -> SD0
-    """
-
     col = str(col).upper()
 
-    # P or X followed by letters + digits
+    # Ignore DEV columns
+    if col.startswith("DEV"):
+        return None, None
+
+    # -----------------------------------------------------
+    # Examples:
+    #
+    # KUR_PN12C1PF001
+    #       ^^^
+    #
+    # KUR_XN12_01
+    #       ^^^
+    #
+    # KURxx_PSD00C1PF001
+    #        ^^^^^
+    #
+    # KUR_XSD0_01
+    #       ^^^^
+    # -----------------------------------------------------
+
     match = re.search(
-        r'([PX])([A-Z]+\d+)',
+        r'(?:^|[_\-])([PX])([A-Z]+\d+)',
         col
     )
 
@@ -177,7 +181,6 @@ def extract_px_identifier(col):
         return None, None
 
     side = match.group(1)
-
     identifier = match.group(2)
 
     return side, identifier
@@ -242,34 +245,54 @@ def find_pairs(df):
         if col_str.upper().startswith("DEV"):
             continue
 
-        side, identifier = extract_px_identifier(col_str)
+        side, identifier = extract_px_identifier(
+            col_str
+        )
 
-        if side is None or identifier is None:
+        if side is None:
             continue
 
-        normalized = normalize_identifier(identifier)
+        normalized = normalize_identifier(
+            identifier
+        )
 
         if side == "P":
-            p_columns.setdefault(normalized, []).append(col)
+
+            p_columns.setdefault(
+                normalized,
+                []
+            ).append(col)
 
         elif side == "X":
-            x_columns.setdefault(normalized, []).append(col)
+
+            x_columns.setdefault(
+                normalized,
+                []
+            ).append(col)
 
 
     pairs = []
 
     # -----------------------------------------------------
-    # ONLY create a result when BOTH P and X exist
+    # ONLY MATCH IDENTIFIERS EXISTING IN BOTH P AND X
     # -----------------------------------------------------
 
-    for identifier in p_columns:
+    common_identifiers = (
+        set(p_columns)
+        & set(x_columns)
+    )
 
-        if identifier not in x_columns:
-            continue
+    for identifier in sorted(
+        common_identifiers
+    ):
 
-        for p_col in p_columns[identifier]:
+        for p_col in p_columns[
+            identifier
+        ]:
 
-            for x_col in x_columns[identifier]:
+            for x_col in x_columns[
+                identifier
+            ]:
 
                 pairs.append(
                     (
@@ -964,190 +987,7 @@ if uploaded_files:
         )
 
 
-    # =====================================================
-    # INDIVIDUAL FILE DETAILS
-    # =====================================================
-
-    # =====================================================
-    # DATE-WISE DRILL DOWN
-    # =====================================================
-    
-    st.markdown("### Date-wise Drill Down")
-    
-    # ---------------------------------------------
-    # Find Date column
-    # ---------------------------------------------
-    
-    date_col = find_date_column(result_df)
-    
-    if date_col is not None:
-    
-        # Make sure Date is datetime
-        result_df[date_col] = pd.to_datetime(
-            result_df[date_col],
-            errors="coerce"
-        )
-    
-        available_dates = (
-            result_df[date_col]
-            .dropna()
-            .dt.date
-            .drop_duplicates()
-            .tolist()
-        )
-    
-        available_dates = sorted(
-            available_dates
-        )
-    
-    
-        if available_dates:
-    
-            selected_date = st.selectbox(
-                "Select Date",
-                available_dates,
-                key=f"date_{filename}"
-            )
-    
-    
-            # ---------------------------------------------
-            # Filter selected date
-            # ---------------------------------------------
-    
-            date_mask = (
-                result_df[date_col].dt.date
-                == selected_date
-            )
-    
-            date_df = result_df[
-                date_mask
-            ].copy()
-    
-    
-            # ---------------------------------------------
-            # Find mismatches for selected date
-            # ---------------------------------------------
-    
-            mismatch_mask = pd.Series(
-                False,
-                index=date_df.index
-            )
-    
-            for result_col in result_columns:
-    
-                if result_col in date_df.columns:
-    
-                    mismatch_mask |= (
-                        date_df[result_col] == False
-                    )
-    
-    
-            date_mismatch_df = date_df[
-                mismatch_mask
-            ]
-    
-    
-            # ---------------------------------------------
-            # Summary for selected date
-            # ---------------------------------------------
-    
-            total_blocks = len(date_df)
-    
-            mismatch_blocks = len(
-                date_mismatch_df
-            )
-    
-            identical_blocks = (
-                total_blocks
-                - mismatch_blocks
-            )
-    
-    
-            d1, d2, d3 = st.columns(3)
-    
-            d1.metric(
-                "Total Blocks",
-                total_blocks
-            )
-    
-            d2.metric(
-                "Identical Blocks",
-                identical_blocks
-            )
-    
-            d3.metric(
-                "Mismatched Blocks",
-                mismatch_blocks
-            )
-    
-    
-            # ---------------------------------------------
-            # Show only mismatched blocks
-            # ---------------------------------------------
-    
-            if not date_mismatch_df.empty:
-    
-                st.markdown(
-                    f"#### Mismatches on {selected_date}"
-                )
-    
-                # Keep Date + P/X columns + results
-                display_columns = [
-                    date_col
-                ]
-    
-                for result_col in result_columns:
-    
-                    if result_col not in date_mismatch_df.columns:
-                        continue
-    
-                    p_col, x_col = pair_lookup[
-                        result_col
-                    ]
-    
-                    if p_col in date_mismatch_df.columns:
-                        display_columns.append(
-                            p_col
-                        )
-    
-                    if x_col in date_mismatch_df.columns:
-                        display_columns.append(
-                            x_col
-                        )
-    
-                    display_columns.append(
-                        result_col
-                    )
-    
-    
-                # Remove duplicate columns
-                display_columns = list(
-                    dict.fromkeys(
-                        display_columns
-                    )
-                )
-    
-    
-                st.dataframe(
-                    date_mismatch_df[
-                        display_columns
-                    ],
-                    use_container_width=True,
-                    height=400
-                )
-    
-            else:
-    
-                st.success(
-                    f"No mismatches found on {selected_date}."
-                )
-    
-    else:
-    
-        st.warning(
-            "Date column could not be detected."
-        )
-
+    st.markdown("## Detailed File Results")
 
     # =====================================================
     # DOWNLOAD
