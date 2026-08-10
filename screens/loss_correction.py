@@ -4,7 +4,9 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-from modules.excel_reader import read_tracking_input
+from modules.excel_reader import (
+    read_tracking_input,
+)
 
 from modules.calculations import (
     calculate_tracking_forecast,
@@ -41,46 +43,10 @@ def reset_loss_correction_state():
     ]
 
     for key in keys:
-
         st.session_state.pop(
             key,
-            None,
+            None
         )
-
-
-# ==========================================================
-# COLUMN NORMALIZATION
-# ==========================================================
-
-def normalize_columns(df):
-    """
-    Normalize dataframe column names.
-
-    Handles:
-        spaces
-        new lines
-        underscores
-        hyphens
-        case differences
-    """
-
-    if df is None:
-        return None
-
-    df = df.copy()
-
-    df.columns = (
-        df.columns
-        .astype(str)
-        .str.strip()
-        .str.replace("\n", " ", regex=False)
-        .str.replace("_", " ", regex=False)
-        .str.replace("-", " ", regex=False)
-        .str.replace(r"\s+", " ", regex=True)
-        .str.lower()
-    )
-
-    return df
 
 
 # ==========================================================
@@ -88,44 +54,43 @@ def normalize_columns(df):
 # ==========================================================
 
 def find_column(df, possible_names):
-    """
-    Find a dataframe column using flexible matching.
-    """
 
-    if df is None or df.empty:
+    if df is None:
         return None
 
-    normalized_columns = {}
+    normalized = {
+        str(col)
+        .strip()
+        .lower()
+        .replace("\n", " ")
+        .replace("_", " ")
+        for col in df.columns
+    }
 
-    for col in df.columns:
-
-        key = (
-            str(col)
-            .strip()
-            .lower()
-            .replace("_", " ")
-            .replace("-", " ")
-        )
-
-        key = " ".join(key.split())
-
-        normalized_columns[key] = col
+    original_columns = list(df.columns)
 
     for name in possible_names:
 
-        key = (
+        target = (
             str(name)
             .strip()
             .lower()
+            .replace("\n", " ")
             .replace("_", " ")
-            .replace("-", " ")
         )
 
-        key = " ".join(key.split())
+        for original in original_columns:
 
-        if key in normalized_columns:
+            current = (
+                str(original)
+                .strip()
+                .lower()
+                .replace("\n", " ")
+                .replace("_", " ")
+            )
 
-            return normalized_columns[key]
+            if current == target:
+                return original
 
     return None
 
@@ -136,43 +101,31 @@ def find_column(df, possible_names):
 
 def extract_actual(data):
     """
-    Extract actual generation.
+    Extract actual plant generation.
 
     Priority:
+        1. Tracking -> Act Power
+        2. Tracking -> other possible actual columns
+        3. Backend Cal -> possible actual columns
 
-    1. Fixed sheet
-    2. Tracking sheet
-    3. Backend Cal
-    4. Backend Cal CL sheets
+    In the current workbook the actual column is:
 
-    This is important because Actual generation
-    does not necessarily exist in Tracking.
+        Tracking -> Act Power
     """
 
-    # ------------------------------------------------------
-    # 1. FIXED SHEET
-    # ------------------------------------------------------
+    tracking = data.get("tracking")
+    backend = data.get("backend")
 
-    fixed = data.get("fixed")
+    # ======================================================
+    # TRACKING
+    # ======================================================
 
-    if fixed is not None:
+    if tracking is not None:
 
-        fixed = fixed.copy()
-
-        fixed.columns = (
-            fixed.columns
-            .astype(str)
-            .str.strip()
-            .str.replace(
-                "\n",
-                " ",
-                regex=False
-            )
-        )
-
-        actual_col = find_column(
-            fixed,
+        tracking_actual_column = find_column(
+            tracking,
             [
+                "Act Power",
                 "Actual",
                 "Actual Power",
                 "Actual Power (MW)",
@@ -180,71 +133,40 @@ def extract_actual(data):
                 "Power (MW)",
                 "Generation",
                 "Actual Generation",
-                "Actual_Generation",
-            ],
+            ]
         )
 
-        if actual_col is not None:
+        if tracking_actual_column is not None:
 
             actual = pd.to_numeric(
-                fixed[actual_col],
-                errors="coerce",
+                tracking[tracking_actual_column],
+                errors="coerce"
             )
 
             actual = (
                 actual
+                .replace([np.inf, -np.inf], np.nan)
                 .fillna(0)
                 .to_numpy(dtype=float)
+            )
+
+            actual = np.maximum(
+                actual,
+                0
             )
 
             return actual
 
-    # ------------------------------------------------------
-    # 2. TRACKING
-    # ------------------------------------------------------
-
-    tracking = data.get("tracking")
-
-    if tracking is not None:
-
-        actual_col = find_column(
-            tracking,
-            [
-                "Actual",
-                "Actual Power",
-                "Actual Power (MW)",
-                "Power",
-                "Power (MW)",
-                "Generation",
-                "Actual Generation",
-                "Actual_Generation",
-            ],
-        )
-
-        if actual_col is not None:
-
-            actual = pd.to_numeric(
-                tracking[actual_col],
-                errors="coerce",
-            )
-
-            return (
-                actual
-                .fillna(0)
-                .to_numpy(dtype=float)
-            )
-
-    # ------------------------------------------------------
-    # 3. BACKEND CAL
-    # ------------------------------------------------------
-
-    backend = data.get("backend")
+    # ======================================================
+    # BACKEND CAL
+    # ======================================================
 
     if backend is not None:
 
-        actual_col = find_column(
+        backend_actual_column = find_column(
             backend,
             [
+                "Act Power",
                 "Actual",
                 "Actual Power",
                 "Actual Power (MW)",
@@ -252,89 +174,52 @@ def extract_actual(data):
                 "Power (MW)",
                 "Generation",
                 "Actual Generation",
-                "Actual_Generation",
-            ],
+            ]
         )
 
-        if actual_col is not None:
+        if backend_actual_column is not None:
 
             actual = pd.to_numeric(
-                backend[actual_col],
-                errors="coerce",
+                backend[backend_actual_column],
+                errors="coerce"
             )
 
-            return (
+            actual = (
                 actual
+                .replace([np.inf, -np.inf], np.nan)
                 .fillna(0)
                 .to_numpy(dtype=float)
             )
 
-    # ------------------------------------------------------
-    # 4. CLUSTER BACKEND SHEETS
-    # ------------------------------------------------------
+            actual = np.maximum(
+                actual,
+                0
+            )
 
-    backend_cluster = data.get(
-        "backend_cluster"
+            return actual
+
+    # ======================================================
+    # ERROR
+    # ======================================================
+
+    tracking_columns = (
+        list(tracking.columns)
+        if tracking is not None
+        else []
     )
 
-    if backend_cluster is not None:
-
-        if isinstance(
-            backend_cluster,
-            list
-        ):
-
-            for backend_df in backend_cluster:
-
-                actual_col = find_column(
-                    backend_df,
-                    [
-                        "Actual",
-                        "Actual Power",
-                        "Actual Power (MW)",
-                        "Power",
-                        "Power (MW)",
-                        "Generation",
-                        "Actual Generation",
-                    ],
-                )
-
-                if actual_col is not None:
-
-                    actual = pd.to_numeric(
-                        backend_df[actual_col],
-                        errors="coerce",
-                    )
-
-                    return (
-                        actual
-                        .fillna(0)
-                        .to_numpy(dtype=float)
-                    )
-
-    # ------------------------------------------------------
-    # NOTHING FOUND
-    # ------------------------------------------------------
-
-    available = []
-
-    for name in [
-        "fixed",
-        "tracking",
-        "backend",
-    ]:
-
-        df = data.get(name)
-
-        if df is not None:
-
-            available.append(
-                f"{name}: {list(df.columns)}"
-            )
+    backend_columns = (
+        list(backend.columns)
+        if backend is not None
+        else []
+    )
 
     raise ValueError(
         "Could not find Actual generation column.\n\n"
-        + "\n".join(available)
+        f"Tracking columns: {tracking_columns}\n\n"
+        f"Backend Cal columns: {backend_columns}\n\n"
+        "Expected the actual generation column to be "
+        "'Act Power' or a similar actual-power column."
     )
 
 
@@ -346,31 +231,39 @@ def extract_ghi_arrays(data):
     """
     Extract GHI arrays.
 
-    Cluster:
-        CL1-GHI ... CL5-GHI
+    Cluster plant:
+        CL1-GHI
+        CL2-GHI
+        CL3-GHI
+        CL4-GHI
+        CL5-GHI
 
-    Non-cluster:
-        GHI Forecast from Fixed.
+    Non-cluster plant:
+        GHI from Fixed sheet.
     """
+
+    has_cluster = data.get(
+        "has_cluster",
+        False
+    )
+
+    cluster_data = data.get(
+        "cluster_data"
+    )
 
     # ======================================================
     # CLUSTER
     # ======================================================
 
-    if data.get("has_cluster", False):
-
-        cluster_data = data.get(
-            "cluster_data"
-        )
+    if has_cluster:
 
         if cluster_data is None:
-
             raise ValueError(
-                "Workbook is marked as cluster "
+                "Workbook is marked as cluster plant, "
                 "but cluster GHI data was not found."
             )
 
-        expected_clusters = [
+        expected_columns = [
             "CL1-GHI",
             "CL2-GHI",
             "CL3-GHI",
@@ -380,35 +273,47 @@ def extract_ghi_arrays(data):
 
         ghi_arrays = []
 
-        for cluster in expected_clusters:
+        for column in expected_columns:
 
             col = find_column(
                 cluster_data,
                 [
-                    cluster,
-                    cluster.replace("-", " "),
-                    cluster.replace("-", "_"),
-                ],
+                    column,
+                    column.replace("-", " "),
+                    column.replace("-", "_"),
+                ]
             )
 
             if col is None:
 
                 raise ValueError(
-                    f"Missing {cluster} in cluster data."
+                    f"Cluster GHI column '{column}' "
+                    "was not found."
                 )
 
             ghi = pd.to_numeric(
                 cluster_data[col],
-                errors="coerce",
+                errors="coerce"
             )
 
             ghi = (
                 ghi
+                .replace(
+                    [np.inf, -np.inf],
+                    np.nan
+                )
                 .fillna(0)
                 .to_numpy(dtype=float)
             )
 
-            ghi_arrays.append(ghi)
+            ghi = np.maximum(
+                ghi,
+                0
+            )
+
+            ghi_arrays.append(
+                ghi
+            )
 
         return ghi_arrays
 
@@ -416,27 +321,29 @@ def extract_ghi_arrays(data):
     # NON-CLUSTER
     # ======================================================
 
-    fixed = data.get("fixed")
+    fixed = data.get(
+        "fixed"
+    )
 
     if fixed is None:
 
         raise ValueError(
             "Non-cluster workbook does not contain "
-            "a Fixed sheet."
+            "the Fixed sheet data."
         )
 
-    ghi_col = find_column(
+    ghi_column = find_column(
         fixed,
         [
             "GHI_Forecast",
             "GHI Forecast",
             "GHI",
-            "GHI Forecast 15min",
+            "GHI Forecast (W/m2)",
             "GHI_Forecast_15min",
-        ],
+        ]
     )
 
-    if ghi_col is None:
+    if ghi_column is None:
 
         raise ValueError(
             "Could not find GHI forecast column "
@@ -444,22 +351,28 @@ def extract_ghi_arrays(data):
         )
 
     ghi = pd.to_numeric(
-        fixed[ghi_col],
-        errors="coerce",
+        fixed[ghi_column],
+        errors="coerce"
     )
 
     ghi = (
         ghi
+        .replace(
+            [np.inf, -np.inf],
+            np.nan
+        )
         .fillna(0)
         .to_numpy(dtype=float)
     )
 
     ghi = np.maximum(
         ghi,
-        0,
+        0
     )
 
-    return [ghi]
+    return [
+        ghi
+    ]
 
 
 # ==========================================================
@@ -468,67 +381,68 @@ def extract_ghi_arrays(data):
 
 def extract_weight_factors(
     data,
-    number_of_arrays,
+    number_of_arrays
 ):
     """
-    Extract cluster weighting factors.
+    Get cluster weighting factors.
 
-    For cluster:
-        Use explicit weight factors if available.
+    If explicit weights are available,
+    use them.
 
-    For non-cluster:
-        Return [1.0].
+    Otherwise use equal weighting.
+
+    Non-cluster:
+        [1.0]
     """
 
-    # ------------------------------------------------------
+    # ======================================================
     # NON-CLUSTER
-    # ------------------------------------------------------
+    # ======================================================
 
-    if not data.get(
-        "has_cluster",
-        False
-    ):
+    if number_of_arrays == 1:
 
         return np.asarray(
             [1.0],
-            dtype=float,
+            dtype=float
         )
 
-    # ------------------------------------------------------
+    # ======================================================
     # CLUSTER
-    # ------------------------------------------------------
+    # ======================================================
 
-    area_weights = data.get(
-        "area_weights"
+    cluster_data = data.get(
+        "cluster_data"
     )
 
-    if area_weights is None:
+    if cluster_data is None:
 
         return (
             np.ones(
                 number_of_arrays,
-                dtype=float,
+                dtype=float
             )
             / number_of_arrays
         )
 
-    weight_col = find_column(
-        area_weights,
-        [
-            "Weight",
-            "Weights",
-            "Weight Factor",
-            "Weight Factor (%)",
-            "Cluster Weight",
-            "Cluster Weight (%)",
-        ],
+    possible_names = [
+        "Weight",
+        "Weights",
+        "Weight Factor",
+        "Weight Factor (%)",
+        "Cluster Weight",
+        "Cluster Weight (%)",
+    ]
+
+    weight_column = find_column(
+        cluster_data,
+        possible_names
     )
 
-    if weight_col is not None:
+    if weight_column is not None:
 
         values = pd.to_numeric(
-            area_weights[weight_col],
-            errors="coerce",
+            cluster_data[weight_column],
+            errors="coerce"
         ).dropna()
 
         if len(values) >= number_of_arrays:
@@ -538,8 +452,6 @@ def extract_weight_factors(
                 .iloc[:number_of_arrays]
                 .to_numpy(dtype=float)
             )
-
-            # Percentage to fraction
 
             if np.nanmax(
                 np.abs(values)
@@ -551,18 +463,16 @@ def extract_weight_factors(
 
             if total > 0:
 
-                values = values / total
+                return values / total
 
-            return values
-
-    # ------------------------------------------------------
+    # ======================================================
     # FALLBACK
-    # ------------------------------------------------------
+    # ======================================================
 
     return (
         np.ones(
             number_of_arrays,
-            dtype=float,
+            dtype=float
         )
         / number_of_arrays
     )
@@ -574,36 +484,34 @@ def extract_weight_factors(
 
 def prepare_array(
     values,
-    length=96,
-    name="Array",
+    length=96
 ):
     """
-    Clean an input array and force 96 blocks.
+    Convert data to exactly 96 blocks.
     """
 
     values = np.asarray(
         values,
-        dtype=float,
+        dtype=float
     )
 
     values = np.nan_to_num(
         values,
         nan=0.0,
         posinf=0.0,
-        neginf=0.0,
+        neginf=0.0
     )
 
     values = np.maximum(
         values,
-        0,
+        0
     )
 
     if len(values) < length:
 
         raise ValueError(
-            f"{name} requires at least "
-            f"{length} blocks. "
-            f"Found {len(values)}."
+            f"Expected at least {length} values, "
+            f"but found {len(values)}."
         )
 
     return values[:length]
@@ -630,8 +538,11 @@ def show_loss_correction():
     # ======================================================
 
     uploaded_file = st.file_uploader(
+
         "Upload Tracking Excel Workbook",
+
         type=["xlsx"],
+
         key="loss_correction_uploader",
     )
 
@@ -639,7 +550,8 @@ def show_loss_correction():
 
         st.info(
             "Upload the Excel workbook containing "
-            "the required tracking data."
+            "Area & Efficiency, Forecast Config, "
+            "Backend Cal, Tracking and Fixed sheets."
         )
 
         return
@@ -685,29 +597,6 @@ def show_loss_correction():
         return
 
     # ======================================================
-    # WORKBOOK TYPE
-    # ======================================================
-
-    has_cluster = data.get(
-        "has_cluster",
-        False,
-    )
-
-    if has_cluster:
-
-        st.success(
-            "Cluster plant detected: "
-            "CL1-GHI to CL5-GHI will be used."
-        )
-
-    else:
-
-        st.info(
-            "Non-cluster plant detected: "
-            "normal GHI Forecast from Fixed will be used."
-        )
-
-    # ======================================================
     # EXTRACT ACTUAL
     # ======================================================
 
@@ -718,8 +607,7 @@ def show_loss_correction():
         )
 
         actual = prepare_array(
-            actual,
-            name="Actual generation",
+            actual
         )
 
     except Exception as e:
@@ -742,11 +630,9 @@ def show_loss_correction():
 
         ghi_arrays = [
             prepare_array(
-                ghi,
-                name=f"GHI {i + 1}",
+                ghi
             )
-            for i, ghi
-            in enumerate(ghi_arrays)
+            for ghi in ghi_arrays
         ]
 
     except Exception as e:
@@ -770,7 +656,7 @@ def show_loss_correction():
     )
 
     # ======================================================
-    # AREA
+    # AREA DATA
     # ======================================================
 
     area_df = data.get(
@@ -780,11 +666,19 @@ def show_loss_correction():
     if area_df is None:
 
         st.error(
-            "Area & Efficiency data "
-            "could not be loaded."
+            "Area & Efficiency data was not found."
         )
 
         return
+
+    # ======================================================
+    # CLUSTER STATUS
+    # ======================================================
+
+    has_cluster = data.get(
+        "has_cluster",
+        False
+    )
 
     # ======================================================
     # WEIGHT FACTORS
@@ -792,7 +686,7 @@ def show_loss_correction():
 
     weight_factors = extract_weight_factors(
         data,
-        len(ghi_arrays),
+        len(ghi_arrays)
     )
 
     # ======================================================
@@ -806,23 +700,23 @@ def show_loss_correction():
     col1, col2, col3, col4 = st.columns(4)
 
     col1.metric(
-        "Plant Type",
-        "Cluster" if has_cluster else "Non-Cluster",
+        "Blocks",
+        len(blocks)
     )
 
     col2.metric(
-        "GHI Arrays",
-        len(ghi_arrays),
+        "Plant Type",
+        "Cluster" if has_cluster else "Non-Cluster"
     )
 
     col3.metric(
-        "Actual Peak",
-        f"{actual.max():.3f}",
+        "GHI Arrays",
+        len(ghi_arrays)
     )
 
     col4.metric(
-        "Latitude",
-        f"{data['latitude']:.4f}°",
+        "Actual Peak",
+        f"{actual.max():.3f}"
     )
 
     # ======================================================
@@ -850,7 +744,7 @@ def show_loss_correction():
 
             for i, ghi in enumerate(
                 ghi_arrays,
-                start=1,
+                start=1
             ):
 
                 input_df[
@@ -866,7 +760,7 @@ def show_loss_correction():
         st.dataframe(
             input_df,
             use_container_width=True,
-            hide_index=True,
+            hide_index=True
         )
 
     # ======================================================
@@ -877,36 +771,70 @@ def show_loss_correction():
         "Optimization Settings"
     )
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
 
     with col1:
 
         maxiter = st.number_input(
+
             "Maximum Iterations",
+
             min_value=10,
+
             max_value=500,
+
             value=100,
+
             step=10,
+
         )
 
     with col2:
 
         popsize = st.number_input(
+
             "Population Size",
+
             min_value=5,
+
             max_value=50,
+
             value=15,
+
             step=5,
+
         )
 
     with col3:
 
         seed = st.number_input(
+
             "Random Seed",
+
             min_value=0,
+
             max_value=9999,
+
             value=42,
+
             step=1,
+
+        )
+
+    with col4:
+
+        efficiency_loss = st.number_input(
+
+            "Efficiency Loss (%)",
+
+            min_value=0.0,
+
+            max_value=10.0,
+
+            value=0.0,
+
+            step=0.1,
+
         )
 
     # ======================================================
@@ -915,6 +843,11 @@ def show_loss_correction():
 
     st.subheader(
         "Parameter Bounds"
+    )
+
+    st.caption(
+        "Differential Evolution searches "
+        "within these ranges."
     )
 
     bounds = [
@@ -930,8 +863,6 @@ def show_loss_correction():
         (10, 70),      # East Limit
 
         (10, 70),      # West Limit
-
-        (0, 10),       # Efficiency Loss
 
     ]
 
@@ -950,8 +881,6 @@ def show_loss_correction():
             "East Tracking Limit",
 
             "West Tracking Limit",
-
-            "Efficiency Loss",
 
         ],
 
@@ -974,7 +903,7 @@ def show_loss_correction():
     st.dataframe(
         bounds_df,
         use_container_width=True,
-        hide_index=True,
+        hide_index=True
     )
 
     # ======================================================
@@ -982,9 +911,13 @@ def show_loss_correction():
     # ======================================================
 
     if st.button(
+
         "🚀 Run Loss Correction",
+
         type="primary",
+
         use_container_width=True,
+
     ):
 
         progress = st.progress(
@@ -999,11 +932,9 @@ def show_loss_correction():
 
         try:
 
-            # ------------------------------------------------
-            # IMPORTANT:
-            # efficiency_loss is now optimized as x[6]
-            # inside optimize_tracking_parameters.
-            # ------------------------------------------------
+            # ==================================================
+            # OPTIMIZE
+            # ==================================================
 
             result = optimize_tracking_parameters(
 
@@ -1017,13 +948,15 @@ def show_loss_correction():
 
                 weight_factors=weight_factors,
 
+                efficiency_loss=efficiency_loss,
+
                 bounds=bounds,
 
-                maxiter=int(maxiter),
+                maxiter=maxiter,
 
-                popsize=int(popsize),
+                popsize=popsize,
 
-                seed=int(seed),
+                seed=seed,
 
             )
 
@@ -1047,45 +980,40 @@ def show_loss_correction():
             # FINAL FORECAST
             # ==================================================
 
-            final_forecast = (
-                calculate_tracking_forecast(
+            final_forecast = calculate_tracking_forecast(
 
-                    ghi_arrays=ghi_arrays,
+                ghi_arrays=ghi_arrays,
 
-                    weights=result["weights"],
+                weights=result[
+                    "weights"
+                ],
 
-                    blocks=blocks,
+                blocks=blocks,
 
-                    dhi_percent=parameters[
-                        "DHI"
-                    ],
+                dhi_percent=parameters[
+                    "DHI"
+                ],
 
-                    ghi_start=parameters[
-                        "Starting Block"
-                    ],
+                ghi_start=parameters[
+                    "Starting Block"
+                ],
 
-                    ghi_end=parameters[
-                        "Ending Block"
-                    ],
+                ghi_end=parameters[
+                    "Ending Block"
+                ],
 
-                    ghi_max=parameters[
-                        "Max Block"
-                    ],
+                ghi_max=parameters[
+                    "Max Block"
+                ],
 
-                    east_limit=parameters[
-                        "East Tracking Limit"
-                    ],
+                east_limit=parameters[
+                    "East Limit"
+                ],
 
-                    west_limit=parameters[
-                        "West Tracking Limit"
-                    ],
+                west_limit=parameters[
+                    "West Limit"
+                ],
 
-                )
-            )
-
-            final_forecast = np.maximum(
-                final_forecast,
-                0,
             )
 
             # ==================================================
@@ -1093,8 +1021,11 @@ def show_loss_correction():
             # ==================================================
 
             metrics = calculate_all_metrics(
+
                 actual,
+
                 final_forecast,
+
             )
 
             # ==================================================
@@ -1106,6 +1037,9 @@ def show_loss_correction():
                 "parameters":
                     parameters,
 
+                "efficiency_loss":
+                    efficiency_loss,
+
                 "actual":
                     actual,
 
@@ -1116,10 +1050,17 @@ def show_loss_correction():
                     metrics,
 
                 "weights":
-                    result["weights"],
+                    result[
+                        "weights"
+                    ],
 
                 "score":
-                    result["score"],
+                    result[
+                        "score"
+                    ],
+
+                "has_cluster":
+                    has_cluster,
 
             }
 
@@ -1140,7 +1081,6 @@ def show_loss_correction():
     )
 
     if result is None:
-
         return
 
     st.divider()
@@ -1165,47 +1105,39 @@ def show_loss_correction():
 
     col1.metric(
         "DHI",
-        parameters["DHI"],
+        parameters["DHI"]
     )
 
     col2.metric(
         "Starting Block",
-        parameters["Starting Block"],
+        parameters["Starting Block"]
     )
 
     col3.metric(
         "Ending Block",
-        parameters["Ending Block"],
+        parameters["Ending Block"]
     )
 
     col4.metric(
         "Max Block",
-        parameters["Max Block"],
+        parameters["Max Block"]
     )
 
     col1, col2, col3 = st.columns(3)
 
     col1.metric(
         "East Tracking Limit",
-        parameters["East Tracking Limit"],
+        parameters["East Limit"]
     )
 
     col2.metric(
         "West Tracking Limit",
-        parameters["West Tracking Limit"],
-    )
-
-    efficiency_loss = parameters.get(
-        "Efficiency Loss",
-        parameters.get(
-            "Efficiency Loss for Tracking",
-            0,
-        ),
+        parameters["West Limit"]
     )
 
     col3.metric(
         "Efficiency Loss",
-        f"{efficiency_loss:.2f}%",
+        f"{result['efficiency_loss']:.2f}%"
     )
 
     # ======================================================
@@ -1224,22 +1156,22 @@ def show_loss_correction():
 
     col1.metric(
         "MAE",
-        f"{metrics['MAE']:.3f}",
+        f"{metrics['MAE']:.3f}"
     )
 
     col2.metric(
         "RMSE",
-        f"{metrics['RMSE']:.3f}",
+        f"{metrics['RMSE']:.3f}"
     )
 
     col3.metric(
         "MAPE",
-        f"{metrics['MAPE']:.2f}%",
+        f"{metrics['MAPE']:.2f}%"
     )
 
     col4.metric(
         "R²",
-        f"{metrics['R2']:.4f}",
+        f"{metrics['R2']:.4f}"
     )
 
     # ======================================================
@@ -1248,7 +1180,7 @@ def show_loss_correction():
 
     st.metric(
         "Combined Optimization Score",
-        f"{result['score']:.6f}",
+        f"{result['score']:.6f}"
     )
 
     # ======================================================
@@ -1263,15 +1195,19 @@ def show_loss_correction():
 
         blocks=blocks,
 
-        actual=result["actual"],
+        actual=result[
+            "actual"
+        ],
 
-        forecast=result["forecast"],
+        forecast=result[
+            "forecast"
+        ],
 
     )
 
     st.plotly_chart(
         fig,
-        use_container_width=True,
+        use_container_width=True
     )
 
     # ======================================================
@@ -1282,46 +1218,44 @@ def show_loss_correction():
         "View Effective Weights"
     ):
 
-        weights = result[
-            "weights"
-        ]
+        if result[
+            "has_cluster"
+        ]:
 
-        if has_cluster:
-
-            weights_df = pd.DataFrame({
-
-                "Cluster": [
-
-                    f"CL{i}"
-
-                    for i in range(
-                        1,
-                        len(weights) + 1
-                    )
-
-                ],
-
-                "Effective Weight":
-                    weights,
-
-            })
+            cluster_names = [
+                f"CL{i}"
+                for i in range(
+                    1,
+                    len(
+                        result[
+                            "weights"
+                        ]
+                    ) + 1
+                )
+            ]
 
         else:
 
-            weights_df = pd.DataFrame({
+            cluster_names = [
+                "Total Plant"
+            ]
 
-                "Plant":
-                    ["Total Plant"],
+        weights_df = pd.DataFrame({
 
-                "Effective Weight":
-                    weights,
+            "Cluster / Plant":
+                cluster_names,
 
-            })
+            "Effective Weight":
+                result[
+                    "weights"
+                ],
+
+        })
 
         st.dataframe(
             weights_df,
             use_container_width=True,
-            hide_index=True,
+            hide_index=True
         )
 
     # ======================================================
@@ -1345,5 +1279,5 @@ def show_loss_correction():
         st.dataframe(
             metrics_df,
             use_container_width=True,
-            hide_index=True,
+            hide_index=True
         )
