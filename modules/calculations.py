@@ -264,13 +264,54 @@ def calculate_tracking_forecast(
     """
     Calculate final tracking power forecast.
 
-    ghi_arrays:
-        List containing CL1-GHI ... CL5-GHI
+    Supports:
 
-    weights:
-        Corresponding effective area/efficiency
-        for CL1 ... CL5
+    Cluster:
+        ghi_arrays = [
+            CL1-GHI,
+            CL2-GHI,
+            CL3-GHI,
+            CL4-GHI,
+            CL5-GHI
+        ]
+
+        weights = [
+            weight1,
+            weight2,
+            weight3,
+            weight4,
+            weight5
+        ]
+
+    Non-cluster:
+        ghi_arrays = [
+            normal_GHI
+        ]
+
+        weights = [
+            total_effective_area
+        ]
     """
+
+    # ==================================================
+    # VALIDATE INPUT
+    # ==================================================
+
+    if len(ghi_arrays) != len(weights):
+
+        raise ValueError(
+            "Number of GHI arrays must match "
+            "number of weights."
+        )
+
+    blocks = np.asarray(
+        blocks,
+        dtype=float
+    )
+
+    # ==================================================
+    # TRACKING ANGLES
+    # ==================================================
 
     _, panel = calculate_tracking_angles(
         blocks=blocks,
@@ -280,6 +321,10 @@ def calculate_tracking_forecast(
         east_limit=east_limit,
         west_limit=west_limit
     )
+
+    # ==================================================
+    # COS PANEL ANGLE
+    # ==================================================
 
     cos_alpha = np.cos(
         np.radians(panel)
@@ -291,10 +336,18 @@ def calculate_tracking_forecast(
         None
     )
 
+    # ==================================================
+    # FINAL FORECAST
+    # ==================================================
+
     forecast = np.zeros(
         len(blocks),
         dtype=float
     )
+
+    # ==================================================
+    # PROCESS EACH GHI ARRAY
+    # ==================================================
 
     for ghi, weight in zip(
         ghi_arrays,
@@ -306,22 +359,44 @@ def calculate_tracking_forecast(
             dtype=float
         )
 
-        dhi = (
-            ghi
-            * dhi_percent
-            / 100.0
+        if len(ghi) != len(blocks):
+
+            raise ValueError(
+                "GHI array length does not "
+                "match blocks."
+            )
+
+        # ---------------------------------------------
+        # DHI
+        # ---------------------------------------------
+
+        dhi = calculate_dhi(
+            ghi=ghi,
+            dhi_percent=dhi_percent
         )
 
-        dni = (
-            ghi - dhi
-        ) / cos_alpha
+        # ---------------------------------------------
+        # DNI
+        # ---------------------------------------------
+
+        dni = calculate_dni(
+            ghi=ghi,
+            dhi=dhi,
+            panel_angle=panel
+        )
+
+        # ---------------------------------------------
+        # POWER
+        # ---------------------------------------------
 
         forecast += (
             dni * weight
         ) / 1_000_000
 
-    return forecast
-
+    return np.maximum(
+        forecast,
+        0
+    )
 from scipy.optimize import differential_evolution
 
 
@@ -331,12 +406,22 @@ def calculate_loss_corrected_weights(
     weight_factors
 ):
     """
-    Calculate effective area for each cluster.
+    Calculate effective area / efficiency weights.
+
+    Cluster plant:
+        weight_factors = [factor1, factor2, ..., factor5]
+
+    Non-cluster plant:
+        weight_factors = [1.0]
     """
 
     df = area_df.copy()
 
-    df["Efficiency Losses(%)"] = (
+    # ---------------------------------------------
+    # Efficiency correction
+    # ---------------------------------------------
+
+    df["Efficiency Losses(%)"] = float(
         efficiency_loss
     )
 
@@ -345,25 +430,33 @@ def calculate_loss_corrected_weights(
         - df["Efficiency Losses(%)"]
     )
 
+    # ---------------------------------------------
+    # Effective area
+    # ---------------------------------------------
+
     effective_area = (
         df["Total area(m2)"]
         * df["Net Efficiency (%)"]
-        / 100
+        / 100.0
     )
 
-    weights = []
+    total_effective_area = (
+        effective_area.sum()
+    )
 
-    for factor in weight_factors:
+    # ---------------------------------------------
+    # Apply weight factors
+    # ---------------------------------------------
 
-        weights.append(
-            effective_area.sum()
-            * factor
+    weights = (
+        total_effective_area
+        * np.asarray(
+            weight_factors,
+            dtype=float
         )
-
-    return np.asarray(
-        weights,
-        dtype=float
     )
+
+    return weights
 
 
 def optimize_tracking_parameters(
