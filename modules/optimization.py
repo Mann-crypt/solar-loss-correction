@@ -50,11 +50,12 @@ def optimize_tracking_parameters(
     blocks,
     area_df,
     weight_factors,
+    efficiency_loss,
     bounds,
     maxiter=100,
     popsize=15,
     seed=42,
-    callback=None,
+    callback=None
 ):
     """
     Optimize Tracking Loss Correction parameters.
@@ -149,12 +150,10 @@ def optimize_tracking_parameters(
             )
 
             weights = calculate_loss_corrected_weights(
-
                 area_df=area_df,
-
                 efficiency_loss=efficiency_loss,
-
                 weight_factors=weight_factors,
+                has_cluster=(len(ghi_arrays) > 1),
             )
 
         except Exception:
@@ -293,27 +292,13 @@ def optimize_tracking_parameters(
     best = result.x
 
     parameters = {
-
-        "DHI":
-            int(round(best[0])),
-
-        "Starting Block":
-            int(round(best[1])),
-
-        "Ending Block":
-            int(round(best[2])),
-
-        "Max Block":
-            int(round(best[3])),
-
-        "East Tracking Limit":
-            int(round(best[4])),
-
-        "West Tracking Limit":
-            int(round(best[5])),
-
-        "Efficiency Loss for Tracking":
-            round(float(best[6]), 2),
+        "DHI": int(best[0]),
+        "Starting Block": int(best[1]),
+        "Ending Block": int(best[2]),
+        "Max Block": int(best[3]),
+        "East Limit": int(best[4]),
+        "West Limit": int(best[5]),
+        "Efficiency Loss": float(efficiency_loss),
     }
 
     # ======================================================
@@ -334,16 +319,8 @@ def optimize_tracking_parameters(
     )
 
     return {
-
-        "parameters":
-            parameters,
-
-        "score":
-            float(result.fun),
-
-        "weights":
-            final_weights,
-
-        "result":
-            result,
+        "parameters": parameters,
+        "score": float(result.fun),
+        "weights": weights,
+        "result": result,
     }
