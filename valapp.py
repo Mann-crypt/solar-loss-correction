@@ -1177,12 +1177,25 @@ if uploaded_files:
             # =================================================
             # DATE SELECTION
             # =================================================
-    
-            selected_date = st.selectbox(
-                "Select Date",
-                available_dates,
+            
+            selected_dates = st.multiselect(
+                "Select Date(s)",
+                options=available_dates,
+                default=available_dates,   # ALL DATES SELECTED BY DEFAULT
                 key=f"date_select_{filename}"
             )
+
+            # =================================================
+            # CHECK DATE SELECTION
+            # =================================================
+            
+            if not selected_dates:
+            
+                st.info(
+                    "Please select at least one date."
+                )
+            
+                continue
     
     
             # =================================================
@@ -1235,64 +1248,76 @@ if uploaded_files:
     
     
             # =================================================
-            # FILTER DATE
+            # FILTER SELECTED DATES
             # =================================================
-    
+            
             date_df = result_df[
-                result_df[date_col].dt.date
-                == selected_date
+                result_df[date_col]
+                .dt.date
+                .isin(selected_dates)
             ].copy()
     
     
             # =================================================
             # MATCH STATUS
             # =================================================
-    
+            
             date_df["Match"] = date_df[
                 selected_result_col
             ].astype(bool)
-    
-    
-            total_blocks = len(
-                date_df
-            )
-    
+            
+            
+            # =================================================
+            # DATE-WISE SUMMARY
+            # =================================================
+            
+            total_blocks = len(date_df)
+            
             identical_blocks = int(
                 date_df["Match"].sum()
             )
-    
+            
             mismatch_blocks = (
                 total_blocks
                 - identical_blocks
             )
-    
-    
+            
+            
             # =================================================
             # DATE METRICS
             # =================================================
-    
+            
             d1, d2, d3 = st.columns(3)
-    
+            
             d1.metric(
                 "Total Blocks",
                 total_blocks
             )
-    
+            
             d2.metric(
                 "Identical Blocks",
                 identical_blocks
             )
-    
+            
             d3.metric(
                 "Mismatched Blocks",
                 mismatch_blocks
             )
-    
-    
+            
+            
+            # =================================================
+            # SELECTED DATE SUMMARY
+            # =================================================
+            
+            st.caption(
+                f"{len(selected_dates)} date(s) selected"
+            )
+            
+            
             # =================================================
             # DISPLAY DATA
             # =================================================
-    
+            
             display_df = date_df[
                 [
                     date_col,
@@ -1301,58 +1326,58 @@ if uploaded_files:
                     "Match"
                 ]
             ].copy()
-    
-    
+            
+            
             # =================================================
             # HIGHLIGHT FUNCTION
             # =================================================
-    
+            
             def highlight_pair(row):
-    
+            
                 styles = pd.Series(
                     "",
                     index=row.index
                 )
-    
+            
                 if row["Match"]:
-    
+            
                     styles["Match"] = (
                         "background-color: #d9f2d9;"
                         "color: #176b17;"
                         "font-weight: bold;"
                     )
-    
+            
                 else:
-    
+            
                     styles[p_col] = (
                         "background-color: #ffcccc;"
                         "color: #9c0006;"
                         "font-weight: bold;"
                     )
-    
+            
                     styles[x_col] = (
                         "background-color: #ffcccc;"
                         "color: #9c0006;"
                         "font-weight: bold;"
                     )
-    
+            
                     styles["Match"] = (
                         "background-color: #ff6666;"
                         "color: white;"
                         "font-weight: bold;"
                     )
-    
+            
                 return styles
-    
-    
+            
+            
             # =================================================
-            # ALL BLOCKS
+            # ALL SELECTED DATES
             # =================================================
-    
+            
             st.markdown(
-                f"#### {selected_date}"
+                "#### Selected Date Results"
             )
-    
+            
             st.dataframe(
                 display_df.style.apply(
                     highlight_pair,
@@ -1361,23 +1386,22 @@ if uploaded_files:
                 use_container_width=True,
                 height=400
             )
-    
-    
+            
+            
             # =================================================
             # MISMATCHES ONLY
             # =================================================
-    
+            
             if mismatch_blocks > 0:
-    
+            
                 st.markdown(
                     "#### ❌ Mismatched Blocks Only"
                 )
-    
+            
                 mismatch_df = display_df[
                     display_df["Match"] == False
                 ].copy()
-    
-    
+            
                 st.dataframe(
                     mismatch_df.style.apply(
                         highlight_pair,
@@ -1386,15 +1410,14 @@ if uploaded_files:
                     use_container_width=True,
                     height=300
                 )
-    
+            
             else:
-    
+            
                 st.success(
                     f"100% identical: "
                     f"{p_col} ↔ {x_col} "
-                    f"on {selected_date}"
-                )
-    
+                    f"for all selected dates."
+                )    
     # =====================================================
     # DOWNLOAD
     # =====================================================
