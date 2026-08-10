@@ -5,20 +5,25 @@ import pandas as pd
 import numpy as np
 
 from modules.excel_reader import (
-    read_loss_correction_input
-)
-
-from modules.utils import (
-    generate_blocks,
-    generate_time_blocks
+    read_loss_correction_input,
 )
 
 from modules.metrics import (
-    calculate_all_metrics
+    calculate_all_metrics,
 )
 
 from modules.plotting import (
-    plot_loss_correction
+    plot_loss_correction,
+)
+
+from modules.calculations import (
+    calculate_declination_angle,
+    calculate_elevation_angle,
+    calculate_poa,
+    calculate_projection,
+    calculate_rt_forecast,
+    calculate_symmetry,
+    find_best_shift,
 )
 
 
@@ -40,6 +45,102 @@ def reset_loss_correction_state():
 
 
 # ==========================================================
+# HELPER FUNCTIONS
+# ==========================================================
+
+def clean_input_data(df):
+
+    df = df.copy()
+
+    numeric_columns = [
+        "GHI_Forecast",
+        "Actual",
+    ]
+
+    for col in numeric_columns:
+
+        if col in df.columns:
+
+            df[col] = pd.to_numeric(
+                df[col],
+                errors="coerce"
+            ).fillna(0)
+
+            df[col] = np.maximum(
+                df[col],
+                0
+            )
+
+    return df
+
+
+def calculate_basic_parameters(df):
+
+    """
+    Calculate parameters that are already available
+    from the current calculations.py.
+
+    Additional parameters such as DHI, starting block,
+    ending block and max block can be added here once
+    their calculation functions are available.
+    """
+
+    actual = df["Actual"].to_numpy(dtype=float)
+
+    forecast = df["GHI_Forecast"].to_numpy(dtype=float)
+
+    blocks = df["Blocks"].to_numpy(dtype=float)
+
+    # ------------------------------------------------------
+    # Peak
+    # ------------------------------------------------------
+
+    peak = float(np.max(actual))
+
+    # ------------------------------------------------------
+    # Maximum block
+    # ------------------------------------------------------
+
+    max_block_index = int(
+        np.argmax(actual)
+    )
+
+    max_block = int(
+        blocks[max_block_index]
+    )
+
+    # ------------------------------------------------------
+    # Starting / ending daylight blocks
+    # ------------------------------------------------------
+
+    daylight_mask = actual > 0
+
+    daylight_blocks = blocks[daylight_mask]
+
+    if len(daylight_blocks) > 0:
+
+        starting_block = int(
+            daylight_blocks[0]
+        )
+
+        ending_block = int(
+            daylight_blocks[-1]
+        )
+
+    else:
+
+        starting_block = 0
+        ending_block = 0
+
+    return {
+        "peak": peak,
+        "starting_block": starting_block,
+        "ending_block": ending_block,
+        "max_block": max_block,
+    }
+
+
+# ==========================================================
 # MAIN SCREEN
 # ==========================================================
 
@@ -49,7 +150,7 @@ def show_loss_correction():
 
     st.caption(
         "Upload GHI Forecast and Actual data "
-        "for one day (96 × 15-minute blocks)."
+        "for one day using 96 × 15-minute blocks."
     )
 
     # ======================================================
@@ -110,6 +211,36 @@ def show_loss_correction():
         return
 
     # ======================================================
+    # VALIDATE INPUT
+    # ======================================================
+
+    required_columns = [
+        "GHI_Forecast",
+        "Actual",
+    ]
+
+    missing_columns = [
+        col
+        for col in required_columns
+        if col not in df.columns
+    ]
+
+    if missing_columns:
+
+        st.error(
+            "Missing required columns: "
+            + ", ".join(missing_columns)
+        )
+
+        return
+
+    # ======================================================
+    # CLEAN INPUT
+    # ======================================================
+
+    df = clean_input_data(df)
+
+    # ======================================================
     # STORE ORIGINAL
     # ======================================================
 
@@ -130,12 +261,40 @@ def show_loss_correction():
         "and Actual values."
     )
 
+    # ------------------------------------------------------
+    # Make sure Blocks exists
+    # ------------------------------------------------------
+
+    if "Blocks" not in df.columns:
+
+        df["Blocks"] = np.arange(
+            1,
+            len(df) + 1
+        )
+
+    # ------------------------------------------------------
+    # Make sure Time-Blocks exists
+    # ------------------------------------------------------
+
+    if "Time-Blocks" not in df.columns:
+
+        df["Time-Blocks"] = [
+            f"{(i // 4):02d}:{(i % 4) * 15:02d}"
+            for i in range(len(df))
+        ]
+
+    editable_columns = [
+        "Blocks",
+        "Time-Blocks",
+        "GHI_Forecast",
+        "Actual",
+    ]
+
     editable_df = df[
         [
-            "Blocks",
-            "Time-Blocks",
-            "GHI_Forecast",
-            "Actual",
+            col
+            for col in editable_columns
+            if col in df.columns
         ]
     ].copy()
 
@@ -226,6 +385,43 @@ def show_loss_correction():
     )
 
     # ======================================================
+    # OPTIONAL INPUT PARAMETERS
+    # ======================================================
+
+    st.subheader("Correction Parameters")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+
+        latitude = st.number_input(
+            "Latitude",
+            value=28.60,
+            format="%.4f",
+            key="loss_latitude",
+        )
+
+    with col2:
+
+        tilt_angle = st.number_input(
+            "Tilt Angle",
+            value=0.0,
+            format="%.2f",
+            key="loss_tilt_angle",
+        )
+
+    with col3:
+
+        correction_weight = st.slider(
+            "RT Weight",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.30,
+            step=0.01,
+            key="loss_rt_weight",
+        )
+
+    # ======================================================
     # RUN CORRECTION
     # ======================================================
 
@@ -235,38 +431,204 @@ def show_loss_correction():
         use_container_width=True,
     ):
 
-        actual = edited_df[
-            "Actual"
-        ].to_numpy(dtype=float)
+        try:
 
-        forecast = edited_df[
-            "GHI_Forecast"
-        ].to_numpy(dtype=float)
+            # ------------------------------------------------
+            # INPUT ARRAYS
+            # ------------------------------------------------
 
-        # --------------------------------------------------
-        # TEMPORARY
-        # --------------------------------------------------
-        # Replace this with the actual correction pipeline.
+            actual = edited_df[
+                "Actual"
+            ].to_numpy(dtype=float)
 
-        corrected = forecast.copy()
+            forecast = edited_df[
+                "GHI_Forecast"
+            ].to_numpy(dtype=float)
 
-        metrics = calculate_all_metrics(
-            actual,
-            corrected
-        )
+            blocks = edited_df[
+                "Blocks"
+            ].to_numpy(dtype=float)
 
-        st.session_state.loss_result = {
+            # ------------------------------------------------
+            # BASIC PARAMETERS
+            # ------------------------------------------------
 
-            "plant_type": plant_type,
+            parameters = calculate_basic_parameters(
+                edited_df
+            )
 
-            "actual": actual,
+            peak = parameters["peak"]
 
-            "forecast": forecast,
+            starting_block = parameters[
+                "starting_block"
+            ]
 
-            "corrected": corrected,
+            ending_block = parameters[
+                "ending_block"
+            ]
 
-            "metrics": metrics,
-        }
+            max_block = parameters[
+                "max_block"
+            ]
+
+            # ------------------------------------------------
+            # SOLAR DECLINATION
+            # ------------------------------------------------
+
+            date = pd.Timestamp.today()
+
+            declination = calculate_declination_angle(
+                date
+            )
+
+            # ------------------------------------------------
+            # SOLAR ELEVATION
+            # ------------------------------------------------
+
+            elevation = calculate_elevation_angle(
+                latitude,
+                declination
+            )
+
+            # ------------------------------------------------
+            # POA
+            # ------------------------------------------------
+
+            # Avoid division by zero
+            if elevation != 0:
+
+                poa = calculate_poa(
+                    forecast,
+                    elevation,
+                    tilt_angle,
+                )
+
+            else:
+
+                poa = forecast.copy()
+
+            # ------------------------------------------------
+            # RT PARAMETERS
+            # ------------------------------------------------
+
+            # Use max block as the default RT pivot.
+            b = max_block
+
+            n1 = starting_block
+            n2 = ending_block
+
+            # ------------------------------------------------
+            # RT PROJECTION
+            # ------------------------------------------------
+
+            projection = calculate_projection(
+                blocks=blocks,
+                peak=peak,
+                n1=n1,
+                n2=n2,
+                b=b,
+            )
+
+            # ------------------------------------------------
+            # RT FORECAST
+            # ------------------------------------------------
+
+            corrected = calculate_rt_forecast(
+                projection=projection,
+                trend=forecast,
+                blocks=blocks,
+                b=b,
+                weight=correction_weight,
+            )
+
+            # ------------------------------------------------
+            # AM SYMMETRY
+            # ------------------------------------------------
+
+            best_shift = find_best_shift(
+                corrected
+            )
+
+            symmetry = calculate_symmetry(
+                corrected,
+                best_shift,
+            )
+
+            # ------------------------------------------------
+            # METRICS
+            # ------------------------------------------------
+
+            metrics = calculate_all_metrics(
+                actual,
+                corrected,
+            )
+
+            # ------------------------------------------------
+            # SAVE RESULT
+            # ------------------------------------------------
+
+            st.session_state.loss_result = {
+
+                "plant_type": plant_type,
+
+                "actual": actual,
+
+                "forecast": forecast,
+
+                "corrected": corrected,
+
+                "projection": projection,
+
+                "poa": poa,
+
+                "symmetry": symmetry,
+
+                "metrics": metrics,
+
+                "parameters": {
+
+                    "Peak": peak,
+
+                    "Starting Block":
+                        starting_block,
+
+                    "Ending Block":
+                        ending_block,
+
+                    "Max Block":
+                        max_block,
+
+                    "RT b":
+                        b,
+
+                    "RT Weight":
+                        correction_weight,
+
+                    "AM Best Shift":
+                        best_shift,
+
+                    "Declination Angle":
+                        declination,
+
+                    "Elevation Angle":
+                        elevation,
+
+                },
+            }
+
+            st.success(
+                "Loss correction completed successfully."
+            )
+
+        except Exception as e:
+
+            st.error(
+                f"Loss correction failed: {e}"
+            )
+
+            st.exception(e)
+
+            return
 
     # ======================================================
     # RESULTS
@@ -277,6 +639,7 @@ def show_loss_correction():
     )
 
     if result is None:
+
         return
 
     st.divider()
@@ -285,53 +648,196 @@ def show_loss_correction():
         "Loss Correction Result"
     )
 
-    metrics = result["metrics"]
+    # ======================================================
+    # CALCULATED PARAMETERS
+    # ======================================================
+
+    st.subheader(
+        "Calculated Parameters"
+    )
+
+    parameters = result[
+        "parameters"
+    ]
+
+    parameter_columns = st.columns(4)
+
+    parameter_items = list(
+        parameters.items()
+    )
+
+    for i, (
+        parameter_name,
+        parameter_value
+    ) in enumerate(parameter_items):
+
+        column = parameter_columns[
+            i % 4
+        ]
+
+        if isinstance(
+            parameter_value,
+            (float, np.floating)
+        ):
+
+            column.metric(
+                parameter_name,
+                f"{parameter_value:.3f}"
+            )
+
+        else:
+
+            column.metric(
+                parameter_name,
+                str(parameter_value)
+            )
+
+    # ======================================================
+    # DHI
+    # ======================================================
+
+    st.subheader(
+        "Calculated Solar Parameters"
+    )
+
+    solar_col1, solar_col2, solar_col3 = (
+        st.columns(3)
+    )
+
+    solar_col1.metric(
+        "Declination",
+        f"{parameters['Declination Angle']:.3f}°"
+    )
+
+    solar_col2.metric(
+        "Elevation",
+        f"{parameters['Elevation Angle']:.3f}°"
+    )
+
+    solar_col3.metric(
+        "Plant Type",
+        result["plant_type"]
+    )
 
     # ======================================================
     # KPI CARDS
     # ======================================================
 
-    col1, col2, col3, col4 = st.columns(4)
-
-    col1.metric(
-        "MAE",
-        f"{metrics['MAE']:.3f}"
+    st.subheader(
+        "Performance Metrics"
     )
 
-    col2.metric(
-        "RMSE",
-        f"{metrics['RMSE']:.3f}"
+    metrics = result["metrics"]
+
+    metric_items = [
+        ("MAE", metrics.get("MAE")),
+        ("RMSE", metrics.get("RMSE")),
+        ("MAPE", metrics.get("MAPE")),
+        ("R²", metrics.get("R2")),
+    ]
+
+    metric_columns = st.columns(
+        len(metric_items)
     )
 
-    col3.metric(
-        "MAPE",
-        f"{metrics['MAPE']:.2f}%"
-    )
+    for column, (
+        metric_name,
+        metric_value
+    ) in zip(
+        metric_columns,
+        metric_items
+    ):
 
-    col4.metric(
-        "R²",
-        f"{metrics['R2']:.4f}"
-    )
+        if metric_value is None:
+
+            column.metric(
+                metric_name,
+                "N/A"
+            )
+
+        elif metric_name == "MAPE":
+
+            column.metric(
+                metric_name,
+                f"{metric_value:.2f}%"
+            )
+
+        else:
+
+            column.metric(
+                metric_name,
+                f"{metric_value:.4f}"
+            )
 
     # ======================================================
-    # GRAPH
+    # FORECAST GRAPH
     # ======================================================
+
+    st.subheader(
+        "Forecast Comparison"
+    )
 
     fig = plot_loss_correction(
 
-        blocks=edited_df["Blocks"],
+        blocks=edited_df[
+            "Blocks"
+        ],
 
-        actual=result["actual"],
+        actual=result[
+            "actual"
+        ],
 
-        forecast=result["forecast"],
+        forecast=result[
+            "forecast"
+        ],
 
-        corrected=result["corrected"],
+        corrected=result[
+            "corrected"
+        ],
     )
 
     st.plotly_chart(
         fig,
         use_container_width=True
     )
+
+    # ======================================================
+    # CORRECTION DATA
+    # ======================================================
+
+    with st.expander(
+        "View Correction Data"
+    ):
+
+        result_df = pd.DataFrame({
+
+            "Blocks":
+                edited_df["Blocks"],
+
+            "Time":
+                edited_df["Time-Blocks"],
+
+            "GHI Forecast":
+                result["forecast"],
+
+            "RT Projection":
+                result["projection"],
+
+            "Corrected Forecast":
+                result["corrected"],
+
+            "Actual":
+                result["actual"],
+
+            "AM Symmetry":
+                result["symmetry"],
+        })
+
+        st.dataframe(
+            result_df,
+            use_container_width=True,
+            hide_index=True,
+        )
 
     # ======================================================
     # ALL METRICS
@@ -344,14 +850,16 @@ def show_loss_correction():
         metrics_df = pd.DataFrame({
 
             "Metric":
-                metrics.keys(),
+                list(metrics.keys()),
 
             "Value":
-                metrics.values(),
+                list(metrics.values()),
         })
 
         st.dataframe(
             metrics_df,
+
             use_container_width=True,
-            hide_index=True
+
+            hide_index=True,
         )
