@@ -862,329 +862,447 @@ def show_loss_correction():
     # RUN OPTIMIZATION
     # ======================================================
 
+    # ======================================================
+# RUN OPTIMIZATION
+# ======================================================
+
+if st.button(
+    "🚀 Run Loss Correction",
+    type="primary",
+    use_container_width=True,
+):
+
+    progress = st.progress(0)
+
+    status = st.empty()
+
+    status.info(
+        "Starting optimization..."
+    )
+
+    try:
+
+        result = optimize_tracking_parameters(
+
+            actual=actual,
+
+            ghi_arrays=ghi_arrays,
+
+            blocks=blocks,
+
+            area_df=area_df,
+
+            weight_factors=weight_factors,
+
+            bounds=bounds,
+
+            maxiter=maxiter,
+
+            popsize=popsize,
+
+            seed=seed,
+
+        )
+
+        progress.progress(100)
+
+        status.success(
+            "Optimization completed."
+        )
+
+        parameters = result["parameters"]
+
+        # --------------------------------------------------
+        # Calculate forecast
+        # --------------------------------------------------
+
+        final_forecast = calculate_tracking_forecast(
+
+            ghi_arrays=ghi_arrays,
+
+            weights=result["weights"],
+
+            blocks=blocks,
+
+            dhi_percent=parameters["DHI"],
+
+            ghi_start=parameters["Starting Block"],
+
+            ghi_end=parameters["Ending Block"],
+
+            ghi_max=parameters["Max Block"],
+
+            east_limit=parameters["East Limit"],
+
+            west_limit=parameters["West Limit"],
+
+        )
+
+        # --------------------------------------------------
+        # Save ONLY parameters + forecast + weights
+        # --------------------------------------------------
+
+        st.session_state.loss_result = {
+
+            "parameters": parameters,
+
+            "actual": actual,
+
+            "forecast": final_forecast,
+
+            "weights": result["weights"],
+
+        }
+
+    except Exception as e:
+
+        progress.empty()
+
+        status.empty()
+
+        st.error(
+            f"Optimization failed: {e}"
+        )
+
+        return
+
+
+# ======================================================
+# RESULTS
+# ======================================================
+
+result = st.session_state.get(
+    "loss_result"
+)
+
+if result is None:
+    return
+
+
+st.divider()
+
+st.subheader(
+    "🎯 Tracking Parameters"
+)
+
+
+parameters = result["parameters"]
+
+
+# ======================================================
+# EDITABLE PARAMETERS
+# ======================================================
+
+st.caption(
+    "You can manually modify the optimized "
+    "parameters and apply them to the forecast."
+)
+
+
+col1, col2, col3, col4 = st.columns(4)
+
+
+with col1:
+
+    dhi_value = st.number_input(
+        "DHI (%)",
+        min_value=0.0,
+        max_value=100.0,
+        value=float(
+            parameters["DHI"]
+        ),
+        step=1.0,
+        key="manual_dhi",
+    )
+
+
+with col2:
+
+    start_value = st.number_input(
+        "Starting Block",
+        min_value=0,
+        max_value=95,
+        value=int(
+            parameters["Starting Block"]
+        ),
+        step=1,
+        key="manual_start",
+    )
+
+
+with col3:
+
+    end_value = st.number_input(
+        "Ending Block",
+        min_value=1,
+        max_value=96,
+        value=int(
+            parameters["Ending Block"]
+        ),
+        step=1,
+        key="manual_end",
+    )
+
+
+with col4:
+
+    max_value = st.number_input(
+        "Max Block",
+        min_value=1,
+        max_value=96,
+        value=int(
+            parameters["Max Block"]
+        ),
+        step=1,
+        key="manual_max",
+    )
+
+
+col1, col2, col3 = st.columns(3)
+
+
+with col1:
+
+    east_value = st.number_input(
+        "East Tracking Limit",
+        min_value=0.0,
+        max_value=90.0,
+        value=float(
+            parameters["East Limit"]
+        ),
+        step=1.0,
+        key="manual_east",
+    )
+
+
+with col2:
+
+    west_value = st.number_input(
+        "West Tracking Limit",
+        min_value=0.0,
+        max_value=90.0,
+        value=float(
+            parameters["West Limit"]
+        ),
+        step=1.0,
+        key="manual_west",
+    )
+
+
+with col3:
+
+    efficiency_value = st.number_input(
+        "Tracking Efficiency Loss (%)",
+        min_value=0.0,
+        max_value=10.0,
+        value=float(
+            parameters["Efficiency Loss"]
+        ),
+        step=0.1,
+        key="manual_efficiency",
+    )
+
+
+# ======================================================
+# VALIDATE PARAMETERS
+# ======================================================
+
+if not (
+    start_value
+    < max_value
+    < end_value
+):
+
+    st.warning(
+        "Invalid GHI configuration. "
+        "Required: Starting Block < Max Block < Ending Block."
+    )
+
+else:
+
+    # ==================================================
+    # APPLY MANUAL PARAMETERS
+    # ==================================================
+
     if st.button(
-        "🚀 Run Loss Correction",
+        "🔄 Apply Parameters",
         type="primary",
         use_container_width=True,
     ):
 
-        progress = st.progress(
-            0
-        )
-
-        status = st.empty()
-
-        status.info(
-            "Starting optimization..."
-        )
-
         try:
 
             # --------------------------------------------------
-            # OPTIMIZATION
+            # Recalculate effective weights
             # --------------------------------------------------
 
-            result = optimize_tracking_parameters(
+            manual_weights = (
+                calculate_loss_corrected_weights(
 
-                actual=actual,
+                    area_df=area_df,
 
-                ghi_arrays=ghi_arrays,
+                    efficiency_loss=efficiency_value,
 
-                blocks=blocks,
+                    weight_factors=weight_factors,
 
-                area_df=area_df,
+                    has_cluster=has_cluster,
 
-                weight_factors=weight_factors,
-
-                bounds=bounds,
-
-                maxiter=maxiter,
-
-                popsize=popsize,
-
-                seed=seed,
-
-            )
-
-            progress.progress(
-                100
-            )
-
-            status.success(
-                "Optimization completed."
+                )
             )
 
             # --------------------------------------------------
-            # BEST PARAMETERS
+            # Recalculate forecast
             # --------------------------------------------------
 
-            parameters = result[
-                "parameters"
-            ]
-
-            # --------------------------------------------------
-            # FINAL FORECAST
-            # --------------------------------------------------
-
-            final_forecast = (
+            manual_forecast = (
                 calculate_tracking_forecast(
 
                     ghi_arrays=ghi_arrays,
 
-                    weights=result[
-                        "weights"
-                    ],
+                    weights=manual_weights,
 
                     blocks=blocks,
 
-                    dhi_percent=parameters[
-                        "DHI"
-                    ],
+                    dhi_percent=dhi_value,
 
-                    ghi_start=parameters[
-                        "Starting Block"
-                    ],
+                    ghi_start=int(
+                        start_value
+                    ),
 
-                    ghi_end=parameters[
-                        "Ending Block"
-                    ],
+                    ghi_end=int(
+                        end_value
+                    ),
 
-                    ghi_max=parameters[
-                        "Max Block"
-                    ],
+                    ghi_max=int(
+                        max_value
+                    ),
 
-                    east_limit=parameters[
-                        "East Limit"
-                    ],
+                    east_limit=east_value,
 
-                    west_limit=parameters[
-                        "West Limit"
-                    ],
+                    west_limit=west_value,
 
                 )
             )
 
-            
-
             # --------------------------------------------------
-            # SAVE RESULT
+            # Update result
             # --------------------------------------------------
 
-            st.session_state.loss_result = {
+            result["parameters"] = {
 
-                "parameters":
-                    parameters,
+                "DHI":
+                    dhi_value,
 
-                "actual":
-                    actual,
+                "Starting Block":
+                    int(start_value),
 
-                "forecast":
-                    final_forecast,
+                "Ending Block":
+                    int(end_value),
 
-                "metrics":
-                    metrics,
+                "Max Block":
+                    int(max_value),
 
-                "weights":
-                    result["weights"],
+                "East Limit":
+                    east_value,
 
-                "score":
-                    result["score"],
+                "West Limit":
+                    west_value,
+
+                "Efficiency Loss":
+                    efficiency_value,
 
             }
 
+            result["forecast"] = (
+                manual_forecast
+            )
+
+            result["weights"] = (
+                manual_weights
+            )
+
+            st.session_state.loss_result = result
+
+            st.success(
+                "Parameters applied successfully."
+            )
+
         except Exception as e:
 
-            progress.empty()
-
-            status.empty()
-
             st.error(
-                f"Optimization failed: {e}"
+                f"Unable to apply parameters: {e}"
             )
 
-            return
 
-    # ======================================================
-    # RESULTS
-    # ======================================================
+# ======================================================
+# FORECAST GRAPH
+# ======================================================
 
-    result = st.session_state.get(
-        "loss_result"
+st.markdown(
+    "### Actual vs Forecast"
+)
+
+
+fig = plot_loss_correction(
+
+    blocks=blocks,
+
+    actual=result["actual"],
+
+    forecast=result["forecast"],
+
+)
+
+
+st.plotly_chart(
+    fig,
+    use_container_width=True,
+)
+
+
+# ======================================================
+# EFFECTIVE WEIGHTS
+# ======================================================
+
+with st.expander(
+    "View Effective Weights"
+):
+
+    weights = np.asarray(
+        result["weights"],
+        dtype=float,
     )
 
-    if result is None:
+    if has_cluster:
 
-        return
-
-    st.divider()
-
-    st.subheader(
-        "🎯 Optimized Tracking Loss Correction"
-    )
-
-    parameters = result[
-        "parameters"
-    ]
-
-    # ======================================================
-    # OPTIMIZED PARAMETERS
-    # ======================================================
-
-    st.subheader("🎯 Tracking Parameters")
-
-    parameters = result["parameters"]
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    col1.number_input(
-        "DHI (%)",
-        value=float(parameters["DHI"]),
-        min_value=0.0,
-        max_value=100.0,
-        step=1.0,
-    )
-    
-    col2.number_input(
-        "Starting Block",
-        value=float(parameters["Starting Block"]),
-        min_value=0.0,
-        max_value=95.0,
-        step=1.0,
-    )
-    
-    col3.number_input(
-        "Ending Block",
-        value=float(parameters["Ending Block"]),
-        min_value=1.0,
-        max_value=96.0,
-        step=1.0,
-    )
-    
-    col4.number_input(
-        "Max Block",
-        value=float(parameters["Max Block"]),
-        min_value=1.0,
-        max_value=96.0,
-        step=1.0,
-    )
-    
-    col1, col2, col3 = st.columns(3)
-    
-    col1.number_input(
-        "East Tracking Limit",
-        value=float(parameters["East Limit"]),
-        min_value=0.0,
-        max_value=90.0,
-        step=1.0,
-    )
-    
-    col2.number_input(
-        "West Tracking Limit",
-        value=float(parameters["West Limit"]),
-        min_value=0.0,
-        max_value=90.0,
-        step=1.0,
-    )
-    
-    col3.number_input(
-        "Efficiency Loss (%)",
-        value=float(parameters["Efficiency Loss"]),
-        min_value=0.0,
-        max_value=10.0,
-        step=0.1,
-    )
-    
-    # ======================================================
-    # GRAPH
-    # ======================================================
-
-    st.markdown(
-        "### Actual vs Forecast"
-    )
-
-    fig = plot_loss_correction(
-
-        blocks=blocks,
-
-        actual=result["actual"],
-
-        forecast=result["forecast"],
-
-    )
-
-    st.plotly_chart(
-        fig,
-        use_container_width=True,
-    )
-
-    # ======================================================
-    # EFFECTIVE WEIGHTS
-    # ======================================================
-
-    with st.expander(
-        "View Effective Weights"
-    ):
-
-        weights = np.asarray(
-            result["weights"],
-            dtype=float,
-        )
-
-        if has_cluster:
-
-            labels = [
-                f"CL{i}"
-                for i in range(
-                    1,
-                    len(weights) + 1
-                )
-            ]
-
-        else:
-
-            labels = [
-                "Total Plant"
-            ]
-
-        # Safety check
-        if len(labels) == len(weights):
-
-            weights_df = pd.DataFrame({
-
-                "Group":
-                    labels,
-
-                "Effective Weight":
-                    weights,
-
-            })
-
-            st.dataframe(
-                weights_df,
-                use_container_width=True,
-                hide_index=True,
+        labels = [
+            f"CL{i}"
+            for i in range(
+                1,
+                len(weights) + 1
             )
+        ]
 
-    # ======================================================
-    # ALL METRICS
-    # ======================================================
+    else:
 
-    with st.expander(
-        "View All Metrics"
-    ):
+        labels = [
+            "Total Plant"
+        ]
 
-        metrics_df = pd.DataFrame({
+    if len(labels) == len(weights):
 
-            "Metric":
-                list(metrics.keys()),
+        weights_df = pd.DataFrame({
 
-            "Value":
-                list(metrics.values()),
+            "Group":
+                labels,
+
+            "Effective Weight":
+                weights,
 
         })
 
         st.dataframe(
-            metrics_df,
+            weights_df,
             use_container_width=True,
             hide_index=True,
         )
