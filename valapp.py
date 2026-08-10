@@ -231,8 +231,8 @@ def normalize_identifier(identifier):
 
 def find_pairs(df):
 
-    p_columns = []
-    x_columns = []
+    p_columns = {}
+    x_columns = {}
 
     for col in df.columns:
 
@@ -242,96 +242,42 @@ def find_pairs(df):
         if col_str.upper().startswith("DEV"):
             continue
 
-        side, identifier = extract_px_identifier(
-            col_str
-        )
+        side, identifier = extract_px_identifier(col_str)
 
-        if side is None:
+        if side is None or identifier is None:
             continue
 
-        normalized = normalize_identifier(
-            identifier
-        )
+        normalized = normalize_identifier(identifier)
 
         if side == "P":
-
-            p_columns.append(
-                (
-                    col_str,
-                    identifier,
-                    normalized
-                )
-            )
+            p_columns.setdefault(normalized, []).append(col)
 
         elif side == "X":
-
-            x_columns.append(
-                (
-                    col_str,
-                    identifier,
-                    normalized
-                )
-            )
+            x_columns.setdefault(normalized, []).append(col)
 
 
     pairs = []
 
     # -----------------------------------------------------
-    # Match P with X
+    # ONLY create a result when BOTH P and X exist
     # -----------------------------------------------------
 
-    for p_col, p_id, p_norm in p_columns:
+    for identifier in p_columns:
 
-        for x_col, x_id, x_norm in x_columns:
+        if identifier not in x_columns:
+            continue
 
-            # Exact normalized match
-            if p_norm == x_norm:
+        for p_col in p_columns[identifier]:
+
+            for x_col in x_columns[identifier]:
 
                 pairs.append(
                     (
-                        p_norm,
+                        identifier,
                         p_col,
                         x_col
                     )
                 )
-
-                continue
-
-
-            # -------------------------------------------------
-            # Handle partial normalized identifiers
-            #
-            # Example:
-            #
-            # PSD00 -> SD0
-            # XSD0  -> SD0
-            # -------------------------------------------------
-
-            if (
-                p_norm.startswith(x_norm)
-                or x_norm.startswith(p_norm)
-            ):
-
-                common = (
-                    x_norm
-                    if len(x_norm) <= len(p_norm)
-                    else p_norm
-                )
-
-                if (
-                    common,
-                    p_col,
-                    x_col
-                ) not in pairs:
-
-                    pairs.append(
-                        (
-                            common,
-                            p_col,
-                            x_col
-                        )
-                    )
-
 
     return pairs
 
@@ -1022,131 +968,185 @@ if uploaded_files:
     # INDIVIDUAL FILE DETAILS
     # =====================================================
 
-    st.markdown(
-        "## Detailed File Results"
-    )
-
-
-    for filename, data in all_results.items():
-
-        report = data["report"]
-
-        result_df = data["data"]
-
-        result_columns = data[
-            "result_columns"
-        ]
-
-        pair_lookup = data[
-            "pair_lookup"
-        ]
-
-
-        with st.expander(
-            f"📄 {filename}",
-            expanded=False
-        ):
-
-
-            if report.empty:
-
-                st.warning(
-                    "No P-X pairs were found."
-                )
-
-                continue
-
-
-            file_pairs = len(
-                report
+    # =====================================================
+    # DATE-WISE DRILL DOWN
+    # =====================================================
+    
+    st.markdown("### Date-wise Drill Down")
+    
+    # ---------------------------------------------
+    # Find Date column
+    # ---------------------------------------------
+    
+    date_col = find_date_column(result_df)
+    
+    if date_col is not None:
+    
+        # Make sure Date is datetime
+        result_df[date_col] = pd.to_datetime(
+            result_df[date_col],
+            errors="coerce"
+        )
+    
+        available_dates = (
+            result_df[date_col]
+            .dropna()
+            .dt.date
+            .drop_duplicates()
+            .tolist()
+        )
+    
+        available_dates = sorted(
+            available_dates
+        )
+    
+    
+        if available_dates:
+    
+            selected_date = st.selectbox(
+                "Select Date",
+                available_dates,
+                key=f"date_{filename}"
             )
-
-
-            file_different = int(
-                report[
-                    "Different Blocks"
-                ].sum()
-            )
-
-
-            m1, m2, m3 = st.columns(3)
-
-
-            m1.metric(
-                "P-X Pairs",
-                file_pairs
-            )
-
-
-            m2.metric(
-                "Different Blocks",
-                file_different
-            )
-
-
-            m3.metric(
-                "Status",
-                "PASS"
-                if file_different == 0
-                else "FAIL"
-            )
-
-
+    
+    
             # ---------------------------------------------
-            # Pair report
+            # Filter selected date
             # ---------------------------------------------
-
-            st.dataframe(
-                report.drop(
-                    columns=["File"],
-                    errors="ignore"
-                ),
-                use_container_width=True,
-                hide_index=True
+    
+            date_mask = (
+                result_df[date_col].dt.date
+                == selected_date
             )
-
-
+    
+            date_df = result_df[
+                date_mask
+            ].copy()
+    
+    
             # ---------------------------------------------
-            # Mismatched blocks
+            # Find mismatches for selected date
             # ---------------------------------------------
-
+    
             mismatch_mask = pd.Series(
                 False,
-                index=result_df.index
+                index=date_df.index
             )
-
-
+    
             for result_col in result_columns:
-
-                mismatch_mask |= (
-                    result_df[
-                        result_col
-                    ] == False
-                )
-
-
-            mismatch_df = result_df[
+    
+                if result_col in date_df.columns:
+    
+                    mismatch_mask |= (
+                        date_df[result_col] == False
+                    )
+    
+    
+            date_mismatch_df = date_df[
                 mismatch_mask
             ]
-
-
-            if not mismatch_df.empty:
-
+    
+    
+            # ---------------------------------------------
+            # Summary for selected date
+            # ---------------------------------------------
+    
+            total_blocks = len(date_df)
+    
+            mismatch_blocks = len(
+                date_mismatch_df
+            )
+    
+            identical_blocks = (
+                total_blocks
+                - mismatch_blocks
+            )
+    
+    
+            d1, d2, d3 = st.columns(3)
+    
+            d1.metric(
+                "Total Blocks",
+                total_blocks
+            )
+    
+            d2.metric(
+                "Identical Blocks",
+                identical_blocks
+            )
+    
+            d3.metric(
+                "Mismatched Blocks",
+                mismatch_blocks
+            )
+    
+    
+            # ---------------------------------------------
+            # Show only mismatched blocks
+            # ---------------------------------------------
+    
+            if not date_mismatch_df.empty:
+    
                 st.markdown(
-                    "### Mismatched Blocks"
+                    f"#### Mismatches on {selected_date}"
                 )
-
+    
+                # Keep Date + P/X columns + results
+                display_columns = [
+                    date_col
+                ]
+    
+                for result_col in result_columns:
+    
+                    if result_col not in date_mismatch_df.columns:
+                        continue
+    
+                    p_col, x_col = pair_lookup[
+                        result_col
+                    ]
+    
+                    if p_col in date_mismatch_df.columns:
+                        display_columns.append(
+                            p_col
+                        )
+    
+                    if x_col in date_mismatch_df.columns:
+                        display_columns.append(
+                            x_col
+                        )
+    
+                    display_columns.append(
+                        result_col
+                    )
+    
+    
+                # Remove duplicate columns
+                display_columns = list(
+                    dict.fromkeys(
+                        display_columns
+                    )
+                )
+    
+    
                 st.dataframe(
-                    mismatch_df,
+                    date_mismatch_df[
+                        display_columns
+                    ],
                     use_container_width=True,
-                    height=350
+                    height=400
                 )
-
+    
             else:
-
+    
                 st.success(
-                    "No mismatched blocks."
+                    f"No mismatches found on {selected_date}."
                 )
+    
+    else:
+    
+        st.warning(
+            "Date column could not be detected."
+        )
 
 
     # =====================================================
