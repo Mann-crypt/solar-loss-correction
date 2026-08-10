@@ -556,27 +556,10 @@ def read_tracking_input(uploaded_file):
     # ==========================================================
 
     return {
-
-        "area": area,
-
-        "cluster_data":
-            cluster_data,
-
-        "has_cluster":
-            has_cluster,
-
-        "latitude":
-            latitude,
-
-        "backend":
-            backend,
-
-        "tracking":
-            tracking,
-
-        "ghi_arrays":
-            ghi_arrays,
-
-        "area_weights":
-            area_weights,
-    }
+    "area": area,
+    "cluster_data": cluster_data,
+    "has_cluster": has_cluster,
+    "latitude": latitude,
+    "backend": backend,
+    "tracking": tracking,
+}
