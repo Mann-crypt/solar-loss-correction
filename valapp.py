@@ -1129,532 +1129,189 @@ if uploaded_files:
     
     
             # =================================================
-            # DATE-WISE DRILL DOWN
-            # =================================================
-    
-            st.markdown("### 📅 Date-wise Drill Down")
-    
-    
-            date_col = find_date_column(
-                result_df
-            )
-    
-    
-            if date_col is None:
-    
-                st.warning(
-                    "Date column could not be detected."
-                )
-    
-                continue
-    
-    
-            # Convert date
-            result_df[date_col] = pd.to_datetime(
-                result_df[date_col],
-                errors="coerce"
-            )
-    
-    
-            available_dates = sorted(
-                result_df[date_col]
-                .dropna()
-                .dt.date
-                .unique()
-                .tolist()
-            )
-    
-    
-            if not available_dates:
-    
-                st.warning(
-                    "No valid dates were found."
-                )
-    
-                continue
-    
-    
-            # =================================================
-            # DATE SELECTION
+            # DATE-WISE P-X PAIR SUMMARY
             # =================================================
             
-            selected_dates = st.multiselect(
-                "Select Date(s)",
-                options=available_dates,
-                default=available_dates,   # ALL DATES SELECTED BY DEFAULT
-                key=f"date_select_{filename}"
-            )
-
-            # =================================================
-            # CHECK DATE SELECTION
-            # =================================================
-            
-            if not selected_dates:
-            
-                st.info(
-                    "Please select at least one date."
-                )
-            
-                continue
-    
-    
-            # =================================================
-            # P-X PAIR SELECTION
-            # =================================================
-    
-            pair_options = {}
-    
-            for result_col in result_columns:
-    
-                if result_col not in pair_lookup:
-                    continue
-    
-                p_col, x_col = pair_lookup[
-                    result_col
-                ]
-    
-                pair_options[
-                    result_col
-                ] = (
-                    f"{p_col}  ↔  {x_col}"
-                )
-    
-    
-            if not pair_options:
-    
-                st.warning(
-                    "No P-X pairs available."
-                )
-    
-                continue
-    
-    
-            selected_result_col = st.selectbox(
-                "Select P-X Pair",
-                list(pair_options.keys()),
-                format_func=lambda x:
-                    pair_options[x],
-                key=f"pair_select_{filename}"
-            )
-    
-    
-            # =================================================
-            # SELECTED P/X COLUMNS
-            # =================================================
-    
-            p_col, x_col = pair_lookup[
-                selected_result_col
-            ]
-    
-    
-            # =================================================
-            # FILTER SELECTED DATES
-            # =================================================
-            
-            date_df = result_df[
-                result_df[date_col]
-                .dt.date
-                .isin(selected_dates)
-            ].copy()
-    
-    
-            # =================================================
-            # MATCH STATUS
-            # =================================================
-            
-            date_df["Match"] = date_df[
-                selected_result_col
-            ].astype(bool)
-            
-            
-            # =================================================
-            # DATE-WISE SUMMARY
-            # =================================================
-            
-            st.markdown("### 📅 Date-wise Summary")
+            st.markdown("### 📅 Date-wise P-X Pair Summary")
             
             date_col = find_date_column(result_df)
             
             if date_col is None:
             
-                st.warning(
-                    "Date column could not be detected."
-                )
+                st.warning("Date column could not be detected.")
             
-                continue
-            
-            
-            # -------------------------------------------------
-            # Convert Date
-            # -------------------------------------------------
-            
-            result_df[date_col] = pd.to_datetime(
-                result_df[date_col],
-                errors="coerce"
-            )
-            
-            
-            # -------------------------------------------------
-            # Get available dates
-            # -------------------------------------------------
-            
-            available_dates = sorted(
-                result_df[date_col]
-                .dropna()
-                .dt.date
-                .unique()
-                .tolist()
-            )
-            
-            
-            if not available_dates:
-            
-                st.warning(
-                    "No valid dates were found."
-                )
-            
-                continue
-            
-            
-            # =================================================
-            # CREATE DATE-WISE SUMMARY
-            # =================================================
-            
-            date_summary = []
-            
-            
-            for current_date in available_dates:
-            
-                day_df = result_df[
-                    result_df[date_col].dt.date
-                    == current_date
-                ]
-            
-            
-                total_blocks = len(day_df)
-            
-                # ---------------------------------------------
-                # Count all comparisons
-                # ---------------------------------------------
-            
-                total_comparisons = (
-                    len(result_columns)
-                    * total_blocks
-                )
-            
-            
-                identical_comparisons = 0
-                different_comparisons = 0
-            
-            
-                for result_col in result_columns:
-            
-                    if result_col not in day_df.columns:
-                        continue
-            
-                    comparison = (
-                        day_df[result_col]
-                        .fillna(False)
-                        .astype(bool)
-                    )
-            
-                    identical_comparisons += int(
-                        comparison.sum()
-                    )
-            
-                    different_comparisons += int(
-                        (~comparison).sum()
-                    )
-            
-            
-                # ---------------------------------------------
-                # Number of P-X pairs having differences
-                # ---------------------------------------------
-            
-                pairs_with_difference = 0
-            
-                for result_col in result_columns:
-            
-                    if result_col not in day_df.columns:
-                        continue
-            
-                    has_difference = (
-                        ~day_df[result_col]
-                        .fillna(False)
-                        .astype(bool)
-                    ).any()
-            
-                    if has_difference:
-            
-                        pairs_with_difference += 1
-            
-            
-                # ---------------------------------------------
-                # Status
-                # ---------------------------------------------
-            
-                status = (
-                    "PASS"
-                    if different_comparisons == 0
-                    else "FAIL"
-                )
-            
-            
-                # ---------------------------------------------
-                # Add row
-                # ---------------------------------------------
-            
-                date_summary.append({
-            
-                    "Date":
-                        current_date,
-            
-                    "Total Blocks":
-                        total_blocks,
-            
-                    "Identical Comparisons":
-                        identical_comparisons,
-            
-                    "Different Comparisons":
-                        different_comparisons,
-            
-                    "P-X Pairs":
-                        len(result_columns),
-            
-                    "Pairs With Difference":
-                        pairs_with_difference,
-            
-                    "Status":
-                        status
-                })
-            
-            
-            date_summary_df = pd.DataFrame(
-                date_summary
-            )
-            
-            
-            # =================================================
-            # DISPLAY DATE SUMMARY
-            # =================================================
-            
-            st.dataframe(
-                date_summary_df,
-                use_container_width=True,
-                hide_index=True
-            )
-
-    # =================================================
-    # MULTI-DATE DRILL DOWN
-    # =================================================
-    
-    st.markdown("### 🔎 Detailed Date Drill Down")
-    
-    
-    selected_dates = st.multiselect(
-        "Select Date(s) to inspect",
-        options=available_dates,
-        default=available_dates,
-        key=f"detail_dates_{filename}"
-    )
-    
-    
-    if selected_dates:
-    
-        selected_df = result_df[
-            result_df[date_col]
-            .dt.date
-            .isin(selected_dates)
-        ].copy()
-    
-    
-        # =================================================
-        # SELECT P-X PAIR
-        # =================================================
-    
-        pair_options = {}
-    
-        for result_col in result_columns:
-    
-            if result_col not in pair_lookup:
-                continue
-    
-            p_col, x_col = pair_lookup[
-                result_col
-            ]
-    
-            pair_options[result_col] = (
-                f"{p_col}  ↔  {x_col}"
-            )
-    
-    
-        if pair_options:
-    
-            selected_result_col = st.selectbox(
-                "Select P-X Pair",
-                list(pair_options.keys()),
-                format_func=lambda x:
-                    pair_options[x],
-                key=f"detail_pair_{filename}"
-            )
-    
-    
-            p_col, x_col = pair_lookup[
-                selected_result_col
-            ]
-    
-    
-            # =================================================
-            # MATCH COLUMN
-            # =================================================
-    
-            selected_df["Match"] = (
-                selected_df[
-                    selected_result_col
-                ]
-                .fillna(False)
-                .astype(bool)
-            )
-    
-    
-            # =================================================
-            # METRICS
-            # =================================================
-    
-            total_blocks = len(
-                selected_df
-            )
-    
-            identical_blocks = int(
-                selected_df["Match"].sum()
-            )
-    
-            mismatch_blocks = (
-                total_blocks
-                - identical_blocks
-            )
-    
-    
-            d1, d2, d3 = st.columns(3)
-    
-            d1.metric(
-                "Total Blocks",
-                total_blocks
-            )
-    
-            d2.metric(
-                "Identical Blocks",
-                identical_blocks
-            )
-    
-            d3.metric(
-                "Mismatched Blocks",
-                mismatch_blocks
-            )
-    
-    
-            # =================================================
-            # DISPLAY
-            # =================================================
-    
-            display_df = selected_df[
-                [
-                    date_col,
-                    p_col,
-                    x_col,
-                    "Match"
-                ]
-            ].copy()
-    
-    
-            # =================================================
-            # HIGHLIGHT
-            # =================================================
-    
-            def highlight_pair(row):
-    
-                styles = pd.Series(
-                    "",
-                    index=row.index
-                )
-    
-                if row["Match"]:
-    
-                    styles["Match"] = (
-                        "background-color: #d9f2d9;"
-                        "color: #176b17;"
-                        "font-weight: bold;"
-                    )
-    
-                else:
-    
-                    styles[p_col] = (
-                        "background-color: #ffcccc;"
-                        "color: #9c0006;"
-                        "font-weight: bold;"
-                    )
-    
-                    styles[x_col] = (
-                        "background-color: #ffcccc;"
-                        "color: #9c0006;"
-                        "font-weight: bold;"
-                    )
-    
-                    styles["Match"] = (
-                        "background-color: #ff6666;"
-                        "color: white;"
-                        "font-weight: bold;"
-                    )
-    
-                return styles
-    
-    
-            st.dataframe(
-                display_df.style.apply(
-                    highlight_pair,
-                    axis=1
-                ),
-                use_container_width=True,
-                height=450
-            )
-    
-    
-            # =================================================
-            # MISMATCHES ONLY
-            # =================================================
-    
-            mismatch_df = display_df[
-                display_df["Match"] == False
-            ].copy()
-    
-    
-            if not mismatch_df.empty:
-    
-                st.markdown(
-                    "#### ❌ Mismatched Blocks"
-                )
-    
-                st.dataframe(
-                    mismatch_df.style.apply(
-                        highlight_pair,
-                        axis=1
-                    ),
-                    use_container_width=True,
-                    height=300
-                )
-    
             else:
-    
-                st.success(
-                    "No mismatches found for the "
-                    "selected dates and P-X pair."
+            
+                result_df[date_col] = pd.to_datetime(
+                    result_df[date_col],
+                    errors="coerce"
                 )
-    
-    else:
-    
-        st.info(
-            "Select at least one date."
-        )
+            
+                available_dates = sorted(
+                    result_df[date_col]
+                    .dropna()
+                    .dt.date
+                    .unique()
+                    .tolist()
+                )
+            
+                if not available_dates:
+            
+                    st.warning("No valid dates were found.")
+            
+                else:
+            
+                    # -------------------------------------------------
+                    # MULTI DATE SELECTION
+                    # ALL DATES SELECTED BY DEFAULT
+                    # -------------------------------------------------
+            
+                    selected_dates = st.multiselect(
+                        "Select Date(s)",
+                        options=available_dates,
+                        default=available_dates,
+                        key=f"summary_dates_{filename}"
+                    )
+            
+                    if not selected_dates:
+            
+                        st.info("Select at least one date.")
+            
+                    else:
+            
+                        # =================================================
+                        # CREATE DATE-WISE P-X SUMMARY
+                        # =================================================
+            
+                        date_wise_summary = []
+            
+                        for current_date in selected_dates:
+            
+                            # ---------------------------------------------
+                            # Data for this date
+                            # ---------------------------------------------
+            
+                            day_df = result_df[
+                                result_df[date_col].dt.date
+                                == current_date
+                            ].copy()
+            
+            
+                            # ---------------------------------------------
+                            # Calculate each P-X pair separately
+                            # ---------------------------------------------
+            
+                            for result_col in result_columns:
+            
+                                if result_col not in pair_lookup:
+                                    continue
+            
+                                if result_col not in day_df.columns:
+                                    continue
+            
+            
+                                p_col, x_col = pair_lookup[
+                                    result_col
+                                ]
+            
+            
+                                # -----------------------------------------
+                                # Comparison results
+                                # -----------------------------------------
+            
+                                comparison = (
+                                    day_df[result_col]
+                                    .fillna(False)
+                                    .astype(bool)
+                                )
+            
+            
+                                total_blocks = len(
+                                    comparison
+                                )
+            
+                                identical_blocks = int(
+                                    comparison.sum()
+                                )
+            
+                                different_blocks = int(
+                                    (~comparison).sum()
+                                )
+            
+            
+                                # -----------------------------------------
+                                # Identifier
+                                # -----------------------------------------
+            
+                                identifier = result_col.replace(
+                                    "_Result",
+                                    ""
+                                )
+            
+            
+                                # -----------------------------------------
+                                # Date-wise row
+                                # -----------------------------------------
+            
+                                date_wise_summary.append({
+            
+                                    "Date":
+                                        current_date,
+            
+                                    "Identifier":
+                                        identifier,
+            
+                                    "P Column":
+                                        p_col,
+            
+                                    "X Column":
+                                        x_col,
+            
+                                    "Total Blocks":
+                                        total_blocks,
+            
+                                    "Identical Blocks":
+                                        identical_blocks,
+            
+                                    "Different Blocks":
+                                        different_blocks,
+            
+                                    "100% Identical":
+                                        (
+                                            "Yes"
+                                            if different_blocks == 0
+                                            else "No"
+                                        )
+                                })
+            
+            
+                        # =================================================
+                        # DATAFRAME
+                        # =================================================
+            
+                        date_wise_summary_df = pd.DataFrame(
+                            date_wise_summary
+                        )
+            
+            
+                        # =================================================
+                        # DISPLAY
+                        # =================================================
+            
+                        if not date_wise_summary_df.empty:
+            
+                            st.dataframe(
+                                date_wise_summary_df,
+                                use_container_width=True,
+                                hide_index=True
+                            )
+            
+                        else:
+            
+                            st.info(
+                                "No P-X comparison results available "
+                                "for the selected dates."
+                            )
     # =====================================================
     # DOWNLOAD
     # =====================================================
