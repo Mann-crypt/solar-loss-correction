@@ -237,3 +237,83 @@ def read_loss_correction_input(uploaded_file):
     )
 
     return df.reset_index(drop=True)
+
+def read_tracking_input(uploaded_file):
+
+    area = pd.read_excel(
+        uploaded_file,
+        sheet_name="Area & Efficiency",
+        header=1,
+        usecols=range(8)
+    )
+
+    area.columns = (
+        area.columns
+        .str.strip()
+    )
+
+    null_indices = (
+        area[
+            area["Module Type"].isna()
+        ].index
+    )
+
+    if len(null_indices) > 0:
+
+        area = area.iloc[
+            :area.index.get_loc(
+                null_indices[0]
+            )
+        ]
+
+    # ------------------------------------------
+    # Cluster weighting
+    # ------------------------------------------
+
+    area_weights = pd.read_excel(
+        uploaded_file,
+        sheet_name="Area & Efficiency",
+        header=2,
+        usecols=[12, 13, 14, 15, 16]
+    )
+
+    # ------------------------------------------
+    # Forecast configuration
+    # ------------------------------------------
+
+    forecast_config = pd.read_excel(
+        uploaded_file,
+        sheet_name="Forecast Config",
+        header=8
+    )
+
+    latitude = float(
+        forecast_config.loc[0, "Lat"]
+    )
+
+    # ------------------------------------------
+    # Backend calculation
+    # ------------------------------------------
+
+    backend = pd.read_excel(
+        uploaded_file,
+        sheet_name="Backend Cal"
+    )
+
+    # ------------------------------------------
+    # Tracking
+    # ------------------------------------------
+
+    tracking = pd.read_excel(
+        uploaded_file,
+        sheet_name="Tracking",
+        header=1
+    )
+
+    return {
+        "area": area,
+        "area_weights": area_weights,
+        "latitude": latitude,
+        "backend": backend,
+        "tracking": tracking,
+    }
