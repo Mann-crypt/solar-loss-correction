@@ -1,3 +1,6 @@
+import numpy as np
+import pandas as pd
+
 def calculate_loss_corrected_weights(
     area_df,
     efficiency_loss,
