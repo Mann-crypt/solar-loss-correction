@@ -1,14 +1,19 @@
-# plotting.py
+# modules/plotting.py
 
 import numpy as np
 import plotly.graph_objects as go
 
+
 def get_blocks(length=96):
+    """
+    Generate block numbers from 1 to length.
+    """
     return np.arange(1, length + 1)
+
 
 def apply_default_layout(fig, title=None):
     """
-    Apply a common layout to all Plotly figures.
+    Apply common Plotly layout.
     """
 
     fig.update_layout(
@@ -31,22 +36,19 @@ def apply_default_layout(fig, title=None):
 
     fig.update_xaxes(
         showgrid=True,
-        gridcolor="#E5E5E5"
     )
 
     fig.update_yaxes(
         showgrid=True,
-        gridcolor="#E5E5E5"
     )
 
     return fig
 
-plot_rt_forecast(
-    blocks=df["Blocks"],
-    projection=df["Projection"],
-    forecast=df["RT Forecast"],
-    actual=df["Actual"],
-)
+
+# --------------------------------------------------
+# RT FORECAST
+# --------------------------------------------------
+
 def plot_rt_forecast(
     blocks,
     projection,
@@ -64,7 +66,7 @@ def plot_rt_forecast(
             x=blocks,
             y=projection,
             name="Projection",
-            line=dict(width=2)
+            mode="lines",
         )
     )
 
@@ -73,7 +75,7 @@ def plot_rt_forecast(
             x=blocks,
             y=forecast,
             name="RT Forecast",
-            line=dict(width=3)
+            mode="lines",
         )
     )
 
@@ -82,7 +84,7 @@ def plot_rt_forecast(
             x=blocks,
             y=actual,
             name="Actual",
-            line=dict(width=3)
+            mode="lines",
         )
     )
 
@@ -92,50 +94,67 @@ def plot_rt_forecast(
     )
 
 
+# --------------------------------------------------
+# CAM CURVE
+# --------------------------------------------------
 
-def plot_cam_curve(percentile, profile, symmetric):
+def plot_cam_curve(
+    percentile,
+    profile,
+    symmetric,
+):
+    """
+    Plot CAM profile.
+    """
 
-  fig = go.Figure()
+    blocks = get_blocks(len(percentile))
 
-  fig.add_trace(
-      go.Scatter(
-          x = get_blocks(len(percentile)),
-          y=symmetric,
-          name="Sym Profile",
-          line=dict(color="blue", width=4)
-      )
-  )
+    fig = go.Figure()
 
-  fig.add_trace(
-      go.Scatter(
-          x = get_blocks(len(percentile)),
-          y=profile,
-          name="Profile",
-          line=dict(color="green", width=4)
-      )
-  )
+    fig.add_trace(
+        go.Scatter(
+            x=blocks,
+            y=symmetric,
+            name="Sym Profile",
+            mode="lines",
+        )
+    )
 
-  fig.add_trace(
-      go.Scatter(
-          x = get_blocks(len(percentile)),
-          y=percentile,
-          name="95th Percentile",
-          line=dict(color="red", width=4)
-      )
-  )
+    fig.add_trace(
+        go.Scatter(
+            x=blocks,
+            y=profile,
+            name="Profile",
+            mode="lines",
+        )
+    )
 
-  fig.update_xaxes(title="Block")
-  fig.update_yaxes(title="Power")
+    fig.add_trace(
+        go.Scatter(
+            x=blocks,
+            y=percentile,
+            name="95th Percentile",
+            mode="lines",
+        )
+    )
 
-return apply_default_layout(
-    fig,
-    "CAM Curve"
-)
+    fig.update_xaxes(
+        title="Block"
+    )
 
-  return apply_default_layout(
-      fig,
-      "CAM Curve"
-  )
+    fig.update_yaxes(
+        title="Power"
+    )
+
+    return apply_default_layout(
+        fig,
+        "CAM Curve"
+    )
+
+
+# --------------------------------------------------
+# LOSS CORRECTION
+# --------------------------------------------------
 
 def plot_loss_correction(
     blocks,
@@ -143,38 +162,42 @@ def plot_loss_correction(
     forecast,
     corrected=None,
 ):
-  fig = go.Figure()
+    """
+    Plot Forecast vs Actual vs Corrected.
+    """
 
-  fig.add_trace(
-      go.Scatter(
-          x=blocks,
-          y=forecast,
-          name="Forecast",
-          line=dict(width=3)
-      )
-  )
-  
-  fig.add_trace(
-      go.Scatter(
-          x=blocks,
-          y=actual,
-          name="Actual",
-          line=dict(width=3)
-      )
-  )
-  
-  if corrected is not None:
-  
-      fig.add_trace(
-          go.Scatter(
-              x=blocks,
-              y=corrected,
-              name="Corrected",
-              line=dict(width=3)
-          )
-      )
-  
-  return apply_default_layout(
-      fig,
-      "Loss Correction"
-  )
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Scatter(
+            x=blocks,
+            y=forecast,
+            name="Forecast",
+            mode="lines",
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=blocks,
+            y=actual,
+            name="Actual",
+            mode="lines",
+        )
+    )
+
+    if corrected is not None:
+
+        fig.add_trace(
+            go.Scatter(
+                x=blocks,
+                y=corrected,
+                name="Corrected",
+                mode="lines",
+            )
+        )
+
+    return apply_default_layout(
+        fig,
+        "Loss Correction"
+    )
