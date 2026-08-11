@@ -445,7 +445,118 @@ def compare_data(df):
         pair_lookup
     )
 
+# =========================================================
+# CREATE DATE-WISE P-X SUMMARY
+# =========================================================
 
+def create_date_wise_summary(
+    result_df,
+    result_columns,
+    pair_lookup,
+    date_col
+):
+
+    if date_col is None:
+        return pd.DataFrame()
+
+    df = result_df.copy()
+
+    df[date_col] = pd.to_datetime(
+        df[date_col],
+        errors="coerce"
+    )
+
+    date_wise_summary = []
+
+    available_dates = sorted(
+        df[date_col]
+        .dropna()
+        .dt.date
+        .unique()
+        .tolist()
+    )
+
+    # =====================================================
+    # DATE
+    # =====================================================
+
+    for current_date in available_dates:
+
+        day_df = df[
+            df[date_col].dt.date == current_date
+        ].copy()
+
+        # =================================================
+        # EACH P-X PAIR
+        # =================================================
+
+        for result_col in result_columns:
+
+            if result_col not in pair_lookup:
+                continue
+
+            if result_col not in day_df.columns:
+                continue
+
+            p_col, x_col = pair_lookup[
+                result_col
+            ]
+
+            comparison = (
+                day_df[result_col]
+                .fillna(False)
+                .astype(bool)
+            )
+
+            total_blocks = len(comparison)
+
+            identical_blocks = int(
+                comparison.sum()
+            )
+
+            different_blocks = int(
+                (~comparison).sum()
+            )
+
+            identifier = result_col.replace(
+                "_Result",
+                ""
+            )
+
+            date_wise_summary.append({
+
+                "Date":
+                    current_date,
+
+                "Identifier":
+                    identifier,
+
+                "P Column":
+                    p_col,
+
+                "X Column":
+                    x_col,
+
+                "Total Blocks":
+                    total_blocks,
+
+                "Identical Blocks":
+                    identical_blocks,
+
+                "Different Blocks":
+                    different_blocks,
+
+                "100% Identical":
+                    (
+                        "Yes"
+                        if different_blocks == 0
+                        else "No"
+                    )
+            })
+
+    return pd.DataFrame(
+        date_wise_summary
+    )
 # =========================================================
 # HIGHLIGHT MISMATCHES
 # =========================================================
@@ -520,7 +631,7 @@ def highlight_mismatch(
 
 
 # =========================================================
-# CREATE EXCEL FILE
+# CREATE FINAL EXCEL REPORT
 # =========================================================
 
 def create_excel_report(
@@ -549,18 +660,16 @@ def create_excel_report(
 
 
         # =================================================
-        # 2. ONE SHEET PER FILE
+        # 2. EACH FILE
         # =================================================
 
         for filename, data in all_results.items():
 
+            # ---------------------------------------------
+            # FILE PAIR SUMMARY
+            # ---------------------------------------------
+
             report_df = data["report"].copy()
-
-
-            # ---------------------------------------------
-            # Remove File column because sheet already
-            # represents that file
-            # ---------------------------------------------
 
             report_df = report_df.drop(
                 columns=["File"],
@@ -569,35 +678,43 @@ def create_excel_report(
 
 
             # ---------------------------------------------
-            # Create safe Excel sheet name
+            # DATE-WISE SUMMARY
             # ---------------------------------------------
 
-            sheet_name = re.sub(
+            date_wise_df = data.get(
+                "date_wise_summary",
+                pd.DataFrame()
+            ).copy()
+
+
+            # =================================================
+            # CREATE BASE SHEET NAME
+            # =================================================
+
+            base_name = re.sub(
                 r'[\[\]\:\*\?\/\\]',
                 "_",
                 str(filename)
             )
 
-            # Excel sheet name max = 31 characters
-            sheet_name = sheet_name[:31]
+            base_name = base_name[:25]
 
 
-            # ---------------------------------------------
-            # Handle duplicate sheet names
-            # ---------------------------------------------
+            # =================================================
+            # FILE SUMMARY SHEET
+            # =================================================
 
-            existing_sheets = (
-                writer.book.sheetnames
-            )
+            file_sheet_name = base_name
 
-            base_name = sheet_name
+            existing_sheets = writer.book.sheetnames
+
             counter = 1
 
-            while sheet_name in existing_sheets:
+            while file_sheet_name in existing_sheets:
 
                 suffix = f"_{counter}"
 
-                sheet_name = (
+                file_sheet_name = (
                     base_name[
                         :31 - len(suffix)
                     ]
@@ -608,7 +725,7 @@ def create_excel_report(
 
 
             # ---------------------------------------------
-            # Write file summary
+            # WRITE FILE SUMMARY
             # ---------------------------------------------
 
             if report_df.empty:
@@ -619,7 +736,7 @@ def create_excel_report(
                     ]
                 }).to_excel(
                     writer,
-                    sheet_name=sheet_name,
+                    sheet_name=file_sheet_name,
                     index=False
                 )
 
@@ -627,7 +744,62 @@ def create_excel_report(
 
                 report_df.to_excel(
                     writer,
-                    sheet_name=sheet_name,
+                    sheet_name=file_sheet_name,
+                    index=False
+                )
+
+
+            # =================================================
+            # DATE-WISE SHEET
+            # =================================================
+
+            date_sheet_base = (
+                f"{base_name}_DateWise"
+            )
+
+            date_sheet_name = (
+                date_sheet_base[:31]
+            )
+
+            existing_sheets = writer.book.sheetnames
+
+            counter = 1
+
+            while date_sheet_name in existing_sheets:
+
+                suffix = f"_{counter}"
+
+                date_sheet_name = (
+                    date_sheet_base[
+                        :31 - len(suffix)
+                    ]
+                    + suffix
+                )
+
+                counter += 1
+
+
+            # ---------------------------------------------
+            # WRITE DATE-WISE SUMMARY
+            # ---------------------------------------------
+
+            if date_wise_df.empty:
+
+                pd.DataFrame({
+                    "Message": [
+                        "No date-wise P-X results found."
+                    ]
+                }).to_excel(
+                    writer,
+                    sheet_name=date_sheet_name,
+                    index=False
+                )
+
+            else:
+
+                date_wise_df.to_excel(
+                    writer,
+                    sheet_name=date_sheet_name,
                     index=False
                 )
 
@@ -759,21 +931,40 @@ if uploaded_files:
                 # STORE
                 # -----------------------------------------
 
+                # =====================================================
+                # CREATE DATE-WISE SUMMARY
+                # =====================================================
+                
+                date_wise_summary_df = create_date_wise_summary(
+                    result_df=result_df,
+                    result_columns=result_columns,
+                    pair_lookup=pair_lookup,
+                    date_col=date_col
+                )
+                
+                
+                # =====================================================
+                # STORE EVERYTHING
+                # =====================================================
+                
                 all_results[
                     uploaded_file.name
                 ] = {
-
+                
                     "data":
                         result_df,
-
+                
                     "result_columns":
                         result_columns,
-
+                
                     "pair_lookup":
                         pair_lookup,
-
+                
                     "report":
-                        report_df
+                        report_df,
+                
+                    "date_wise_summary":
+                        date_wise_summary_df
                 }
 
 
