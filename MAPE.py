@@ -2,32 +2,44 @@
 # PSS × FORECASTER MAPE ANALYZER
 # ============================================================
 #
-# INPUT:
+# MULTIPLE FILE UPLOAD
 #
-# Multiple CSV / Excel files
+# IMPORTANT STRUCTURE
 #
-# Example column:
+# Each file contains ONLY ONE PSS.
 #
-# 66 KV   Bhulleriyan_ALL12.5_F1
+# Example PSS values inside a file:
+#
+#   66 KV Bhulleriyan
+#   66 kV Bhulleriyan
+#   66K
+#
+# These are treated as the same PSS.
+#
+#
+# FORECAST COLUMNS
+#
+#   66 KV Bhulleriyan_ALL12.5_F1
+#   66 KV Bhulleriyan_ALL12.5_F2
 #
 # Parsed as:
 #
-# PSS        = 66 KV   Bhulleriyan
-# Forecaster = ALL12.5_F1
+#   PSS        = 66 KV Bhulleriyan
+#   Forecaster = ALL12.5_F1
 #
-# The complete column is treated as Forecast data.
 #
-# Actual columns can have names similar to:
+# ACTUAL COLUMNS
 #
-# Green Gen-Meter
-# Green Gen-SCADA
-# SEMS
-# Actual Power
-# Actual Generation
-# etc.
+#   Green Gen-Meter
+#   Green Gen-SCADA
+#   SEMS
 #
 # ============================================================
 
+
+# ============================================================
+# IMPORTS
+# ============================================================
 
 import io
 import re
@@ -38,7 +50,7 @@ import streamlit as st
 
 
 # ============================================================
-# PAGE CONFIGURATION
+# PAGE CONFIG
 # ============================================================
 
 st.set_page_config(
@@ -49,16 +61,12 @@ st.set_page_config(
 
 
 # ============================================================
-# CUSTOM CSS
+# CSS
 # ============================================================
 
 st.markdown(
     """
     <style>
-
-    .main {
-        padding-top: 1rem;
-    }
 
     .block-container {
         padding-top: 1.5rem;
@@ -66,9 +74,7 @@ st.markdown(
     }
 
     .stMetric {
-        border: 1px solid rgba(128,128,128,0.25);
         border-radius: 10px;
-        padding: 10px;
     }
 
     </style>
@@ -83,42 +89,148 @@ st.markdown(
 
 st.title("📊 PSS × Forecaster MAPE Analyzer")
 
-st.caption(
-    "Upload multiple files. Forecast columns are identified from "
-    "column names using the PSS_Forecaster naming convention."
+st.write(
+    """
+    Upload multiple files. Each file represents one PSS.
+    Forecast columns are automatically detected from the
+    `PSS_Forecaster` naming convention.
+    """
 )
 
 
 # ============================================================
-# CONSTANTS
+# GENERAL TEXT NORMALIZATION
 # ============================================================
 
-ACTUAL_PRIORITY_PATTERNS = [
-    "green gen meter",
-    "green gen scada",
-    "green generation meter",
-    "green generation scada",
-    "actual power",
-    "actual generation",
-    "actual gen",
-    "actual energy",
-    "actual",
-    "sems",
-]
+def normalize_text(value):
+    """
+    General text normalization.
+
+    Examples:
+
+        66 KV Bhulleriyan
+        66 kV Bhulleriyan
+        66K
+
+    are normalized for comparison.
+    """
+
+    if pd.isna(value):
+        return ""
+
+    text = str(value).strip().lower()
+
+    text = re.sub(
+        r"[^a-z0-9]+",
+        " ",
+        text,
+    )
+
+    text = re.sub(
+        r"\s+",
+        " ",
+        text,
+    )
+
+    return text.strip()
 
 
-ACTUAL_REQUIRED_TERMS = [
-    ["green", "gen", "meter"],
-    ["green", "gen", "scada"],
-    ["green", "generation", "meter"],
-    ["green", "generation", "scada"],
-    ["actual", "power"],
-    ["actual", "generation"],
-    ["actual", "gen"],
-    ["actual", "energy"],
-    ["actual"],
-    ["sems"],
-]
+# ============================================================
+# PSS NORMALIZATION
+# ============================================================
+
+def normalize_pss(value):
+    """
+    Normalize PSS names.
+
+    The goal is to treat formatting differences as the
+    same PSS.
+
+    Examples:
+
+        66 KV Bhulleriyan
+        66 kV Bhulleriyan
+        66K
+
+    all resolve to a common comparison key.
+
+    """
+
+    if pd.isna(value):
+        return ""
+
+    text = str(value).strip().lower()
+
+    # Remove HTML break tags if present
+    text = re.sub(
+        r"<br\s*/?>",
+        " ",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    # Remove all whitespace
+    compact = re.sub(
+        r"\s+",
+        "",
+        text,
+    )
+
+    # Normalize KV variations
+    compact = compact.replace(
+        "kv",
+        "k",
+    )
+
+    # --------------------------------------------------------
+    # Specific normalization:
+    #
+    # 66 KV
+    # 66 kV
+    # 66K
+    #
+    # become 66K
+    # --------------------------------------------------------
+
+    compact = re.sub(
+        r"(\d+)k",
+        r"\1k",
+        compact,
+    )
+
+    return compact.upper()
+
+
+# ============================================================
+# DISPLAY PSS NAME
+# ============================================================
+
+def clean_display_pss(value):
+    """
+    Creates a clean display name.
+
+    This does NOT affect the comparison key.
+    """
+
+    if pd.isna(value):
+        return ""
+
+    text = str(value).strip()
+
+    text = re.sub(
+        r"<br\s*/?>",
+        " ",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    text = re.sub(
+        r"\s+",
+        " ",
+        text,
+    )
+
+    return text.strip()
 
 
 # ============================================================
@@ -127,34 +239,23 @@ ACTUAL_REQUIRED_TERMS = [
 
 def normalize_column_name(column):
     """
-    Normalize column names for comparison.
-
-    Examples:
-
-        Green Gen-Meter
-        Green_Gen_Meter
-        GREEN GEN METER
-
-    become comparable.
+    Normalize a column name for Actual detection.
     """
 
     text = str(column).strip().lower()
 
-    # Replace separators
     text = re.sub(
         r"[_\-/]+",
         " ",
         text,
     )
 
-    # Remove special characters
     text = re.sub(
         r"[^a-z0-9 ]+",
         " ",
         text,
     )
 
-    # Remove duplicate spaces
     text = re.sub(
         r"\s+",
         " ",
@@ -169,9 +270,6 @@ def normalize_column_name(column):
 # ============================================================
 
 def to_numeric(series):
-    """
-    Safely convert a Series to numeric.
-    """
 
     if pd.api.types.is_numeric_dtype(series):
 
@@ -183,264 +281,28 @@ def to_numeric(series):
     return pd.to_numeric(
         series
         .astype(str)
-        .str.replace(",", "", regex=False)
-        .str.replace("%", "", regex=False)
+        .str.replace(
+            ",",
+            "",
+            regex=False,
+        )
+        .str.replace(
+            "%",
+            "",
+            regex=False,
+        )
         .str.strip(),
         errors="coerce",
     )
 
 
 # ============================================================
-# PARSE PSS + FORECASTER
-# ============================================================
-
-def parse_pss_forecaster(column_name):
-    """
-    Parse:
-
-        66 KV   Bhulleriyan_ALL12.5_F1
-
-    into:
-
-        PSS        = 66 KV   Bhulleriyan
-        Forecaster = ALL12.5_F1
-
-    IMPORTANT:
-    Split only at the FIRST underscore.
-    """
-
-    text = str(column_name).strip()
-
-    if "_" not in text:
-
-        return None, None
-
-    pss_name, forecaster_name = text.split(
-        "_",
-        1,
-    )
-
-    pss_name = pss_name.strip()
-    forecaster_name = forecaster_name.strip()
-
-    if not pss_name or not forecaster_name:
-
-        return None, None
-
-    return (
-        pss_name,
-        forecaster_name,
-    )
-
-
-# ============================================================
-# DETECT FORECAST COLUMNS
-# ============================================================
-
-def detect_forecast_columns(df):
-    """
-    A Forecast column is identified by:
-
-        anything_before_first_underscore
-        _
-        anything_after_first_underscore
-
-    Example:
-
-        66 KV   Bhulleriyan_ALL12.5_F1
-
-    is a Forecast column.
-
-    Columns without an underscore are not treated as Forecast
-    columns.
-    """
-
-    detected = []
-
-    for column in df.columns:
-
-        pss, forecaster = (
-            parse_pss_forecaster(
-                column
-            )
-        )
-
-        if pss is None:
-
-            continue
-
-        numeric = to_numeric(
-            df[column]
-        )
-
-        numeric_rows = int(
-            numeric.notna().sum()
-        )
-
-        # Only accept columns containing actual numeric data
-        if numeric_rows == 0:
-
-            continue
-
-        detected.append(
-            {
-                "Column": column,
-                "PSS": pss,
-                "Forecaster": forecaster,
-                "Numeric Rows": numeric_rows,
-            }
-        )
-
-    return pd.DataFrame(
-        detected
-    )
-
-
-# ============================================================
-# DETECT ACTUAL COLUMNS
-# ============================================================
-
-def detect_actual_columns(df):
-    """
-    Detect Actual generation columns using flexible matching.
-
-    Examples:
-
-        Green Gen-Meter
-        Green Gen-SCADA
-        SEMS
-        Actual Power
-        Actual Generation
-    """
-
-    detected = []
-
-    for column in df.columns:
-
-        normalized = normalize_column_name(
-            column
-        )
-
-        words = set(
-            normalized.split()
-        )
-
-        score = 0
-        reasons = []
-
-        # ----------------------------------------------------
-        # Exact / strong patterns
-        # ----------------------------------------------------
-
-        if normalized == "sems":
-
-            score += 200
-            reasons.append("SEMS")
-
-        if normalized == "actual":
-
-            score += 200
-            reasons.append("Actual")
-
-        # ----------------------------------------------------
-        # Green Gen
-        # ----------------------------------------------------
-
-        if (
-            "green" in words
-            and "gen" in words
-        ):
-
-            score += 150
-            reasons.append(
-                "Green + Gen"
-            )
-
-        # ----------------------------------------------------
-        # Green Generation
-        # ----------------------------------------------------
-
-        if (
-            "green" in words
-            and "generation" in words
-        ):
-
-            score += 150
-            reasons.append(
-                "Green + Generation"
-            )
-
-        # ----------------------------------------------------
-        # Actual
-        # ----------------------------------------------------
-
-        if "actual" in words:
-
-            score += 150
-            reasons.append("Actual")
-
-        # ----------------------------------------------------
-        # Meter
-        # ----------------------------------------------------
-
-        if "meter" in words:
-
-            score += 50
-            reasons.append("Meter")
-
-        # ----------------------------------------------------
-        # SCADA
-        # ----------------------------------------------------
-
-        if "scada" in words:
-
-            score += 50
-            reasons.append("SCADA")
-
-        # ----------------------------------------------------
-        # SEMS
-        # ----------------------------------------------------
-
-        if "sems" in words:
-
-            score += 200
-            reasons.append("SEMS")
-
-        # ----------------------------------------------------
-        # Accept strong matches
-        # ----------------------------------------------------
-
-        if score >= 100:
-
-            detected.append(
-                {
-                    "Column": column,
-                    "Score": score,
-                    "Reason": ", ".join(
-                        reasons
-                    ),
-                }
-            )
-
-    detected.sort(
-        key=lambda x: x["Score"],
-        reverse=True,
-    )
-
-    return pd.DataFrame(
-        detected
-    )
-
-
-# ============================================================
-# READ UPLOADED FILE
+# READ FILE
 # ============================================================
 
 def read_uploaded_file(uploaded_file):
 
-    file_name = (
-        uploaded_file.name.lower()
-    )
+    file_name = uploaded_file.name.lower()
 
     # --------------------------------------------------------
     # CSV
@@ -480,7 +342,7 @@ def read_uploaded_file(uploaded_file):
         )
 
     raise ValueError(
-        "Unsupported file format."
+        "Unsupported file type."
     )
 
 
@@ -514,28 +376,561 @@ def clean_dataframe(df):
 
 
 # ============================================================
-# CALCULATE MAPE
+# DETECT PSS DATA COLUMN
 # ============================================================
 
-def calculate_mape(
+def detect_pss_data_column(df):
+    """
+    Attempts to identify a column containing PSS names.
+
+    The column is expected to contain repeated values such as:
+
+        66 KV Bhulleriyan
+        66 kV Bhulleriyan
+        66K
+
+    We score object/string columns based on:
+        - repeated values
+        - PSS-like text
+        - KV / K patterns
+    """
+
+    candidates = []
+
+    for column in df.columns:
+
+        series = df[column]
+
+        # Skip numeric columns
+        if pd.api.types.is_numeric_dtype(
+            series
+        ):
+            continue
+
+        non_null = (
+            series.dropna()
+            .astype(str)
+            .str.strip()
+        )
+
+        if non_null.empty:
+            continue
+
+        # Number of unique values
+        unique_count = (
+            non_null.nunique()
+        )
+
+        # Number of populated rows
+        populated = len(non_null)
+
+        if populated == 0:
+            continue
+
+        # Repetition ratio
+        repetition_ratio = (
+            1
+            - unique_count / populated
+        )
+
+        normalized_values = [
+            normalize_pss(x)
+            for x in non_null.head(500)
+        ]
+
+        pss_like_count = sum(
+            (
+                "K" in value
+                and any(
+                    char.isdigit()
+                    for char in value
+                )
+            )
+            for value in normalized_values
+        )
+
+        pss_like_ratio = (
+            pss_like_count
+            / len(normalized_values)
+            if normalized_values
+            else 0
+        )
+
+        score = (
+            repetition_ratio * 50
+            + pss_like_ratio * 100
+        )
+
+        candidates.append(
+            {
+                "Column": column,
+                "Score": score,
+                "Unique Values": unique_count,
+                "Rows": populated,
+            }
+        )
+
+    if not candidates:
+
+        return None, pd.DataFrame()
+
+    candidates.sort(
+        key=lambda x: x["Score"],
+        reverse=True,
+    )
+
+    result = pd.DataFrame(
+        candidates
+    )
+
+    return (
+        candidates[0]["Column"],
+        result,
+    )
+
+
+# ============================================================
+# EXTRACT PSS FROM DATA
+# ============================================================
+
+def determine_file_pss(
+    df,
+    pss_column=None,
+):
+    """
+    Determine the single PSS represented by a file.
+
+    Since one file contains only one PSS, all normalized
+    values should resolve to the same PSS key.
+    """
+
+    if pss_column is None:
+
+        return (
+            None,
+            pd.DataFrame(),
+        )
+
+    series = df[
+        pss_column
+    ].dropna()
+
+    if series.empty:
+
+        return (
+            None,
+            pd.DataFrame(),
+        )
+
+    records = []
+
+    for value in series:
+
+        display_value = (
+            clean_display_pss(
+                value
+            )
+        )
+
+        normalized_value = (
+            normalize_pss(
+                value
+            )
+        )
+
+        if not normalized_value:
+            continue
+
+        records.append(
+            {
+                "Original PSS": display_value,
+                "Normalized PSS": normalized_value,
+            }
+        )
+
+    if not records:
+
+        return (
+            None,
+            pd.DataFrame(),
+        )
+
+    pss_values = pd.DataFrame(
+        records
+    )
+
+    # Frequency of normalized values
+    frequency = (
+        pss_values[
+            "Normalized PSS"
+        ]
+        .value_counts()
+    )
+
+    dominant_key = (
+        frequency.index[0]
+    )
+
+    dominant_rows = (
+        pss_values[
+            pss_values[
+                "Normalized PSS"
+            ]
+            == dominant_key
+        ]
+    )
+
+    # Use most frequent original spelling
+    display_pss = (
+        dominant_rows[
+            "Original PSS"
+        ]
+        .value_counts()
+        .index[0]
+    )
+
+    return (
+        display_pss,
+        pss_values,
+    )
+
+
+# ============================================================
+# PARSE FORECAST COLUMN
+# ============================================================
+
+def parse_forecast_column(
+    column_name
+):
+    """
+    Example:
+
+        66 KV Bhulleriyan_ALL12.5_F1
+
+    becomes:
+
+        PSS        = 66 KV Bhulleriyan
+        Forecaster = ALL12.5_F1
+
+    Split ONLY at first underscore.
+    """
+
+    text = str(
+        column_name
+    ).strip()
+
+    if "_" not in text:
+
+        return (
+            None,
+            None,
+        )
+
+    pss_part, forecaster_part = (
+        text.split(
+            "_",
+            1,
+        )
+    )
+
+    pss_part = pss_part.strip()
+    forecaster_part = (
+        forecaster_part.strip()
+    )
+
+    if (
+        not pss_part
+        or not forecaster_part
+    ):
+
+        return (
+            None,
+            None,
+        )
+
+    return (
+        pss_part,
+        forecaster_part,
+    )
+
+
+# ============================================================
+# DETECT FORECAST COLUMNS
+# ============================================================
+
+def detect_forecast_columns(
+    df,
+    file_pss,
+):
+    """
+    Detect forecast columns using:
+
+        PSS_Forecaster
+
+    The PSS portion must match the PSS detected from
+    the file after normalization.
+    """
+
+    results = []
+
+    normalized_file_pss = (
+        normalize_pss(
+            file_pss
+        )
+    )
+
+    for column in df.columns:
+
+        pss_part, forecaster = (
+            parse_forecast_column(
+                column
+            )
+        )
+
+        if pss_part is None:
+
+            continue
+
+        normalized_column_pss = (
+            normalize_pss(
+                pss_part
+            )
+        )
+
+        # ----------------------------------------------------
+        # PSS must match
+        # ----------------------------------------------------
+
+        if (
+            normalized_column_pss
+            != normalized_file_pss
+        ):
+
+            continue
+
+        # ----------------------------------------------------
+        # Must contain numeric data
+        # ----------------------------------------------------
+
+        numeric = to_numeric(
+            df[column]
+        )
+
+        numeric_rows = int(
+            numeric.notna().sum()
+        )
+
+        if numeric_rows == 0:
+
+            continue
+
+        results.append(
+            {
+                "Forecast Column": column,
+                "PSS From Column": pss_part,
+                "PSS": file_pss,
+                "Forecaster": forecaster,
+                "Numeric Rows": numeric_rows,
+            }
+        )
+
+    return pd.DataFrame(
+        results
+    )
+
+
+# ============================================================
+# ACTUAL COLUMN DETECTION
+# ============================================================
+
+def detect_actual_columns(
+    df,
+    exclude_columns=None,
+):
+    """
+    Detect Actual generation columns.
+
+    Examples:
+
+        Green Gen-Meter
+        Green Gen-SCADA
+        SEMS
+        Actual Power
+        Actual Generation
+    """
+
+    if exclude_columns is None:
+
+        exclude_columns = []
+
+    results = []
+
+    for column in df.columns:
+
+        if column in exclude_columns:
+
+            continue
+
+        normalized = (
+            normalize_column_name(
+                column
+            )
+        )
+
+        words = set(
+            normalized.split()
+        )
+
+        score = 0
+        reasons = []
+
+        # ----------------------------------------------------
+        # SEMS
+        # ----------------------------------------------------
+
+        if "sems" in words:
+
+            score += 200
+            reasons.append(
+                "SEMS"
+            )
+
+        # ----------------------------------------------------
+        # Actual
+        # ----------------------------------------------------
+
+        if "actual" in words:
+
+            score += 150
+            reasons.append(
+                "Actual"
+            )
+
+        # ----------------------------------------------------
+        # Green + Gen
+        # ----------------------------------------------------
+
+        if (
+            "green" in words
+            and "gen" in words
+        ):
+
+            score += 150
+            reasons.append(
+                "Green Gen"
+            )
+
+        # ----------------------------------------------------
+        # Green + Generation
+        # ----------------------------------------------------
+
+        if (
+            "green" in words
+            and "generation" in words
+        ):
+
+            score += 150
+            reasons.append(
+                "Green Generation"
+            )
+
+        # ----------------------------------------------------
+        # Meter
+        # ----------------------------------------------------
+
+        if "meter" in words:
+
+            score += 50
+            reasons.append(
+                "Meter"
+            )
+
+        # ----------------------------------------------------
+        # SCADA
+        # ----------------------------------------------------
+
+        if "scada" in words:
+
+            score += 50
+            reasons.append(
+                "SCADA"
+            )
+
+        # ----------------------------------------------------
+        # Generation
+        # ----------------------------------------------------
+
+        if "generation" in words:
+
+            score += 30
+            reasons.append(
+                "Generation"
+            )
+
+        # ----------------------------------------------------
+        # Gen
+        # ----------------------------------------------------
+
+        if "gen" in words:
+
+            score += 30
+            reasons.append(
+                "Gen"
+            )
+
+        # ----------------------------------------------------
+        # Numeric validation
+        # ----------------------------------------------------
+
+        numeric = to_numeric(
+            df[column]
+        )
+
+        numeric_rows = int(
+            numeric.notna().sum()
+        )
+
+        if numeric_rows == 0:
+
+            continue
+
+        # ----------------------------------------------------
+        # Accept strong Actual candidates
+        # ----------------------------------------------------
+
+        if score >= 100:
+
+            results.append(
+                {
+                    "Actual Column": column,
+                    "Score": score,
+                    "Reason": ", ".join(
+                        reasons
+                    ),
+                    "Numeric Rows": numeric_rows,
+                }
+            )
+
+    results.sort(
+        key=lambda x: x["Score"],
+        reverse=True,
+    )
+
+    return pd.DataFrame(
+        results
+    )
+
+
+# ============================================================
+# MAPE
+# ============================================================
+
+def calculate_metrics(
     actual,
     forecast,
     exclude_zero=True,
     minimum_actual=0.0,
 ):
-    """
-    MAPE:
-
-        mean(
-            abs(
-                Actual - Forecast
-            )
-            /
-            abs(Actual)
-        ) * 100
-
-    Zero Actual values are excluded by default.
-    """
 
     actual = to_numeric(
         actual
@@ -545,10 +940,6 @@ def calculate_mape(
         forecast
     )
 
-    # --------------------------------------------------------
-    # Basic valid mask
-    # --------------------------------------------------------
-
     mask = (
         actual.notna()
         & forecast.notna()
@@ -557,7 +948,7 @@ def calculate_mape(
     )
 
     # --------------------------------------------------------
-    # Minimum Actual
+    # Minimum actual
     # --------------------------------------------------------
 
     if minimum_actual > 0:
@@ -568,7 +959,7 @@ def calculate_mape(
         )
 
     # --------------------------------------------------------
-    # Exclude zero Actual
+    # Zero actual
     # --------------------------------------------------------
 
     if exclude_zero:
@@ -578,7 +969,7 @@ def calculate_mape(
         )
 
     # --------------------------------------------------------
-    # No valid rows
+    # No valid data
     # --------------------------------------------------------
 
     if mask.sum() == 0:
@@ -605,25 +996,25 @@ def calculate_mape(
         * 100
     )
 
-    mape = ape.mean()
-
-    mae = np.abs(
-        error
-    ).mean()
-
-    rmse = np.sqrt(
-        np.mean(
-            error ** 2
-        )
-    )
-
-    bias = error.mean()
-
     return {
-        "MAPE (%)": float(mape),
-        "MAE": float(mae),
-        "RMSE": float(rmse),
-        "Bias": float(bias),
+        "MAPE (%)": float(
+            ape.mean()
+        ),
+        "MAE": float(
+            np.abs(
+                error
+            ).mean()
+        ),
+        "RMSE": float(
+            np.sqrt(
+                np.mean(
+                    error ** 2
+                )
+            )
+        ),
+        "Bias": float(
+            error.mean()
+        ),
         "Valid Rows": int(
             mask.sum()
         ),
@@ -634,7 +1025,7 @@ def calculate_mape(
 # ROW LEVEL APE
 # ============================================================
 
-def calculate_ape_series(
+def calculate_ape(
     actual,
     forecast,
     exclude_zero=True,
@@ -649,10 +1040,9 @@ def calculate_ape_series(
         forecast
     )
 
-    ape = pd.Series(
+    result = pd.Series(
         np.nan,
         index=actual.index,
-        dtype=float,
     )
 
     mask = (
@@ -675,7 +1065,7 @@ def calculate_ape_series(
             >= minimum_actual
         )
 
-    ape.loc[mask] = (
+    result.loc[mask] = (
         np.abs(
             (
                 forecast.loc[mask]
@@ -686,19 +1076,19 @@ def calculate_ape_series(
         * 100
     )
 
-    return ape
+    return result
 
 
 # ============================================================
-# MULTIPLE FILE UPLOADER
+# FILE UPLOADER
 # ============================================================
 
 uploaded_files = st.file_uploader(
-    "📂 Upload Multiple Files",
+    "📂 Upload Multiple CSV / Excel Files",
     type=[
+        "csv",
         "xlsx",
         "xls",
-        "csv",
     ],
     accept_multiple_files=True,
 )
@@ -707,23 +1097,25 @@ uploaded_files = st.file_uploader(
 if not uploaded_files:
 
     st.info(
-        "Upload multiple CSV/Excel files to begin."
+        "Upload your files to start the MAPE calculation."
     )
 
     st.stop()
 
 
 # ============================================================
-# SETTINGS
+# MAPE SETTINGS
 # ============================================================
 
 st.subheader(
     "⚙️ MAPE Settings"
 )
 
-setting1, setting2 = st.columns(2)
+setting_col1, setting_col2 = (
+    st.columns(2)
+)
 
-with setting1:
+with setting_col1:
 
     exclude_zero = st.checkbox(
         "Exclude Actual = 0",
@@ -735,10 +1127,10 @@ with setting1:
     )
 
 
-with setting2:
+with setting_col2:
 
     minimum_actual = st.number_input(
-        "Minimum Actual Value",
+        "Minimum Actual Generation",
         min_value=0.0,
         value=0.0,
         step=1.0,
@@ -746,33 +1138,28 @@ with setting2:
 
 
 # ============================================================
-# FILE INFORMATION
+# FILE LIST
 # ============================================================
 
 st.subheader(
     "📁 Uploaded Files"
 )
 
-file_table = []
-
-for uploaded_file in uploaded_files:
-
-    file_table.append(
+file_list = pd.DataFrame(
+    [
         {
-            "File": uploaded_file.name,
+            "File": file.name,
             "Size (KB)": round(
-                uploaded_file.size
-                / 1024,
+                file.size / 1024,
                 2,
             ),
         }
-    )
-
+        for file in uploaded_files
+    ]
+)
 
 st.dataframe(
-    pd.DataFrame(
-        file_table
-    ),
+    file_list,
     use_container_width=True,
     hide_index=True,
 )
@@ -782,33 +1169,35 @@ st.dataframe(
 # CALCULATE BUTTON
 # ============================================================
 
-calculate_button = st.button(
+calculate = st.button(
     "🚀 Calculate MAPE",
     type="primary",
     use_container_width=True,
 )
 
 
-if not calculate_button:
+if not calculate:
 
     st.info(
-        "Click 'Calculate MAPE' after uploading your files."
+        "Click Calculate MAPE to process all uploaded files."
     )
 
     st.stop()
 
 
 # ============================================================
-# STORAGE
+# RESULT STORAGE
 # ============================================================
 
-all_mape_results = []
+mape_results = []
 
-all_row_results = []
+row_results = []
 
-all_forecast_detection = []
+file_pss_results = []
 
-all_actual_detection = []
+forecast_detection_results = []
+
+actual_detection_results = []
 
 processing_errors = []
 
@@ -817,30 +1206,30 @@ processing_errors = []
 # PROGRESS
 # ============================================================
 
-progress_bar = st.progress(
+progress = st.progress(
     0
 )
 
-status_text = st.empty()
+status = st.empty()
 
 
 # ============================================================
-# PROCESS EVERY FILE
+# PROCESS FILES
 # ============================================================
 
-for file_index, uploaded_file in enumerate(
+for index, uploaded_file in enumerate(
     uploaded_files
 ):
 
-    status_text.write(
-        f"Processing {uploaded_file.name}..."
+    status.write(
+        f"Processing: {uploaded_file.name}"
     )
 
     try:
 
-        # ----------------------------------------------------
+        # ====================================================
         # READ
-        # ----------------------------------------------------
+        # ====================================================
 
         df = read_uploaded_file(
             uploaded_file
@@ -853,127 +1242,179 @@ for file_index, uploaded_file in enumerate(
         if df.empty:
 
             raise ValueError(
-                "File contains no usable data."
+                "File is empty."
             )
 
-        # ----------------------------------------------------
+        # ====================================================
+        # DETECT PSS COLUMN
+        # ====================================================
+
+        pss_column, pss_candidates = (
+            detect_pss_data_column(
+                df
+            )
+        )
+
+        if pss_column is None:
+
+            raise ValueError(
+                "Could not automatically identify "
+                "the PSS data column."
+            )
+
+        # ====================================================
+        # DETERMINE FILE PSS
+        # ====================================================
+
+        file_pss, pss_values = (
+            determine_file_pss(
+                df,
+                pss_column,
+            )
+        )
+
+        if not file_pss:
+
+            raise ValueError(
+                "Could not determine PSS from the file."
+            )
+
+        # ====================================================
+        # SAVE FILE PSS
+        # ====================================================
+
+        file_pss_results.append(
+            {
+                "File": uploaded_file.name,
+                "PSS Column": pss_column,
+                "Detected PSS": file_pss,
+                "Normalized PSS": normalize_pss(
+                    file_pss
+                ),
+                "Unique Normalized PSS Values": (
+                    pss_values[
+                        "Normalized PSS"
+                    ]
+                    .nunique()
+                    if not pss_values.empty
+                    else 0
+                ),
+            }
+        )
+
+        # ====================================================
         # DETECT FORECAST COLUMNS
-        # ----------------------------------------------------
+        # ====================================================
 
         forecast_df = (
             detect_forecast_columns(
-                df
+                df,
+                file_pss,
             )
         )
-
-        # ----------------------------------------------------
-        # DETECT ACTUAL COLUMNS
-        # ----------------------------------------------------
-
-        actual_df = (
-            detect_actual_columns(
-                df
-            )
-        )
-
-        # ----------------------------------------------------
-        # STORE DETECTION INFORMATION
-        # ----------------------------------------------------
-
-        if not forecast_df.empty:
-
-            forecast_temp = (
-                forecast_df.copy()
-            )
-
-            forecast_temp.insert(
-                0,
-                "File",
-                uploaded_file.name,
-            )
-
-            all_forecast_detection.append(
-                forecast_temp
-            )
-
-        if not actual_df.empty:
-
-            actual_temp = (
-                actual_df.copy()
-            )
-
-            actual_temp.insert(
-                0,
-                "File",
-                uploaded_file.name,
-            )
-
-            all_actual_detection.append(
-                actual_temp
-            )
-
-        # ----------------------------------------------------
-        # VALIDATE FORECAST
-        # ----------------------------------------------------
 
         if forecast_df.empty:
 
             raise ValueError(
-                "No PSS_Forecaster forecast columns detected."
+                f"No forecast columns found for PSS "
+                f"'{file_pss}'. Expected columns like "
+                f"'PSS_Forecaster'."
             )
 
-        # ----------------------------------------------------
-        # VALIDATE ACTUAL
-        # ----------------------------------------------------
+        # ====================================================
+        # SAVE FORECAST DETECTION
+        # ====================================================
+
+        forecast_temp = (
+            forecast_df.copy()
+        )
+
+        forecast_temp.insert(
+            0,
+            "File",
+            uploaded_file.name,
+        )
+
+        forecast_detection_results.append(
+            forecast_temp
+        )
+
+        # ====================================================
+        # DETECT ACTUAL COLUMNS
+        # ====================================================
+
+        actual_df = (
+            detect_actual_columns(
+                df,
+                exclude_columns=[
+                    pss_column
+                ],
+            )
+        )
 
         if actual_df.empty:
 
             raise ValueError(
-                "No Actual columns detected."
+                "No Actual generation columns found."
             )
 
-        # ----------------------------------------------------
-        # FORECAST COLUMNS
-        # ----------------------------------------------------
+        # ====================================================
+        # SAVE ACTUAL DETECTION
+        # ====================================================
 
-        forecast_columns = (
-            forecast_df["Column"]
-            .tolist()
+        actual_temp = (
+            actual_df.copy()
         )
 
-        # ----------------------------------------------------
-        # ACTUAL COLUMNS
-        # ----------------------------------------------------
-
-        actual_columns = (
-            actual_df["Column"]
-            .tolist()
+        actual_temp.insert(
+            0,
+            "File",
+            uploaded_file.name,
         )
 
-        # ----------------------------------------------------
-        # FORECAST × ACTUAL
-        # ----------------------------------------------------
+        actual_detection_results.append(
+            actual_temp
+        )
 
-        for forecast_column in forecast_columns:
+        # ====================================================
+        # FORECAST LOOP
+        # ====================================================
 
-            # Get PSS and Forecaster
-            pss_name, forecaster_name = (
-                parse_pss_forecaster(
-                    forecast_column
+        for _, forecast_info in (
+            forecast_df.iterrows()
+        ):
+
+            forecast_column = (
+                forecast_info[
+                    "Forecast Column"
+                ]
+            )
+
+            forecaster = (
+                forecast_info[
+                    "Forecaster"
+                ]
+            )
+
+            # =================================================
+            # ACTUAL LOOP
+            # =================================================
+
+            for _, actual_info in (
+                actual_df.iterrows()
+            ):
+
+                actual_column = (
+                    actual_info[
+                        "Actual Column"
+                    ]
                 )
-            )
 
-            if pss_name is None:
+                # =============================================
+                # MAPE
+                # =============================================
 
-                continue
-
-            # ------------------------------------------------
-            # Compare Forecast against EVERY Actual
-            # ------------------------------------------------
-
-            for actual_column in actual_columns:
-
-                metrics = calculate_mape(
+                metrics = calculate_metrics(
                     actual=df[
                         actual_column
                     ],
@@ -984,25 +1425,30 @@ for file_index, uploaded_file in enumerate(
                     minimum_actual=minimum_actual,
                 )
 
-                all_mape_results.append(
+                # =============================================
+                # SAVE MAPE RESULT
+                # =============================================
+
+                mape_results.append(
                     {
-                        "PSS": pss_name,
-                        "Forecaster": forecaster_name,
+                        "File": uploaded_file.name,
+                        "PSS": file_pss,
+                        "Forecaster": forecaster,
                         "Forecast Column": forecast_column,
                         "Actual Column": actual_column,
-                        "File": uploaded_file.name,
                         **metrics,
                     }
                 )
 
-                # ------------------------------------------------
-                # ROW LEVEL DATA
-                # ------------------------------------------------
+                # =============================================
+                # ROW LEVEL
+                # =============================================
 
-                row_result = pd.DataFrame(
+                row_data = pd.DataFrame(
                     {
-                        "PSS": pss_name,
-                        "Forecaster": forecaster_name,
+                        "File": uploaded_file.name,
+                        "PSS": file_pss,
+                        "Forecaster": forecaster,
                         "Forecast Column": forecast_column,
                         "Actual Column": actual_column,
                         "Actual": to_numeric(
@@ -1018,9 +1464,9 @@ for file_index, uploaded_file in enumerate(
                     }
                 )
 
-                row_result[
+                row_data[
                     "APE (%)"
-                ] = calculate_ape_series(
+                ] = calculate_ape(
                     df[
                         actual_column
                     ],
@@ -1031,28 +1477,23 @@ for file_index, uploaded_file in enumerate(
                     minimum_actual=minimum_actual,
                 )
 
-                # Add original file name
-                row_result[
-                    "File"
-                ] = uploaded_file.name
-
-                all_row_results.append(
-                    row_result
+                row_results.append(
+                    row_data
                 )
 
-    except Exception as e:
+    except Exception as error:
 
         processing_errors.append(
             {
                 "File": uploaded_file.name,
-                "Error": str(e),
+                "Error": str(error),
             }
         )
 
-    progress_bar.progress(
+    progress.progress(
         int(
             (
-                file_index + 1
+                index + 1
             )
             / len(uploaded_files)
             * 100
@@ -1060,27 +1501,27 @@ for file_index, uploaded_file in enumerate(
     )
 
 
-status_text.empty()
+status.empty()
 
 
 # ============================================================
-# BUILD RESULTS
+# BUILD RESULT DATAFRAME
 # ============================================================
 
 mape_df = pd.DataFrame(
-    all_mape_results
+    mape_results
 )
 
 
 # ============================================================
-# PROCESSING ERRORS
+# ERRORS
 # ============================================================
 
 if processing_errors:
 
     st.warning(
         f"{len(processing_errors)} file(s) "
-        "had processing issues."
+        "could not be completely processed."
     )
 
     st.dataframe(
@@ -1099,37 +1540,37 @@ if processing_errors:
 if mape_df.empty:
 
     st.error(
-        "No MAPE results could be calculated."
+        "No MAPE results were generated."
     )
 
     st.stop()
 
 
 # ============================================================
-# METRICS
+# KPI
 # ============================================================
 
 st.divider()
 
-metric1, metric2, metric3, metric4 = (
-    st.columns(4)
-)
+k1, k2, k3, k4 = st.columns(4)
 
-with metric1:
+with k1:
 
     st.metric(
-        "Files Processed",
+        "Files",
         len(uploaded_files),
     )
 
-with metric2:
+with k2:
 
     st.metric(
         "PSS",
-        mape_df["PSS"].nunique(),
+        mape_df[
+            "PSS"
+        ].nunique(),
     )
 
-with metric3:
+with k3:
 
     st.metric(
         "Forecasters",
@@ -1138,10 +1579,10 @@ with metric3:
         ].nunique(),
     )
 
-with metric4:
+with k4:
 
     st.metric(
-        "Comparisons",
+        "MAPE Comparisons",
         len(mape_df),
     )
 
@@ -1154,25 +1595,25 @@ st.subheader(
     "📊 MAPE Detail"
 )
 
-display_mape = (
+mape_display = (
     mape_df.copy()
 )
 
-for column in [
+for col in [
     "MAPE (%)",
     "MAE",
     "RMSE",
     "Bias",
 ]:
 
-    display_mape[column] = (
-        display_mape[column]
+    mape_display[col] = (
+        mape_display[col]
         .round(4)
     )
 
 
 st.dataframe(
-    display_mape,
+    mape_display,
     use_container_width=True,
     hide_index=True,
 )
@@ -1212,17 +1653,16 @@ summary_df = (
             "Bias",
             "mean",
         ),
-        Actual_Comparisons=(
-            "Actual Column",
-            "count",
-        ),
         Valid_Rows=(
             "Valid Rows",
             "sum",
         ),
+        Actual_Comparisons=(
+            "Actual Column",
+            "count",
+        ),
     )
 )
-
 
 summary_df[
     [
@@ -1249,14 +1689,14 @@ st.dataframe(
 
 
 # ============================================================
-# BEST FORECASTER FOR EACH PSS
+# BEST FORECASTER
 # ============================================================
 
 st.subheader(
-    "🏆 Best Forecaster for Each PSS"
+    "🏆 Best Forecaster by PSS"
 )
 
-best_forecaster_df = (
+best_forecaster = (
     summary_df
     .sort_values(
         "MAPE",
@@ -1271,14 +1711,14 @@ best_forecaster_df = (
 
 
 st.dataframe(
-    best_forecaster_df,
+    best_forecaster,
     use_container_width=True,
     hide_index=True,
 )
 
 
 # ============================================================
-# PSS × FORECASTER MAPE MATRIX
+# MAPE MATRIX
 # ============================================================
 
 st.subheader(
@@ -1295,7 +1735,6 @@ mape_matrix = (
     .round(4)
 )
 
-
 st.dataframe(
     mape_matrix,
     use_container_width=True,
@@ -1303,48 +1742,37 @@ st.dataframe(
 
 
 # ============================================================
-# ACTUAL COLUMN DETECTION
+# FILE → PSS DETECTION
 # ============================================================
 
 with st.expander(
-    "🔍 Actual Column Detection"
+    "🔍 File / PSS Detection"
 ):
 
-    if all_actual_detection:
+    file_pss_df = pd.DataFrame(
+        file_pss_results
+    )
 
-        actual_detection_df = (
-            pd.concat(
-                all_actual_detection,
-                ignore_index=True,
-            )
-        )
-
-        st.dataframe(
-            actual_detection_df,
-            use_container_width=True,
-            hide_index=True,
-        )
-
-    else:
-
-        st.info(
-            "No Actual columns detected."
-        )
+    st.dataframe(
+        file_pss_df,
+        use_container_width=True,
+        hide_index=True,
+    )
 
 
 # ============================================================
-# FORECAST COLUMN DETECTION
+# FORECAST DETECTION
 # ============================================================
 
 with st.expander(
-    "🔍 PSS / Forecaster Column Detection"
+    "🔍 Forecast Column Detection"
 ):
 
-    if all_forecast_detection:
+    if forecast_detection_results:
 
         forecast_detection_df = (
             pd.concat(
-                all_forecast_detection,
+                forecast_detection_results,
                 ignore_index=True,
             )
         )
@@ -1355,10 +1783,28 @@ with st.expander(
             hide_index=True,
         )
 
-    else:
 
-        st.info(
-            "No PSS_Forecaster columns detected."
+# ============================================================
+# ACTUAL DETECTION
+# ============================================================
+
+with st.expander(
+    "🔍 Actual Column Detection"
+):
+
+    if actual_detection_results:
+
+        actual_detection_df = (
+            pd.concat(
+                actual_detection_results,
+                ignore_index=True,
+            )
+        )
+
+        st.dataframe(
+            actual_detection_df,
+            use_container_width=True,
+            hide_index=True,
         )
 
 
@@ -1366,16 +1812,23 @@ with st.expander(
 # ROW LEVEL DATA
 # ============================================================
 
-if all_row_results:
+if row_results:
 
     row_level_df = pd.concat(
-        all_row_results,
+        row_results,
         ignore_index=True,
     )
 
-    with st.expander(
-        "📋 Row-Level APE"
-    ):
+else:
+
+    row_level_df = pd.DataFrame()
+
+
+with st.expander(
+    "📋 Row-Level APE"
+):
+
+    if not row_level_df.empty:
 
         st.dataframe(
             row_level_df,
@@ -1383,13 +1836,15 @@ if all_row_results:
             height=500,
         )
 
-else:
+    else:
 
-    row_level_df = pd.DataFrame()
+        st.info(
+            "No row-level data available."
+        )
 
 
 # ============================================================
-# CREATE EXCEL REPORT
+# EXCEL REPORT
 # ============================================================
 
 def create_excel_report(
@@ -1397,8 +1852,9 @@ def create_excel_report(
     summary,
     best_forecaster,
     matrix,
-    actual_detection,
+    file_pss,
     forecast_detection,
+    actual_detection,
     row_level,
 ):
 
@@ -1409,9 +1865,9 @@ def create_excel_report(
         engine="openpyxl",
     ) as writer:
 
-        # ----------------------------------------------------
+        # -----------------------------------------------
         # MAPE DETAIL
-        # ----------------------------------------------------
+        # -----------------------------------------------
 
         mape_detail.to_excel(
             writer,
@@ -1419,9 +1875,9 @@ def create_excel_report(
             index=False,
         )
 
-        # ----------------------------------------------------
+        # -----------------------------------------------
         # SUMMARY
-        # ----------------------------------------------------
+        # -----------------------------------------------
 
         summary.to_excel(
             writer,
@@ -1429,9 +1885,9 @@ def create_excel_report(
             index=False,
         )
 
-        # ----------------------------------------------------
+        # -----------------------------------------------
         # BEST FORECASTER
-        # ----------------------------------------------------
+        # -----------------------------------------------
 
         best_forecaster.to_excel(
             writer,
@@ -1439,30 +1895,28 @@ def create_excel_report(
             index=False,
         )
 
-        # ----------------------------------------------------
+        # -----------------------------------------------
         # MATRIX
-        # ----------------------------------------------------
+        # -----------------------------------------------
 
         matrix.to_excel(
             writer,
             sheet_name="MAPE Matrix",
         )
 
-        # ----------------------------------------------------
-        # ACTUAL DETECTION
-        # ----------------------------------------------------
+        # -----------------------------------------------
+        # FILE PSS
+        # -----------------------------------------------
 
-        if not actual_detection.empty:
+        file_pss.to_excel(
+            writer,
+            sheet_name="File PSS",
+            index=False,
+        )
 
-            actual_detection.to_excel(
-                writer,
-                sheet_name="Actual Detection",
-                index=False,
-            )
-
-        # ----------------------------------------------------
+        # -----------------------------------------------
         # FORECAST DETECTION
-        # ----------------------------------------------------
+        # -----------------------------------------------
 
         if not forecast_detection.empty:
 
@@ -1472,9 +1926,21 @@ def create_excel_report(
                 index=False,
             )
 
-        # ----------------------------------------------------
+        # -----------------------------------------------
+        # ACTUAL DETECTION
+        # -----------------------------------------------
+
+        if not actual_detection.empty:
+
+            actual_detection.to_excel(
+                writer,
+                sheet_name="Actual Detection",
+                index=False,
+            )
+
+        # -----------------------------------------------
         # ROW LEVEL
-        # ----------------------------------------------------
+        # -----------------------------------------------
 
         if not row_level.empty:
 
@@ -1490,30 +1956,14 @@ def create_excel_report(
 
 
 # ============================================================
-# PREPARE DETECTION TABLES
+# PREPARE DETECTION DATA
 # ============================================================
 
-if all_actual_detection:
-
-    actual_detection_export = (
-        pd.concat(
-            all_actual_detection,
-            ignore_index=True,
-        )
-    )
-
-else:
-
-    actual_detection_export = (
-        pd.DataFrame()
-    )
-
-
-if all_forecast_detection:
+if forecast_detection_results:
 
     forecast_detection_export = (
         pd.concat(
-            all_forecast_detection,
+            forecast_detection_results,
             ignore_index=True,
         )
     )
@@ -1525,17 +1975,39 @@ else:
     )
 
 
+if actual_detection_results:
+
+    actual_detection_export = (
+        pd.concat(
+            actual_detection_results,
+            ignore_index=True,
+        )
+    )
+
+else:
+
+    actual_detection_export = (
+        pd.DataFrame()
+    )
+
+
+file_pss_export = pd.DataFrame(
+    file_pss_results
+)
+
+
 # ============================================================
-# CREATE REPORT
+# CREATE EXCEL
 # ============================================================
 
-excel_report = create_excel_report(
+excel_file = create_excel_report(
     mape_detail=mape_df,
     summary=summary_df,
-    best_forecaster=best_forecaster_df,
+    best_forecaster=best_forecaster,
     matrix=mape_matrix,
-    actual_detection=actual_detection_export,
+    file_pss=file_pss_export,
     forecast_detection=forecast_detection_export,
+    actual_detection=actual_detection_export,
     row_level=row_level_df,
 )
 
@@ -1548,7 +2020,7 @@ st.divider()
 
 st.download_button(
     label="📥 Download Complete MAPE Report",
-    data=excel_report,
+    data=excel_file,
     file_name="PSS_Forecaster_MAPE_Report.xlsx",
     mime=(
         "application/vnd.openxmlformats-officedocument."
@@ -1563,8 +2035,8 @@ st.download_button(
 # ============================================================
 
 st.success(
-    f"MAPE calculation completed: "
+    f"Completed MAPE calculation for "
     f"{mape_df['PSS'].nunique()} PSS, "
     f"{mape_df['Forecaster'].nunique()} Forecasters, "
-    f"{len(mape_df)} Actual-vs-Forecaster comparisons."
+    f"and {len(mape_df)} Actual-vs-Forecast comparisons."
 )
